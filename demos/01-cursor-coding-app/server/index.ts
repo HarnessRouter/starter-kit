@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -10,7 +10,10 @@ import type { RunRecord } from './types.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
+dotenv.config({ path: path.resolve(root, '../..', '.env') });
+dotenv.config({ path: path.join(root, '.env'), override: true });
 const agentMap = JSON.parse(fs.readFileSync(path.join(root, 'config/agents.json'), 'utf8')) as Record<string, string>;
+agentMap.coding_assistant = process.env.HR_CURSOR_AGENT_ID || agentMap.coding_assistant;
 const store = new OwnershipStore(path.join(root, 'data/ownership.json'));
 const apiBase = 'https://api.harnessrouter.ai';
 const apiKey = process.env.HR_API_KEY;
@@ -42,7 +45,7 @@ async function upstreamJson(urlPath: string, init: RequestInit = {}) {
 function errorResponse(res: Response, error: unknown) {
   const value = error as { status?: number; message?: string };
   const status = value.status && value.status >= 400 && value.status < 600 ? value.status : 502;
-  res.status(status).json({ error: value.message || 'LumaCare could not be reached.' });
+  res.status(status).json({ error: value.message || 'The coding agent could not be reached.' });
 }
 
 function requireOwnership(req: Request, res: Response): RunRecord | null {
@@ -63,7 +66,7 @@ app.get('/api/config', (req, res) => {
     user: req.productUser,
     users: Object.values(DEMO_USERS),
     features: Object.keys(agentMap),
-    agent: { name: 'LumaCare Pediatric Oncology Companion', model: 'GPT-5.6 Sol' },
+    agent: { name: 'HarnessRouter Coding Agent', model: 'Configured in HarnessRouter' },
   });
 });
 
@@ -78,7 +81,7 @@ app.post('/api/runs', async (req, res) => {
   const sessionId = req.body.sessionId ? String(req.body.sessionId) : null;
   const harnessId = agentMap[featureKey];
 
-  if (!harnessId) return res.status(400).json({ error: 'Unknown feature' });
+  if (!harnessId) return res.status(503).json({ error: 'Set HR_CURSOR_AGENT_ID in the root .env file before running the coding demo.' });
   if (!input || input.length > 20_000) return res.status(400).json({ error: 'Enter a task under 20,000 characters.' });
   if ((previousResponseId || sessionId) && !(previousResponseId && sessionId)) {
     return res.status(400).json({ error: 'A continuation requires both recovery identifiers.' });
@@ -185,7 +188,7 @@ app.post('/api/runs', async (req, res) => {
     if (buffer.trim()) handleFrame(buffer);
   } catch {
     if (!res.closed) {
-      res.write(`data: ${JSON.stringify({ type: 'lumacare.stream.disconnected', response: { id: recoveredResponseId, metadata: { session_id: recoveredSessionId } } })}\n\n`);
+      res.write(`data: ${JSON.stringify({ type: 'coding.stream.disconnected', response: { id: recoveredResponseId, metadata: { session_id: recoveredSessionId } } })}\n\n`);
     }
   } finally {
     if (!res.closed) res.end();
@@ -278,7 +281,7 @@ app.get('/api/sessions/:sessionId/archive', async (req, res) => {
     const upstream = await fetch(`${apiBase}/v1/sessions/${encodeURIComponent(record.sessionId)}/files/archive?changed=true`, { headers: upstreamHeaders() });
     if (!upstream.ok || !upstream.body) return res.status(upstream.status).json({ error: 'Archive unavailable' });
     res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', 'attachment; filename="lumacare-guides.zip"');
+    res.setHeader('Content-Disposition', 'attachment; filename="coding-session-files.zip"');
     res.send(Buffer.from(await upstream.arrayBuffer()));
   } catch (error) {
     errorResponse(res, error);
@@ -296,5 +299,5 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(port, () => console.log(`LumaCare is running at http://localhost:${port}`));
+  app.listen(port, () => console.log(`Cursor-style coding demo is running at http://localhost:${port}`));
 }
