@@ -23,8 +23,10 @@ The checked-in `config/agents.json` maps the `care_companion` feature to its pur
 ## What is included
 
 - Calm, responsive family-facing care guidance
+- A stable guide viewport across waiting, live streaming, and completed states
 - Structured plain-language guides and care-team questions
-- Data-only streaming with immediate recovery-ID persistence
+- Data-only streaming with isolated per-run buffers and immediate recovery-ID persistence
+- Explicit per-run cancellation that remains safe during fast stop/retry and caregiver switching
 - Session recall and continue/revise flows
 - Ownership checks for session details, cancellation, previews, and downloads
 - Sandboxed HTML previews and authenticated artifact/archive proxying
@@ -41,3 +43,5 @@ npm run test --workspace=@harnessrouter/lumacare
 npm run build --workspace=@harnessrouter/lumacare
 npm run preview:lumacare
 ```
+
+The LumaCare tests include stream parsing, cross-user ownership, family-facing guide formatting, checklist-state preservation, and responsive guide-layout contracts.
