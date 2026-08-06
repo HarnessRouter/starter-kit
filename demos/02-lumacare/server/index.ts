@@ -14,6 +14,9 @@ dotenv.config({ path: path.resolve(root, '../..', '.env') });
 dotenv.config({ path: path.join(root, '.env'), override: true });
 const agentMap = JSON.parse(fs.readFileSync(path.join(root, 'config/agents.json'), 'utf8')) as Record<string, string>;
 const store = new OwnershipStore(path.join(root, 'data/ownership.json'));
+type ActiveRun = { userId: string; controller: AbortController; reader: ReadableStreamDefaultReader<Uint8Array> | null; sessionId: string | null };
+const activeRuns = new Map<string, ActiveRun>();
+const cancelledRuns = new Map<string, string>();
 const apiBase = 'https://api.harnessrouter.ai';
 const apiKey = process.env.HR_API_KEY;
 
@@ -78,10 +81,17 @@ app.post('/api/runs', async (req, res) => {
   const input = String(req.body.input || '').trim();
   const previousResponseId = req.body.previousResponseId ? String(req.body.previousResponseId) : null;
   const sessionId = req.body.sessionId ? String(req.body.sessionId) : null;
+  const clientRunId = String(req.body.clientRunId || '');
   const harnessId = agentMap[featureKey];
 
   if (!harnessId) return res.status(400).json({ error: 'Unknown feature' });
   if (!input || input.length > 20_000) return res.status(400).json({ error: 'Enter a task under 20,000 characters.' });
+  if (!/^[0-9a-f-]{36}$/i.test(clientRunId)) return res.status(400).json({ error: 'A valid client run ID is required.' });
+  if (cancelledRuns.get(clientRunId) === req.productUser.id) {
+    cancelledRuns.delete(clientRunId);
+    return res.status(409).json({ error: 'This run was cancelled before it started.' });
+  }
+  if (activeRuns.has(clientRunId)) return res.status(409).json({ error: 'This run is already active.' });
   if ((previousResponseId || sessionId) && !(previousResponseId && sessionId)) {
     return res.status(400).json({ error: 'A continuation requires both recovery identifiers.' });
   }
@@ -90,21 +100,10 @@ app.post('/api/runs', async (req, res) => {
   }
 
   const upstreamController = new AbortController();
-  let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+  const activeRun: ActiveRun = { userId: req.productUser.id, controller: upstreamController, reader: null, sessionId };
+  activeRuns.set(clientRunId, activeRun);
   let recoveredSessionId = sessionId;
   let recoveredResponseId = previousResponseId;
-
-  const handleClientClose = () => {
-    if (res.writableEnded) return;
-    upstreamController.abort();
-    reader?.cancel().catch(() => {});
-    if (recoveredSessionId) {
-      upstreamJson(`/v1/sessions/${encodeURIComponent(recoveredSessionId)}/cancel`, { method: 'POST' })
-        .then(() => store.update(recoveredSessionId!, { status: 'cancelled' }))
-        .catch((error) => console.warn('Could not confirm upstream cancellation after client disconnect.', error));
-    }
-  };
-  res.on('close', handleClientClose);
 
   const requestBody: Record<string, unknown> = { input, stream: true };
   if (previousResponseId && sessionId) {
@@ -124,14 +123,15 @@ app.post('/api/runs', async (req, res) => {
       signal: upstreamController.signal,
     });
   } catch {
-    res.off('close', handleClientClose);
+    activeRuns.delete(clientRunId);
+    if (upstreamController.signal.aborted) return res.end();
     if (res.closed) return;
     return res.status(502).json({ error: 'HarnessRouter could not be reached.' });
   }
 
   if (!upstream.ok || !upstream.body) {
     const detail = await upstream.json().catch(() => ({ detail: 'Agent request failed.' })) as { detail?: string };
-    res.off('close', handleClientClose);
+    activeRuns.delete(clientRunId);
     return res.status(upstream.status || 502).json({ error: detail.detail || 'Agent request failed.' });
   }
 
@@ -142,7 +142,7 @@ app.post('/api/runs', async (req, res) => {
   res.flushHeaders();
 
   const streamReader = upstream.body.getReader();
-  reader = streamReader;
+  activeRun.reader = streamReader;
   const decoder = new TextDecoder();
   let buffer = '';
 
@@ -156,6 +156,7 @@ app.post('/api/runs', async (req, res) => {
       if (event.type === 'response.created') {
         recoveredResponseId = event.response?.id || recoveredResponseId;
         recoveredSessionId = event.response?.metadata?.session_id || recoveredSessionId;
+        activeRun.sessionId = recoveredSessionId;
         if (recoveredResponseId && recoveredSessionId) {
           const now = new Date().toISOString();
           const existing = store.getAuthorized(recoveredSessionId, req.productUser.id);
@@ -211,7 +212,32 @@ app.post('/api/runs', async (req, res) => {
     }
   } finally {
     if (!res.closed) res.end();
-    res.off('close', handleClientClose);
+    if (activeRuns.get(clientRunId) === activeRun) activeRuns.delete(clientRunId);
+  }
+});
+
+app.post('/api/runs/:clientRunId/cancel', async (req, res) => {
+  const clientRunId = String(req.params.clientRunId);
+  const run = activeRuns.get(clientRunId);
+  if (!run) {
+    cancelledRuns.set(clientRunId, req.productUser.id);
+    setTimeout(() => { if (cancelledRuns.get(clientRunId) === req.productUser.id) cancelledRuns.delete(clientRunId); }, 30_000).unref();
+    return res.json({ cancelled: true });
+  }
+  if (run.userId !== req.productUser.id) return res.status(404).json({ error: 'Active run not found' });
+  run.controller.abort();
+  await run.reader?.cancel().catch(() => {});
+  try {
+    if (run.sessionId) {
+      const result = await upstreamJson(`/v1/sessions/${encodeURIComponent(run.sessionId)}/cancel`, { method: 'POST' });
+      store.update(run.sessionId, { status: 'cancelled' });
+      return res.json(result);
+    }
+    return res.json({ cancelled: true });
+  } catch (error) {
+    errorResponse(res, error);
+  } finally {
+    activeRuns.delete(clientRunId);
   }
 });
 

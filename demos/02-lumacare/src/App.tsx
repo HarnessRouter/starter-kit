@@ -9,7 +9,7 @@ import { normalizeGuideText, parseChecklistItem } from './guide';
 import type { AgentFile, SessionRecord } from './types';
 
 type Config = { user: { id: string; name: string; initials: string }; users: { id: string; name: string; initials: string }[]; agent: { name: string; model: string } };
-type ActiveRun = { id: number; userId: string; controller: AbortController; session: SessionRecord | null; buffer: string; frame: number | null };
+type ActiveRun = { id: number; clientRunId: string; userId: string; controller: AbortController; session: SessionRecord | null; buffer: string; frame: number | null };
 const quickPrompts = [
   { icon: MessageCircle, tone: 'lavender', title: 'Prepare for our next visit', text: 'Help me prepare for our next oncology appointment. Give me a short checklist and questions to ask.' },
   { icon: LifeBuoy, tone: 'mint', title: 'Make today a little easier', text: 'My child is having a hard day during treatment. Help me make a gentle plan for comfort, routines, and what to note for the care team.' },
@@ -101,7 +101,7 @@ export default function App() {
       run.controller.abort();
       if (run.frame !== null) cancelAnimationFrame(run.frame);
       run.buffer = '';
-      if (run.session) api(`/api/sessions/${run.session.sessionId}/cancel`, run.userId, { method: 'POST' }).catch(() => {});
+      api(`/api/runs/${run.clientRunId}/cancel`, run.userId, { method: 'POST' }).catch(() => {});
     };
     localStorage.setItem('lumacare-user', userId);
     setActiveSession(null); setAnswer(''); setFiles([]); setStatus('idle');
@@ -147,14 +147,15 @@ export default function App() {
       previousRun.controller.abort();
       if (previousRun.frame !== null) cancelAnimationFrame(previousRun.frame);
       previousRun.buffer = '';
+      api(`/api/runs/${previousRun.clientRunId}/cancel`, previousRun.userId, { method: 'POST' }).catch(() => {});
     }
     setError(''); setAnswer(''); setFiles([]); setIsFollowing(true); setSubmittedPrompt(prompt); setStatus('running'); if (!continuation) setInput('');
     const controller = new AbortController();
-    const run: ActiveRun = { id: ++runSequenceRef.current, userId, controller, session: continuation ? activeSession : null, buffer: '', frame: null };
+    const run: ActiveRun = { id: ++runSequenceRef.current, clientRunId: crypto.randomUUID(), userId, controller, session: continuation ? activeSession : null, buffer: '', frame: null };
     activeRunRef.current = run;
     if (!continuation) setActiveSession(null);
     try {
-      const body: Record<string, string> = { featureKey: 'care_companion', input: prompt };
+      const body: Record<string, string> = { featureKey: 'care_companion', clientRunId: run.clientRunId, input: prompt };
       if (activeSession && continuation) { body.sessionId = activeSession.sessionId; body.previousResponseId = activeSession.responseId; }
       const response = await fetch('/api/runs', { method: 'POST', headers: apiHeaders(userId, true), body: JSON.stringify(body), signal: controller.signal });
       if (!response.ok || !response.body) { const data = await response.json().catch(() => ({})); throw new Error(data.error || 'LumaCare could not start your guide.'); }
@@ -176,7 +177,7 @@ export default function App() {
     if (run.frame !== null) cancelAnimationFrame(run.frame);
     run.buffer = '';
     setInput((value) => value || submittedPrompt); setStatus('cancelled');
-    if (run.session) api(`/api/sessions/${run.session.sessionId}/cancel`, run.userId, { method: 'POST' }).catch(() => setError('The guide stopped here, but server cancellation could not be confirmed.'));
+    api(`/api/runs/${run.clientRunId}/cancel`, run.userId, { method: 'POST' }).catch(() => setError('The guide stopped here, but server cancellation could not be confirmed.'));
   };
   const usePrompt = (text: string) => { setInput(text); requestAnimationFrame(() => composerRef.current?.focus()); };
   const downloadGuide = async () => {
