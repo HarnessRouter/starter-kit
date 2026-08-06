@@ -50,6 +50,7 @@ export default function App() {
   const [activeSession, setActiveSession] = useState<SessionRecord | null>(null);
   const [files, setFiles] = useState<AgentFile[]>([]);
   const [input, setInput] = useState('');
+  const [submittedPrompt, setSubmittedPrompt] = useState('');
   const [answer, setAnswer] = useState('');
   const [status, setStatus] = useState<'idle' | 'running' | 'completed' | 'incomplete' | 'failed' | 'cancelled'>('idle');
   const [error, setError] = useState('');
@@ -129,7 +130,7 @@ export default function App() {
   const runTask = async (continuation?: string) => {
     const prompt = (continuation || input).trim();
     if (!prompt || status === 'running') return;
-    setError(''); setAnswer(''); setFiles([]); setIsFollowing(true); setStatus('running'); if (!continuation) setInput('');
+    setError(''); setAnswer(''); setFiles([]); setIsFollowing(true); setSubmittedPrompt(prompt); setStatus('running'); if (!continuation) setInput('');
     const controller = new AbortController(); abortRef.current = controller;
     try {
       const body: Record<string, string> = { featureKey: 'care_companion', input: prompt };
@@ -146,7 +147,7 @@ export default function App() {
 
   const openSession = async (session: SessionRecord) => { setHistoryOpen(false); setAnswer(''); setLoadingSession(true); try { await refreshSession(session); } catch (e) { setError((e as Error).message); setStatus('failed'); } finally { setLoadingSession(false); } };
   const cancelRun = async () => {
-    abortRef.current?.abort(); setStatus('cancelled');
+    abortRef.current?.abort(); setInput((value) => value || submittedPrompt); setStatus('cancelled');
     const session = activeSessionRef.current;
     if (session) api(`/api/sessions/${session.sessionId}/cancel`, userId, { method: 'POST' }).catch(() => {});
   };
@@ -172,10 +173,10 @@ export default function App() {
       <div className={`content-wrap ${status === 'running' || answer ? 'has-active-guide' : ''}`}>
         <section className="hero"><div><span className="eyebrow"><Sparkles size={13} />HERE WITH YOU</span><h1>One next step<br /><em>at a time.</em></h1><p>Practical, compassionate support for the moments between appointments.</p></div><div className="hero-art" aria-hidden="true"><div className="sun" /><div className="hill one" /><div className="hill two" /><div className="family"><i /><i /><i /></div></div></section>
         <section className="urgent-strip"><Phone size={18} /><div><strong>Think this may be an emergency?</strong><span>Call local emergency services. For fever or infection concerns during treatment, contact your child’s oncology team now and follow their fever plan.</span></div></section>
-        {!answer && status !== 'running' ? <><section className="quick-section"><div className="section-heading"><div><span>START HERE</span><h2>What would help right now?</h2></div><p>You don’t need the perfect words.</p></div><div className="quick-grid">{quickPrompts.map(({ icon: Icon, tone, title, text }) => <button key={title} className={`quick-card ${tone}`} onClick={() => usePrompt(text)}><span><Icon size={20} /></span><div><strong>{title}</strong><small>{text.split('.')[0]}.</small></div><ChevronRight size={18} /></button>)}</div></section><section className="reassurance"><div className="quote-mark">“</div><blockquote>There is no right way to feel today.<br /><em>Small steps still count.</em></blockquote><div className="leaf" /></section></> :
+        {!answer && status !== 'running' && status !== 'cancelled' ? <><section className="quick-section"><div className="section-heading"><div><span>START HERE</span><h2>What would help right now?</h2></div><p>You don’t need the perfect words.</p></div><div className="quick-grid">{quickPrompts.map(({ icon: Icon, tone, title, text }) => <button key={title} className={`quick-card ${tone}`} onClick={() => usePrompt(text)}><span><Icon size={20} /></span><div><strong>{title}</strong><small>{text.split('.')[0]}.</small></div><ChevronRight size={18} /></button>)}</div></section><section className="reassurance"><div className="quote-mark">“</div><blockquote>There is no right way to feel today.<br /><em>Small steps still count.</em></blockquote><div className="leaf" /></section></> :
           <section className="result-card" ref={resultRef} aria-busy={status === 'running'}><div className="result-head"><div><span className="luma-mark"><Heart size={16} fill="currentColor" /></span><div><strong>Your LumaCare guide</strong><small>{loadingSession ? 'Opening your saved guide…' : status === 'running' && answer ? 'Writing your guide live…' : status === 'running' ? 'Preparing a thoughtful response…' : status === 'cancelled' ? 'Guide stopped' : 'Ready to review with your care team'}</small></div></div>{status === 'running' && answer && <span className="live-status"><i />Live</span>}{status === 'completed' && files.length > 0 && <button onClick={downloadGuide}><Download size={16} />Save guide</button>}</div>
             <div className="result-body" ref={resultBodyRef} onScroll={(event) => { const body = event.currentTarget; setIsFollowing(body.scrollHeight - body.scrollTop - body.clientHeight < 48); }}>
-              {status === 'running' && !answer ? <div className="thinking" role="status" aria-live="polite"><div className="thinking-intro"><LoaderCircle className="spin" size={24} /><div><strong>Putting your guide together</strong><span>This usually takes 15–30 seconds. You can safely stop at any time.</span></div></div><ol className="progress-steps"><li className="done"><Check size={14} />Request received</li><li className={elapsedSeconds >= 3 ? 'done' : 'active'}>{elapsedSeconds >= 3 ? <Check size={14} /> : <LoaderCircle className="spin" size={14} />}Organizing the next steps</li><li className={elapsedSeconds >= 10 ? 'active' : ''}>{elapsedSeconds >= 10 ? <LoaderCircle className="spin" size={14} /> : <span>3</span>}Writing your care guide</li></ol><small className="elapsed">Working for {elapsedSeconds}s</small></div> : <div role="status" aria-live="polite"><Guide text={answer} /></div>}
+              {status === 'running' && !answer ? <div className="thinking" role="status" aria-live="polite"><div className="thinking-intro"><LoaderCircle className="spin" size={24} /><div><strong>Putting your guide together</strong><span>This usually takes 15–30 seconds. You can safely stop at any time.</span></div></div><ol className="progress-steps"><li className="done"><Check size={14} />Request received</li><li className={elapsedSeconds >= 3 ? 'done' : 'active'}>{elapsedSeconds >= 3 ? <Check size={14} /> : <LoaderCircle className="spin" size={14} />}Organizing the next steps</li><li className={elapsedSeconds >= 10 ? 'active' : ''}>{elapsedSeconds >= 10 ? <LoaderCircle className="spin" size={14} /> : <span>3</span>}Writing your care guide</li></ol><small className="elapsed">Working for {elapsedSeconds}s</small></div> : status === 'cancelled' && !answer ? <div className="cancelled-state" role="status"><CircleStop size={24} /><div><strong>Guide stopped</strong><span>Your message is back in the composer, ready to edit or try again.</span></div></div> : <div role="status" aria-live="polite"><Guide text={answer} /></div>}
               {status === 'incomplete' && <button className="continue-button" onClick={() => runTask('Continue the current guide, keeping it concise and completing any missing sections.')}><RefreshCw size={15} />Continue this guide</button>}
             </div>
             {status === 'running' && answer && !isFollowing && <button className="jump-latest" onClick={() => { setIsFollowing(true); const body = resultBodyRef.current; if (body) body.scrollTop = body.scrollHeight; }}>Jump to latest <ArrowRight size={14} /></button>}
