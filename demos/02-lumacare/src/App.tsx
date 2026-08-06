@@ -5,10 +5,11 @@ import {
   Phone, RefreshCw, ShieldCheck, Sparkles, X,
 } from 'lucide-react';
 import { api, apiHeaders, SSEParser, type StreamEvent } from './api';
-import { normalizeGuideText } from './guide';
+import { normalizeGuideText, parseChecklistItem } from './guide';
 import type { AgentFile, SessionRecord } from './types';
 
 type Config = { user: { id: string; name: string; initials: string }; users: { id: string; name: string; initials: string }[]; agent: { name: string; model: string } };
+type ActiveRun = { id: number; userId: string; controller: AbortController; session: SessionRecord | null; buffer: string; frame: number | null };
 const quickPrompts = [
   { icon: MessageCircle, tone: 'lavender', title: 'Prepare for our next visit', text: 'Help me prepare for our next oncology appointment. Give me a short checklist and questions to ask.' },
   { icon: LifeBuoy, tone: 'mint', title: 'Make today a little easier', text: 'My child is having a hard day during treatment. Help me make a gentle plan for comfort, routines, and what to note for the care team.' },
@@ -34,10 +35,12 @@ function Guide({ text }: { text: string }) {
   const displayText = normalizeGuideText(text);
   return <div className="guide-copy">{displayText.split('\n').map((line, index) => {
     const clean = line.trim();
+    const task = parseChecklistItem(clean);
     if (!clean) return <div className="guide-space" key={index} />;
     if (clean.startsWith('## ')) return <h3 key={index}>{clean.slice(3)}</h3>;
     if (clean.startsWith('# ')) return <h2 key={index}>{clean.slice(2)}</h2>;
-    if (/^[-*] /.test(clean)) return <div className="guide-bullet" key={index}><i /><span>{clean.slice(2).replace(/^\[[ xX]\]\s*/, '').replace(/\*\*/g, '')}</span></div>;
+    if (task) return <div className={`guide-bullet task ${task.checked ? 'checked' : 'pending'}`} key={index} role="listitem" aria-label={`${task.checked ? 'Completed' : 'Pending'}: ${task.text}`}><i aria-hidden="true">{task.checked && <Check size={12} />}</i><span>{task.text}</span></div>;
+    if (/^[-*] /.test(clean)) return <div className="guide-bullet" key={index}><i /><span>{clean.slice(2).replace(/\*\*/g, '')}</span></div>;
     if (/^\d+\. /.test(clean)) return <div className="guide-bullet numbered" key={index}><i>{clean.match(/^\d+/)?.[0]}</i><span>{clean.replace(/^\d+\. /, '').replace(/\*\*/g, '')}</span></div>;
     return <p key={index}>{clean.replace(/\*\*/g, '')}</p>;
   })}</div>;
@@ -62,12 +65,8 @@ export default function App() {
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const resultRef = useRef<HTMLElement>(null);
   const resultBodyRef = useRef<HTMLDivElement>(null);
-  const activeSessionRef = useRef<SessionRecord | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
-  const streamBufferRef = useRef('');
-  const frameRef = useRef<number | null>(null);
-
-  useEffect(() => { activeSessionRef.current = activeSession; }, [activeSession]);
+  const activeRunRef = useRef<ActiveRun | null>(null);
+  const runSequenceRef = useRef(0);
 
   useEffect(() => {
     if (status !== 'running') { setElapsedSeconds(0); return; }
@@ -94,10 +93,21 @@ export default function App() {
   }, [userId]);
 
   useEffect(() => {
+    const stopRun = () => {
+      const run = activeRunRef.current;
+      if (!run || run.userId !== userId) return;
+      runSequenceRef.current += 1;
+      activeRunRef.current = null;
+      run.controller.abort();
+      if (run.frame !== null) cancelAnimationFrame(run.frame);
+      run.buffer = '';
+      if (run.session) api(`/api/sessions/${run.session.sessionId}/cancel`, run.userId, { method: 'POST' }).catch(() => {});
+    };
     localStorage.setItem('lumacare-user', userId);
     setActiveSession(null); setAnswer(''); setFiles([]); setStatus('idle');
     api<Config>('/api/config', userId).then(setConfig).catch((e) => setError(e.message));
     loadSessions().catch(() => {});
+    return stopRun;
   }, [userId, loadSessions]);
 
   const refreshSession = useCallback(async (session: SessionRecord) => {
@@ -109,19 +119,21 @@ export default function App() {
     loadSessions().catch(() => {}); return record;
   }, [loadSessions, userId]);
 
-  const handleEvent = useCallback((event: StreamEvent, prompt: string) => {
+  const handleEvent = useCallback((event: StreamEvent, prompt: string, run: ActiveRun) => {
+    if (activeRunRef.current !== run) return;
     if (event.type === 'response.created') {
       const session = { sessionId: event.response?.metadata?.session_id, responseId: event.response?.id, userId, title: prompt.length > 64 ? `${prompt.slice(0, 64)}…` : prompt, prompt, status: 'running', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-      activeSessionRef.current = session; setActiveSession(session);
+      run.session = session; setActiveSession(session);
     } else if (event.type === 'response.output_text.delta') {
-      streamBufferRef.current += String(event.delta || '');
-      if (frameRef.current === null) frameRef.current = requestAnimationFrame(() => {
-        const delta = streamBufferRef.current; streamBufferRef.current = ''; frameRef.current = null;
+      run.buffer += String(event.delta || '');
+      if (run.frame === null) run.frame = requestAnimationFrame(() => {
+        if (activeRunRef.current !== run) return;
+        const delta = run.buffer; run.buffer = ''; run.frame = null;
         setAnswer((value) => value + delta);
       });
     } else if (event.type === 'response.completed' || event.type === 'response.incomplete' || event.type === 'response.failed') {
-      if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
-      const delta = streamBufferRef.current; streamBufferRef.current = ''; frameRef.current = null;
+      if (run.frame !== null) cancelAnimationFrame(run.frame);
+      const delta = run.buffer; run.buffer = ''; run.frame = null;
       if (delta) setAnswer((value) => value + delta);
       setStatus(event.type === 'response.completed' ? 'completed' : event.type === 'response.incomplete' ? 'incomplete' : event.response?.status === 'cancelled' ? 'cancelled' : 'failed');
     }
@@ -130,26 +142,41 @@ export default function App() {
   const runTask = async (continuation?: string) => {
     const prompt = (continuation || input).trim();
     if (!prompt || status === 'running') return;
+    const previousRun = activeRunRef.current;
+    if (previousRun) {
+      previousRun.controller.abort();
+      if (previousRun.frame !== null) cancelAnimationFrame(previousRun.frame);
+      previousRun.buffer = '';
+    }
     setError(''); setAnswer(''); setFiles([]); setIsFollowing(true); setSubmittedPrompt(prompt); setStatus('running'); if (!continuation) setInput('');
-    const controller = new AbortController(); abortRef.current = controller;
+    const controller = new AbortController();
+    const run: ActiveRun = { id: ++runSequenceRef.current, userId, controller, session: continuation ? activeSession : null, buffer: '', frame: null };
+    activeRunRef.current = run;
+    if (!continuation) setActiveSession(null);
     try {
       const body: Record<string, string> = { featureKey: 'care_companion', input: prompt };
       if (activeSession && continuation) { body.sessionId = activeSession.sessionId; body.previousResponseId = activeSession.responseId; }
       const response = await fetch('/api/runs', { method: 'POST', headers: apiHeaders(userId, true), body: JSON.stringify(body), signal: controller.signal });
       if (!response.ok || !response.body) { const data = await response.json().catch(() => ({})); throw new Error(data.error || 'LumaCare could not start your guide.'); }
       const parser = new SSEParser(); const reader = response.body.getReader(); const decoder = new TextDecoder();
-      while (true) { const { done, value } = await reader.read(); if (done) break; parser.push(decoder.decode(value, { stream: true })).forEach((event) => handleEvent(event, prompt)); }
-      parser.flush().forEach((event) => handleEvent(event, prompt));
-      setTimeout(() => setActiveSession((current) => { if (current) refreshSession(current).catch(() => {}); return current; }), 700);
-    } catch (e) { if ((e as Error).name !== 'AbortError') { setStatus('failed'); setError((e as Error).message); } }
-    finally { abortRef.current = null; }
+      while (true) { const { done, value } = await reader.read(); if (done) break; parser.push(decoder.decode(value, { stream: true })).forEach((event) => handleEvent(event, prompt, run)); }
+      parser.flush().forEach((event) => handleEvent(event, prompt, run));
+      window.setTimeout(() => { if (runSequenceRef.current === run.id && run.session) refreshSession(run.session).catch(() => {}); }, 700);
+    } catch (e) { if ((e as Error).name !== 'AbortError' && activeRunRef.current === run) { setStatus('failed'); setError((e as Error).message); } }
+    finally { if (activeRunRef.current === run) activeRunRef.current = null; }
   };
 
   const openSession = async (session: SessionRecord) => { setHistoryOpen(false); setAnswer(''); setLoadingSession(true); try { await refreshSession(session); } catch (e) { setError((e as Error).message); setStatus('failed'); } finally { setLoadingSession(false); } };
   const cancelRun = async () => {
-    abortRef.current?.abort(); setInput((value) => value || submittedPrompt); setStatus('cancelled');
-    const session = activeSessionRef.current;
-    if (session) api(`/api/sessions/${session.sessionId}/cancel`, userId, { method: 'POST' }).catch(() => {});
+    const run = activeRunRef.current;
+    if (!run) return;
+    runSequenceRef.current += 1;
+    activeRunRef.current = null;
+    run.controller.abort();
+    if (run.frame !== null) cancelAnimationFrame(run.frame);
+    run.buffer = '';
+    setInput((value) => value || submittedPrompt); setStatus('cancelled');
+    if (run.session) api(`/api/sessions/${run.session.sessionId}/cancel`, run.userId, { method: 'POST' }).catch(() => setError('The guide stopped here, but server cancellation could not be confirmed.'));
   };
   const usePrompt = (text: string) => { setInput(text); requestAnimationFrame(() => composerRef.current?.focus()); };
   const downloadGuide = async () => {

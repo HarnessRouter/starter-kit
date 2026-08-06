@@ -5,3 +5,9 @@ export function normalizeGuideText(text: string) {
     .replace(/Primary artifact:\s*\[[^\]]+\]\([^)]+\)/gi, '')
     .trimStart();
 }
+
+export function parseChecklistItem(line: string) {
+  const match = line.trim().match(/^[-*]\s+\[([ xX])\]\s+(.+)$/);
+  if (!match) return null;
+  return { checked: match[1].toLowerCase() === 'x', text: match[2].replace(/\*\*/g, '') };
+}

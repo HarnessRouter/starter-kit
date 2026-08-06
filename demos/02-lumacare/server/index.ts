@@ -89,6 +89,23 @@ app.post('/api/runs', async (req, res) => {
     return res.status(404).json({ error: 'Session not found' });
   }
 
+  const upstreamController = new AbortController();
+  let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+  let recoveredSessionId = sessionId;
+  let recoveredResponseId = previousResponseId;
+
+  const handleClientClose = () => {
+    if (res.writableEnded) return;
+    upstreamController.abort();
+    reader?.cancel().catch(() => {});
+    if (recoveredSessionId) {
+      upstreamJson(`/v1/sessions/${encodeURIComponent(recoveredSessionId)}/cancel`, { method: 'POST' })
+        .then(() => store.update(recoveredSessionId!, { status: 'cancelled' }))
+        .catch((error) => console.warn('Could not confirm upstream cancellation after client disconnect.', error));
+    }
+  };
+  res.on('close', handleClientClose);
+
   const requestBody: Record<string, unknown> = { input, stream: true };
   if (previousResponseId && sessionId) {
     requestBody.previous_response_id = previousResponseId;
@@ -104,13 +121,17 @@ app.post('/api/runs', async (req, res) => {
         'Idempotency-Key': crypto.randomUUID(),
       }),
       body: JSON.stringify(requestBody),
+      signal: upstreamController.signal,
     });
   } catch {
+    res.off('close', handleClientClose);
+    if (res.closed) return;
     return res.status(502).json({ error: 'HarnessRouter could not be reached.' });
   }
 
   if (!upstream.ok || !upstream.body) {
     const detail = await upstream.json().catch(() => ({ detail: 'Agent request failed.' })) as { detail?: string };
+    res.off('close', handleClientClose);
     return res.status(upstream.status || 502).json({ error: detail.detail || 'Agent request failed.' });
   }
 
@@ -120,11 +141,10 @@ app.post('/api/runs', async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
 
-  const reader = upstream.body.getReader();
+  const streamReader = upstream.body.getReader();
+  reader = streamReader;
   const decoder = new TextDecoder();
   let buffer = '';
-  let recoveredSessionId = sessionId;
-  let recoveredResponseId = previousResponseId;
 
   const handleFrame = (frame: string) => {
     const dataLines = frame.split(/\r?\n/).filter((line) => line.startsWith('data:'));
@@ -170,7 +190,7 @@ app.post('/api/runs', async (req, res) => {
 
   try {
     while (true) {
-      const { done, value } = await reader.read();
+      const { done, value } = await streamReader.read();
       if (done) break;
       const text = decoder.decode(value, { stream: true });
       if (!res.closed) res.write(text);
@@ -191,6 +211,7 @@ app.post('/api/runs', async (req, res) => {
     }
   } finally {
     if (!res.closed) res.end();
+    res.off('close', handleClientClose);
   }
 });
 
