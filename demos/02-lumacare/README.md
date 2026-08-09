@@ -9,7 +9,7 @@ LumaCare is a family-care companion for parents and caregivers of children recei
 From the repository root:
 
 1. Run `npm install` if dependencies are not installed.
-2. Copy `.env.example` to the repository root as `.env` and set `HR_API_KEY`.
+2. Copy `.env.example` to the repository root as `.env` and set `HR_API_KEY` (no key yet? Follow [Get your API key](../../README.md#get-your-api-key) in the repository README).
 3. Start the demo:
 
    ```bash

@@ -22,6 +22,8 @@ From the repository root:
    PORT=3000
    ```
 
+   No key yet? Follow [Get your API key](../../README.md#get-your-api-key) in the repository README. Starting the demo consumes no credits; credits are only used when tasks run.
+
 3. Start the primary demo.
 
    ```bash
@@ -40,7 +42,7 @@ Open [http://localhost:3000](http://localhost:3000).
 | `src/App.tsx` | Provides the Cursor-style coding-agent interface and session history |
 | `tests/` | Covers stream parsing and cross-user session ownership |
 
-The demo intentionally does not include a production repository sandbox. Configure the HarnessRouter coding agent with the tools and repository access appropriate to your workshop environment.
+The demo intentionally does not include a production repository sandbox. Configure the HarnessRouter coding agent with the tools and repository access appropriate to your environment.
 
 ## Direct workspace commands
 
