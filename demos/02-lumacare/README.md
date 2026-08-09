@@ -1,6 +1,6 @@
 # LumaCare
 
-The secondary HarnessRouter reference demo in this repository.
+The secondary HarnessRouter reference demo in this repository, originally built for the HarnessRouter workshop at Harvard.
 
 LumaCare is a family-care companion for parents and caregivers of children receiving cancer care. It demonstrates how the same secure streaming, persistence, ownership, and artifact patterns used by the primary coding demo can support a specialized domain experience.
 
