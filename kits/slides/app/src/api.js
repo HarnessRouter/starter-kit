@@ -26,7 +26,10 @@ export async function slidesHarness() {
 
 /** Every deck: one per session on this Harness, newest first. */
 export async function listDecks(harnessId) {
-  const doc = await req(`/sessions?harness_id=${encodeURIComponent(harnessId)}&limit=100`);
+  // The filter is `harness`, not `harness_id` — with the wrong name the server ignores it and
+  // answers with every session in the org, so the deck list quietly fills with other harnesses'
+  // work. Caught exactly that way.
+  const doc = await req(`/sessions?harness=${encodeURIComponent(harnessId)}&limit=100`);
   const rows = doc.sessions || doc.data || [];
   return rows.map((s) => ({
     id: s.id || s.session_id,
