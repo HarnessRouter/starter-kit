@@ -1,0 +1,83 @@
+/* Slides kit. Deliberately close to the HarnessRouter console's own visual language so moving
+   between them does not feel like changing product. */
+:root {
+  --ink: #16181d; --ink-2: #3b4048; --mute: #6b7280; --line: #e5e7eb;
+  --surface: #fff; --bg: #f7f8fa; --brand: #6E55FF; --sel: #6E55FF; --danger: #c0392b;
+}
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, sans-serif;
+  color: var(--ink); background: var(--bg); }
+
+.sl-page { max-width: 1100px; margin: 0 auto; padding: 28px 24px 48px; }
+.sl-head { display: flex; align-items: center; gap: 16px; padding: 14px 20px;
+  border-bottom: 1px solid var(--line); background: var(--surface); }
+.sl-head h1 { flex: 1; font-size: 17px; font-weight: 700; margin: 0; }
+.sl-page .sl-head { background: none; border: 0; padding: 0 0 20px; }
+.sl-page .sl-head h1 { font-size: 26px; }
+
+.sl-btn { font: inherit; font-size: 13px; font-weight: 600; color: var(--ink-2);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 9px;
+  padding: 8px 14px; cursor: pointer; }
+.sl-btn:hover:not(:disabled) { border-color: #cfd4dc; }
+.sl-btn:disabled { opacity: .5; cursor: default; }
+.sl-primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+
+.sl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; }
+.sl-card { display: flex; flex-direction: column; gap: 8px; padding: 0 0 12px; text-align: left;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  cursor: pointer; overflow: hidden; font: inherit; }
+.sl-card:hover { border-color: #cfd4dc; }
+.sl-card-thumb { display: flex; align-items: center; justify-content: center; aspect-ratio: 16/9;
+  background: linear-gradient(135deg, #eef0ff, #f7f8fa); border-bottom: 1px solid var(--line); }
+.sl-card-icon { font-size: 26px; color: #b9bfd6; }
+.sl-card-title { font-size: 13.5px; font-weight: 600; padding: 0 12px; }
+.sl-card-meta { font-size: 11.5px; color: var(--mute); padding: 0 12px; }
+.sl-skel { height: 168px; background: linear-gradient(90deg,#eee,#f6f6f6,#eee);
+  background-size: 200% 100%; animation: sl-sh 1.2s linear infinite; }
+@keyframes sl-sh { to { background-position: -200% 0; } }
+.sl-empty { color: var(--mute); font-size: 14px; max-width: 52ch; line-height: 1.6; }
+.sl-error { color: var(--danger); font-size: 13px; }
+
+.sl-deck { display: flex; flex-direction: column; height: 100%; }
+.sl-body { flex: 1; display: grid; grid-template-columns: 168px 1fr 320px; min-height: 0; }
+.sl-filmstrip { overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px;
+  border-right: 1px solid var(--line); background: var(--surface); }
+.sl-thumb { position: relative; display: block; width: 100%; aspect-ratio: 16/9; padding: 0;
+  border: 1px solid var(--line); border-radius: 8px; overflow: hidden; cursor: pointer;
+  background: #fff; }
+.sl-thumb.on { border-color: var(--brand); box-shadow: 0 0 0 2px rgba(110,85,255,.18); }
+.sl-thumb-n { position: absolute; left: 4px; top: 4px; z-index: 2; font-size: 10px; color: var(--mute);
+  background: rgba(255,255,255,.85); border-radius: 4px; padding: 1px 4px; }
+.sl-thumb-stage { display: block; width: 1920px; height: 1080px; transform: scale(.0729);
+  transform-origin: top left; }
+.sl-canvas { position: relative; padding: 20px; min-width: 0; }
+.sl-stage { position: relative; width: 100%; height: 100%; }
+.sl-slide { position: relative; overflow: hidden; }
+.sl-bullets { margin: 0; padding-left: 1.2em; }
+.sl-img-empty { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%;
+  background: #eceef3; color: #9aa1ad; font-size: 24px; }
+.sl-blank { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--mute); }
+
+.sl-chat { border-left: 1px solid var(--line); background: var(--surface); padding: 16px;
+  display: flex; flex-direction: column; gap: 10px; }
+.sl-hint { font-size: 12.5px; color: var(--mute); line-height: 1.55; margin: 0; }
+.sl-chat textarea { flex: 1; min-height: 110px; resize: none; font: inherit; font-size: 13.5px;
+  padding: 10px; border: 1px solid var(--line); border-radius: 9px; }
+
+/* Print: slides only, one per page, at real aspect. */
+.sl-print { display: none; }
+@media print {
+  .sl-head, .sl-filmstrip, .sl-chat, .sl-canvas { display: none !important; }
+  .sl-print { display: block; }
+  .sl-print-page { page-break-after: always; width: 1920px; height: 1080px;
+    transform-origin: top left; }
+  @page { size: 1920px 1080px; margin: 0; }
+}
+@media (max-width: 1080px) { .sl-body { grid-template-columns: 120px 1fr 280px; } }
+@media (max-width: 820px) {
+  .sl-body { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; }
+  .sl-filmstrip { flex-direction: row; border-right: 0; border-bottom: 1px solid var(--line); }
+  .sl-thumb { width: 130px; flex: 0 0 auto; }
+  .sl-chat { border-left: 0; border-top: 1px solid var(--line); }
+}
