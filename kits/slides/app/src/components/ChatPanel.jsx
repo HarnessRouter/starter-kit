@@ -52,8 +52,8 @@ function turnsToMessages(turns) {
   return m;
 }
 
-export function ChatColumn({ deckId, seed, title, copilotBuilding, collapsed, onToggle, onDeckMaybeChanged,
-                             onSessionStarted, width }) {
+export function ChatColumn({ deckId, seed, template, title, copilotBuilding, collapsed, onToggle,
+                             onDeckMaybeChanged, onSessionStarted, width }) {
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const [attaching, setAttaching] = useState(false);

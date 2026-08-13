@@ -274,6 +274,13 @@ export function DeckPage({ id: routeId, seed, template }) {
                     exporting={exporting} peers={collab.peers} live={collab.live}
                     saveState={saveState} copilotBusy={copilotBusy} />
         <div className="sl-body">
+          {/* No deck yet: the skeleton IS the body. Rendering it inside the canvas left
+              the real rail sitting empty beside it — two rails and a white gutter. */}
+          {!deck && (!noDeck || noDeck.working) ? (
+            <SkeletonDeck note={noDeck?.working
+              ? (tplName ? `Designing your deck in ${tplName}…` : 'Designing your deck…')
+              : 'Loading deck…'} />
+          ) : (<>
           <aside className="sl-rail scroll" ref={railRef}>
             {slides.map((s, i) => (
               <button key={s.id} className={'sl-rail-item' + (i === sel ? ' active' : '')}
@@ -296,25 +303,21 @@ export function DeckPage({ id: routeId, seed, template }) {
                 onDragState={(elId, frame) => collab.setDrag(elId, frame, slide.id)}
                 peers={collab.peers}
               />
+            ) : deck ? (
+              <div className="empty-note" style={{ paddingTop: 80 }}>This deck has no slides.</div>
             ) : (
-              deck ? (
-                <div className="empty-note" style={{ paddingTop: 80 }}>This deck has no slides.</div>
-              ) : noDeck && !noDeck.working ? (
-                <div className="empty-note" style={{ paddingTop: 80 }}>
-                  <div>{noDeck.text}</div>
-                  {noDeck.detail && <pre className="deck-empty-detail">{noDeck.detail}</pre>}
-                  <div style={{ marginTop: 14 }}>
-                    Ask the copilot again on the right — the conversation is still here.
-                  </div>
+              // The only case left here: a turn finished without writing a deck. Its own last
+              // words are the only honest explanation we have.
+              <div className="empty-note" style={{ paddingTop: 80 }}>
+                <div>{noDeck?.text}</div>
+                {noDeck?.detail && <pre className="deck-empty-detail">{noDeck.detail}</pre>}
+                <div style={{ marginTop: 14 }}>
+                  Ask the copilot again on the right — the conversation is still here.
                 </div>
-              ) : (
-                // Still coming: show the shape of a deck rather than a sentence in an empty pane.
-                <SkeletonDeck note={noDeck?.working
-                  ? (tplName ? `Designing your deck in ${tplName}…` : 'Designing your deck…')
-                  : 'Loading deck…'} />
-              )
+              </div>
             )}
           </div>
+          </>)}
         </div>
       </div>
 
@@ -322,6 +325,7 @@ export function DeckPage({ id: routeId, seed, template }) {
       <ChatColumn
         deckId={id}
         seed={seed}
+        template={template}
         title={deck?.meta?.title || 'Copilot'}
         copilotBuilding={copilotBusy}
         collapsed={false}

@@ -120,12 +120,6 @@ function ViewToggle({ value, onChange }) {
 const AV_COLORS = ['#4F46E5', '#7C3AED', '#DB2777', '#D97706', '#059669', '#2563EB'];
 function colorFor(id) { let h = 0; for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) >>> 0; return AV_COLORS[h % AV_COLORS.length]; }
 function initialOf(n) { return String(n || '?').trim().charAt(0).toUpperCase() || '?'; }
-function AccessStack({ me }) {
-  if (!me?.id) return <span className="gt-last">—</span>;
-  const name = me.display_name || me.name || me.email || 'You';
-  return <span className="acc-stack"><span className="acc-av" style={{ background: colorFor(me.id) }} title={`${name} (you)`}>{initialOf(name)}</span></span>;
-}
-
 const VIEW_KEY = 'slides.decks.view';
 
 export function LandingPage() {
@@ -298,7 +292,7 @@ export function LandingPage() {
               )}
             </div>
             {decks === null ? (
-              <div className="gtable-wrap"><table className="gtable"><thead><tr><th>Name</th><th className="col-last">Last viewed</th><th className="col-access">Access</th><th className="gt-actions" /></tr></thead><tbody><SkeletonTableRows count={4} /></tbody></table></div>
+              <div className="gtable-wrap"><table className="gtable"><thead><tr><th>Name</th><th className="col-last">Last viewed</th><th className="gt-actions" /></tr></thead><tbody><SkeletonTableRows count={4} /></tbody></table></div>
             ) : decks.length === 0 ? (
               <div className="card empty-note">No slides yet. Create a deck from the prompt above or pick a template.</div>
             ) : deckMatches.length === 0 ? (
@@ -318,13 +312,12 @@ export function LandingPage() {
               </div>
             ) : (
               <div className="gtable-wrap"><table className="gtable">
-                <thead><tr><th>Name</th><th className="col-last">Last viewed</th><th className="col-access">Access</th><th className="gt-actions" /></tr></thead>
+                <thead><tr><th>Name</th><th className="col-last">Last viewed</th><th className="gt-actions" /></tr></thead>
                 <tbody>
                   {deckMatches.map((d) => (
                     <tr key={d.id} tabIndex={0} onClick={() => { if (editingId !== d.id) openDeck(d.id); }} onKeyDown={(e) => { if (e.key === 'Enter' && editingId !== d.id) openDeck(d.id); }}>
                       <td><span className="gt-name"><span className="gt-thumb"><DeckThumb id={d.id} /></span>{editingId === d.id ? renameField(d) : <span className="gcard-name" title={d.name}>{d.name}</span>}</span></td>
                       <td className="gt-last col-last">{relativeTime(viewed[d.id]) || '—'}</td>
-                      <td className="col-access"><AccessStack me={me} /></td>
                       <td className="gt-actions">{rowActions(d)}</td>
                     </tr>
                   ))}
