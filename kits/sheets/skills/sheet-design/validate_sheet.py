@@ -175,8 +175,11 @@ def check_cells(sheet: dict, columns: list, row_ids: set) -> None:
             st = cell.get("status")
             if st is not None and st not in STATUSES:
                 err(f"{at}.status", f"is {json.dumps(st)}", f"use one of: {' '.join(sorted(STATUSES))}")
-            if bool(cell.get("run_id")) != bool(cell.get("session_id")) and (cell.get("run_id") or cell.get("session_id")):
-                err(at, "has one of run_id / session_id but not the other",
+            # A `skipped` cell belongs to a run without ever having had a session; that is what
+            # skipped means, and the app writes it. Only a cell claiming to have RUN needs both.
+            if st in ("running", "done", "failed") \
+                    and bool(cell.get("run_id")) != bool(cell.get("session_id")):
+                err(at, "claims to have run but has only one of run_id / session_id",
                     "both come from a real run — delete them, or leave the cell out entirely")
 
         if col.get("type") == "checkbox" and "value" in cell and not isinstance(cell["value"], bool):

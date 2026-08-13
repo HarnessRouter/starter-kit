@@ -102,7 +102,10 @@ export function interpolate(prompt, columns, values) {
     const col = columnByName(columns, name);
     if (!col) return whole;                       // a config error; the planner refuses first
     const v = values[col.id];
-    if (v === undefined || v === null || v === '') { missing.push(col.name); return ''; }
+    if (v === undefined || v === null || v === '') {
+      if (!missing.includes(col.name)) missing.push(col.name);   // named once, however often used
+      return '';
+    }
     return v;
   });
   return { text, missing };
@@ -284,8 +287,12 @@ export function validate(sheet) {
       if (cell.status !== undefined && !CELL_STATUS.includes(cell.status)) {
         err(`cells["${k}"].status`, `is ${JSON.stringify(cell.status)}`, `Use one of: ${CELL_STATUS.join(' ')}.`);
       }
-      if (Boolean(cell.run_id) !== Boolean(cell.session_id) && (cell.run_id || cell.session_id)) {
-        err(`cells["${k}"]`, 'has one of run_id / session_id but not the other',
+      // A cell that was never dispatched belongs to a run without having a session — that is
+      // what `skipped` means, and it is written by the app itself. Only a cell that claims to
+      // have RUN needs both halves of the reference.
+      const ran = ['running', 'done', 'failed'].includes(cell.status);
+      if (ran && Boolean(cell.run_id) !== Boolean(cell.session_id)) {
+        err(`cells["${k}"]`, 'claims to have run but has only one of run_id / session_id',
             'Both come from a real run. Delete them, or leave the cell out entirely.');
       }
     }

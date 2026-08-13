@@ -286,3 +286,24 @@ test('a dispatcher that throws fails that cell and nothing else', async () => {
   assert.equal(states.get('row_2:c2').error, 'network died');
   assert.deepEqual({ done: prog.done, failed: prog.failed }, { done: 2, failed: 1 });
 });
+
+test('a skipped upstream cascades too, and every planned cell ends with a state', async () => {
+  // The empty-input case: the dispatcher itself returns 'skipped' rather than failing. Its
+  // downstream cell has nothing to read either, and must not be left blank in a run that claims
+  // to have planned it.
+  const s = sheetOf([col('c1', 'A'), agent('c2', 'Brief', 'x {{A}}'), agent('c3', 'Fit', 'y {{Brief}}')], 2);
+  const f = fakeDispatcher({
+    answer: (t) => (t.column.name === 'Brief' && t.rowId === 'row_1'
+      ? { status: 'skipped', error: 'A is empty in this row.' }
+      : { status: 'done', value: 'ok' }),
+  });
+  const states = new Map();
+  const r = new Runner({ sheet: s, plan: plan(s, { kind: 'sheet' }, 'all', ENV), dispatch: f.dispatch,
+                         onCell: (k, rec) => states.set(k, rec) });
+  const prog = await r.run();
+
+  assert.equal(states.get('row_1:c3').status, 'skipped');
+  assert.equal(states.get('row_1:c3').error, 'Brief was skipped in this row.');
+  assert.equal(states.get('row_2:c3').status, 'done', 'the other row is untouched');
+  assert.equal(prog.settled, prog.planned, 'planned and settled must agree when the run ends');
+});

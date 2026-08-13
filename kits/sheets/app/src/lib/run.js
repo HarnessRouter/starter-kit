@@ -171,7 +171,11 @@ export class Runner {
   }
 
   /** Everything downstream of `key` in ITS OWN ROW. A sheet run is N independent row-pipelines;
-   *  one bad row must not cost the other ninety-nine. */
+   *  one bad row must not cost the other ninety-nine.
+   *
+   *  Skipped upstreams cascade exactly like failed ones. They did not run, so a cell that reads
+   *  them has nothing to read — and leaving it with no record at all is worse than saying so: the
+   *  run would report six planned and five settled, with the sixth cell simply blank. */
   _skipDownstream(key, reason) {
     const start = this.byKey.get(key);
     if (!start) return;
@@ -232,6 +236,15 @@ export class Runner {
       await Promise.race([...this.inflight.values()].map((c) => c.settled));
     }
     await Promise.allSettled(pending);
+    // Every planned cell ends with a state. A cell can be left without one when its dependency
+    // never resolved for a reason the cascade did not cover; a run that reports six planned and
+    // five settled, with the sixth silently blank, is a run whose own counts do not add up.
+    if (!this.stopped) {
+      for (const c of this.plan.cells) {
+        if (this.results.get(c.key)) continue;
+        this._set(c.key, { status: 'skipped', error: 'An earlier column in this row did not run.' });
+      }
+    }
     return this.progress();
   }
 
@@ -256,9 +269,9 @@ export class Runner {
       .then(() => this.dispatch(task, { signal: ctrl.signal }))
       .then((record) => {
         this._set(c.key, record);
-        if (record.status === 'failed') {
-          this._skipDownstream(c.key, `${task.column?.name || 'An earlier column'} failed in this row.`);
-        }
+        const name = task.column?.name || 'An earlier column';
+        if (record.status === 'failed') this._skipDownstream(c.key, `${name} failed in this row.`);
+        else if (record.status === 'skipped') this._skipDownstream(c.key, `${name} was skipped in this row.`);
       })
       .catch((e) => {
         this._set(c.key, { status: 'failed', error: e?.message || 'This cell could not run.' });

@@ -4,7 +4,7 @@
 // there is nothing else to store. Creating one costs no network call here: the choice becomes
 // real on the first turn, which is the only thing that opens a session.
 import { useEffect, useRef, useState } from 'react';
-import { ArrowUp, MoreHorizontal, Sparkles, Table2 } from 'lucide-react';
+import { ArrowUp, MoreHorizontal, Table2 } from 'lucide-react';
 import { useDialog } from 'reifyui';
 import {
   deleteSheet, lastViewedMap, listSheets, newSheetId, relativeTime, renameSheet, sheetsHarness,
@@ -23,7 +23,7 @@ function openNew(template, seed) {
 function TemplateCard({ template, onPick }) {
   const agentCols = (template.sheet?.columns || []).filter((c) => c.type === 'harness').length;
   return (
-    <button className="tpl-card" onClick={() => onPick(template.id)}>
+    <button className="tpl-card" onClick={() => onPick(template)}>
       <div className="tpl-grid" aria-hidden="true">
         {(template.sheet?.columns || []).slice(0, 4).map((c) => (
           <span key={c.id} className={'tpl-col' + (c.type === 'harness' ? ' agent' : '')}>{c.name}</span>
@@ -105,36 +105,40 @@ export function LandingPage() {
   const remove = async (sheet) => {
     const ok = await dialog.confirm({
       title: `Delete “${sheet.name}”?`,
-      body: 'The sheet and its conversation go with it. This cannot be undone.',
+      message: 'The sheet and its conversation go with it. This cannot be undone.',
       destructive: true,
       confirmLabel: 'Delete',
     });
     if (!ok) return;
-    await deleteSheet(sheet.id).catch((e) => dialog.alert({ variant: 'error', title: 'Could not delete', body: e.message }));
+    await deleteSheet(sheet.id).catch((e) => dialog.alert({ variant: 'error', title: 'Could not delete', message: e.message }));
     reload();
   };
 
   return (
-    <div className="land">
+    <div className="landing">
       <Topbar />
 
       <section className="hero">
         <h1>What do you want to work through?</h1>
-        <p className="hero-sub">
+        <p className="sub">
           Describe the sheet. Columns that run one of your agents on every row are set up here too.
         </p>
-        <div className="hero-box">
+        <div className="promptbox">
           <textarea
-            className="hero-input" rows={3} value={prompt} autoFocus
+            rows={3} value={prompt} autoFocus
             placeholder="Track 20 competitors: name, site, a short brief on each, and how directly they compete."
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && prompt.trim()) openNew('blank', prompt.trim());
             }} />
-          <button className="btn primary hero-go" disabled={!prompt.trim() || launched === false}
-                  onClick={() => openNew('blank', prompt.trim())}>
-            <ArrowUp size={16} /> Start
-          </button>
+          <div className="pb-row">
+            <span className="hint">Agent columns are set up in the sheet, once it exists.</span>
+            <div className="topbar-spacer" />
+            <button className="btn primary" disabled={!prompt.trim() || launched === false}
+                    onClick={() => openNew('blank', prompt.trim())}>
+              <ArrowUp size={16} /> Start
+            </button>
+          </div>
         </div>
       </section>
 
@@ -145,16 +149,22 @@ export function LandingPage() {
       )}
 
       {templates.length > 0 && (
-        <section className="sec">
-          <h2><Sparkles size={16} /> Start from a template</h2>
+        <section className="section">
+          <div className="section-h"><h2>Start from a template</h2></div>
           <div className="tpl-row scroll">
-            {templates.map((t) => <TemplateCard key={t.id} template={t} onPick={(id) => openNew(id, '')} />)}
+            {/* A template start is still a first turn — nothing but a turn creates a session, and
+                the starting sheet only becomes real when one runs. The sentence is the person's
+                side of it; the sheet itself rides in `instructions`, out of the transcript. */}
+            {templates.map((t) => (
+              <TemplateCard key={t.id} template={t}
+                            onPick={(tpl) => openNew(tpl.id, `Start a sheet from the ${tpl.name} template.`)} />
+            ))}
           </div>
         </section>
       )}
 
-      <section className="sec">
-        <h2>My sheets</h2>
+      <section className="section">
+        <div className="section-h"><h2>My sheets</h2></div>
         {sheets === null ? (
           <div className="empty-note">Loading…</div>
         ) : sheets.length === 0 ? (

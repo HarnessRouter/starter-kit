@@ -33,7 +33,8 @@ function stripSeedFromHash() {
 
 const history = (id) => (isPending(id) ? Promise.resolve([]) : sessionTurns(id));
 
-export function ChatColumn({ sheetId, seed, title, agentBusy, onSheetMaybeChanged, onSessionStarted, width }) {
+export function ChatColumn({ sheetId, seed, title, agentBusy, onSheetMaybeChanged, onSessionStarted,
+                             width, collapsed, onToggle }) {
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -168,12 +169,28 @@ export function ChatColumn({ sheetId, seed, title, agentBusy, onSheetMaybeChange
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agentBusy, messages.length, busy]);
 
+  if (collapsed) {
+    return (
+      <aside className="gp-chat collapsed">
+        <div className="gp-chat-h">
+          <button className="top-side-toggle" type="button" onClick={onToggle}
+                  title="Show the copilot" aria-label="Show the copilot">
+            <PanelRight size={17} />
+          </button>
+        </div>
+      </aside>
+    );
+  }
+
   const empty = messages.length === 0;
 
   return (
     <aside className="gp-chat" style={width ? { flex: `0 0 ${width}px` } : undefined}>
       <div className="gp-chat-h">
-        <PanelRight size={16} className="gp-chat-ic" aria-hidden="true" />
+        <button className="top-side-toggle" type="button" onClick={onToggle}
+                title="Hide the copilot" aria-label="Hide the copilot">
+          <PanelRight size={17} />
+        </button>
         <span className="gp-chat-title" title={title || undefined}>{title || 'Copilot'}</span>
         {agentBusy && <span className="gp-chat-cop" title="The agent is working"><Sparkles size={12} /></span>}
         {connecting && <span className="stat-lbl">connecting</span>}

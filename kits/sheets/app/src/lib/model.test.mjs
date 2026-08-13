@@ -111,10 +111,16 @@ test('run state in a plain cell is refused — it claims a run that never happen
   assert.match(e.what, /session_id/);
 });
 
-test('an agent cell needs both run_id and session_id or neither', () => {
+test('an agent cell that RAN needs both run_id and session_id; a skipped one does not', () => {
   const cols = [col('c1', 'A'), agent('c2', 'B', 'do {{A}}')];
   const half = sheet(cols, [{ id: 'row_1' }], { 'row_1:c2': { run_id: 'run_1', status: 'done' } });
-  assert.ok(validate(half).errors.some((e) => e.what.includes('not the other')));
+  assert.ok(validate(half).errors.some((e) => e.what.includes('only one of run_id')));
+
+  // The app writes exactly this for a cell it never dispatched. Flagging it made the sheet page
+  // show the person an error about its own correct output.
+  const skipped = sheet(cols, [{ id: 'row_1' }],
+                        { 'row_1:c2': { run_id: 'run_1', status: 'skipped', error: 'A is empty in this row.' } });
+  assert.deepEqual(validate(skipped).errors, []);
 
   const both = sheet(cols, [{ id: 'row_1' }],
                      { 'row_1:c2': { run_id: 'run_1', session_id: 'hsess1', status: 'done', value: 'v' } });
@@ -200,4 +206,10 @@ test('materialize gives a template fresh ids and remaps attach and cells with th
   assert.deepEqual(Object.keys(s.cells), [cellKey(s.rows[0].id, s.columns[0].id)],
                    'a cell naming a row the template does not have is dropped, not carried');
   assert.deepEqual(validate(s).errors, []);
+});
+
+test('a column referenced twice is named once when it is empty', () => {
+  const cols = [col('c1', 'Company')];
+  const out = interpolate('About {{Company}}. Save notes for {{Company}}.', cols, { c1: '' });
+  assert.deepEqual(out.missing, ['Company'], '"Company and Company are empty" is not a sentence');
 });

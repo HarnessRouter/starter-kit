@@ -12,6 +12,16 @@ import { cancelResponse, containerFileUrl, createResponse, getResponse, patchSes
 import { VALUE_MAX, interpolate } from './model.js';
 
 const POLL_MS = 2000;
+/** How long a terminal-but-empty response is given to produce its own content.
+ *
+ *  Measured on a live instance: a turn reports status "completed" — and the session reports
+ *  turn_status "done" — about two seconds BEFORE its output items are written. Believing either
+ *  signal on its own records "the agent finished without answering" over a turn that answered
+ *  perfectly well, which is the worst kind of wrong: it looks like a model failure and it costs a
+ *  re-run to disprove. There is no third signal to consult; the record IS the answer, so the only
+ *  honest rule is to wait for it, bounded. Costs nothing on the normal path — the loop exits the
+ *  instant content appears. */
+const SETTLE_MS = 15000;
 /** Refuse an attachment larger than the API accepts rather than truncating a file silently. */
 const FILE_MAX = 25 * 1024 * 1024;
 
@@ -167,14 +177,31 @@ export function makeCellDispatcher({ sheetId, runId, sheetTitle, columns, onCell
         const st = res?.status;
         if (st === 'queued' || st === 'in_progress' || st === 'running' || !st) continue;
 
-        const value = textOf(res);
-        const artifacts = artifactsOf(res);
+        let value = textOf(res);
+        let artifacts = artifactsOf(res);
+
+        // Terminal, but empty: the record may simply not be written yet (see SETTLE_MS). Give it
+        // the grace window before concluding anything, and take whatever turns up.
+        if (!value && !artifacts.length) {
+          const deadline = Date.now() + SETTLE_MS;
+          while (Date.now() < deadline && !signal.aborted) {
+            // eslint-disable-next-line no-await-in-loop
+            await new Promise((r) => setTimeout(r, 1000));
+            // eslint-disable-next-line no-await-in-loop
+            const again = await getResponse(responseId).catch(() => null);
+            if (!again) continue;
+            value = textOf(again);
+            artifacts = artifactsOf(again);
+            if (value || artifacts.length) { res = again; break; }
+          }
+        }
+
         const base = { ...partial, ended_at: now(), session_id: res?.metadata?.session_id || sessionId };
 
         if (st === 'completed') {
-          // "completed" means the agent exited cleanly, which is not the same as answering. A
-          // turn that produced neither text nor a file did not fill this cell, and saying it did
-          // would be the worst kind of wrong.
+          // "completed" means the agent exited cleanly, which is not the same as answering. A turn
+          // that produced neither text nor a file did not fill this cell, and saying it did would
+          // be a green tick over nothing.
           if (!value && !artifacts.length) {
             return { ...base, status: 'failed', error: 'The agent finished without answering.' };
           }

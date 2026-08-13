@@ -95,6 +95,7 @@ export function SheetPage({ id: routeId, seed, template }) {
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(null);
   const [notice, setNotice] = useState('');
+  const [chatOpen, setChatOpen] = useState(() => window.innerWidth > 900);
 
   const dialog = useDialog();
   const chatPane = useResizablePane({ initial: 380, min: 300, maxFraction: 0.6, fromRight: true, storageKey: 'sheets.chat.w' });
@@ -284,12 +285,12 @@ export function SheetPage({ id: routeId, seed, template }) {
       await dialog.alert({
         variant: 'warning',
         title: 'This sheet can’t run yet',
-        body: p.refusals.map((r) => `${r.column} ${r.reason}`).join('\n'),
+        message: p.refusals.map((r) => `${r.column} ${r.reason}`).join('\n'),
       });
       return;
     }
     if (!p.cells.length) {
-      await dialog.alert({ title: 'Nothing to run', body: filter === 'failed'
+      await dialog.alert({ title: 'Nothing to run', message: filter === 'failed'
         ? 'No cells failed in the last run.'
         : 'Every cell in this scope already has a result.' });
       return;
@@ -297,7 +298,7 @@ export function SheetPage({ id: routeId, seed, template }) {
     if (scope.kind === 'sheet') {
       const ok = await dialog.confirm({
         title: `Run ${p.cells.length} cell${p.cells.length === 1 ? '' : 's'}?`,
-        body: 'Running replaces the results in these columns. The conversations stay in your history.\n\n'
+        message: 'Running replaces the results in these columns. The conversations stay in your history.\n\n'
             + 'The run happens in this tab. If you close it, cells already started will finish; nothing new starts.',
         confirmLabel: 'Run',
       });
@@ -323,6 +324,18 @@ export function SheetPage({ id: routeId, seed, template }) {
       cur.cells = cur.cells || {};
       if (record.status === null) delete cur.cells[key];
       else cur.cells[key] = { ...(cur.cells[key] || {}), ...record, run_id: rid };
+      // Counters are recomputed from the cells rather than incremented, and written on every
+      // change rather than only at the end: a tab reopened mid-run reads this file, and a run
+      // header that says 0 done over four finished cells is a lie the file told.
+      if (cur.run?.id === rid) {
+        const mine = Object.values(cur.cells).filter((c) => c.run_id === rid);
+        cur.run = {
+          ...cur.run,
+          done: mine.filter((c) => c.status === 'done').length,
+          failed: mine.filter((c) => c.status === 'failed').length,
+          skipped: mine.filter((c) => c.status === 'skipped').length,
+        };
+      }
       commit(cur);
     };
 
@@ -444,7 +457,7 @@ export function SheetPage({ id: routeId, seed, template }) {
     try {
       await exportSheet(kind, sheetRef.current);
     } catch (e) {
-      dialog.alert({ variant: 'error', title: 'Export didn’t finish', body: e?.message || 'Please try again.' });
+      dialog.alert({ variant: 'error', title: 'Export didn’t finish', message: e?.message || 'Please try again.' });
     }
   };
 
@@ -510,11 +523,11 @@ export function SheetPage({ id: routeId, seed, template }) {
                 lastRun={!running ? lastRunSummary(sheet.run) : ''}
               />
               <button className="btn" onClick={() => setPasting(true)} disabled={readOnly}>
-                <ClipboardPaste size={14} /> Paste rows
+                <ClipboardPaste size={14} /> <span className="lbl">Paste rows</span>
               </button>
               <div className="sl-export-wrap" ref={exportRef}>
                 <button className="btn" onClick={(e) => { e.stopPropagation(); setExportOpen((v) => !v); }}>
-                  <Download size={14} /> Export
+                  <Download size={14} /> <span className="lbl">Export</span>
                 </button>
                 {exportOpen && (
                   <div className="sl-export-menu" onClick={(e) => e.stopPropagation()}>
@@ -585,6 +598,8 @@ export function SheetPage({ id: routeId, seed, template }) {
         onSheetMaybeChanged={load}
         onSessionStarted={adoptSession}
         width={chatPane.width}
+        collapsed={!chatOpen}
+        onToggle={() => setChatOpen((v) => !v)}
       />
 
       {openCell?.column && (
