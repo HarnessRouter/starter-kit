@@ -264,7 +264,7 @@ export function DeckPage({ id: routeId, seed }) {
           <aside className="sl-rail scroll" ref={railRef}>
             {slides.map((s, i) => (
               <button key={s.id} className={'sl-rail-item' + (i === sel ? ' active' : '')}
-                      onClick={() => { setSel(i); setSelEl(null); }}>
+                      onClick={(e) => { setSel(i); setSelEl(null); e.currentTarget.blur(); }}>
                 <span className="sl-rail-num">{i + 1}</span>
                 <span className="sl-rail-thumb">
                   <SlideView slide={s} theme={deck.theme} resolveSrc={resolveSrc} />
