@@ -9,7 +9,9 @@ import { getSession, logout, SESSION_EVENT } from '../lib/auth';
 import { SlMark } from './SlMark';
 
 export const LINKS = {
-  docs: 'https://github.com/HarnessRouter/starter-kit',
+  // The kit's own folder, not the repository root — someone asking this app for help wants the
+  // Slides README and its skill, not a list of every starter kit.
+  docs: 'https://github.com/HarnessRouter/starter-kit/tree/main/kits/slides',
 };
 
 export function Wordmark({ size = 18 }) {
