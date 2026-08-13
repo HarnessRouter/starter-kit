@@ -11,7 +11,7 @@ import {
 import { SlideView } from 'reifyui/slides';
 import {
   subscribe, listTemplates, listDecks, createDeck, renameDeck, deleteDeck,
-  getTemplateDetail, getDeck, lastViewedMap, relativeTime, uploadRef,
+  getDeck, lastViewedMap, relativeTime, uploadRef,
 } from '../lib/sl';
 import { PROMPT_IDEAS } from '../lib/promptIdeas';
 import { Topbar } from '../components/Topbar';
@@ -168,10 +168,11 @@ export function LandingPage() {
           : (refFile ? refFile.name.replace(/\.[^.]+$/, '') : (tpl ? tpl.name : 'Untitled deck'));
         let seed = text || (refFile ? `Build a deck from the attached document ${refFile.name} — use it as the starting point for both content and style.`
           : `Design a ${tpl.name} deck.`);
-        if (tpl) {
-          const det = await getTemplateDetail(tpl.id);
-          seed += `\n\nUse this template as inspiration (adapt, don't copy): ${det.context}`;
-        }
+        // The template brief deliberately does NOT go in the seed. The seed becomes the user's
+        // chat message, and pasting a design spec into it means every widget that renders this
+        // conversation — this copilot, the console's task view, the trace — shows the person a
+        // wall of text they did not write. It travels as `instructions` instead (lib/copilot.js),
+        // which the gateway keeps out of the recorded user text.
         const res = await createDeck(name, tpl ? tpl.id : 'blank');
         if (refFile) {
           await uploadRef(res.id, refFile);

@@ -123,6 +123,17 @@ export function DeckPage({ id, seed }) {
     load();
   }, [id, load]);
 
+  // Keep looking while the agent is working. The deck is a file it writes DURING the turn, and
+  // reads now hit the live workspace, so slides appear as they are written instead of after the
+  // turn ends. Without this the page shows "Designing your deck…" over a deck that is already on
+  // disk — which is exactly what it did, because the only other refresh is the stream ending, and
+  // a reloaded tab has no stream.
+  useEffect(() => {
+    if (!noDeck?.working && deck) return undefined;
+    const t = window.setInterval(() => { void load(); }, 4000);
+    return () => window.clearInterval(t);
+  }, [noDeck?.working, deck, load]);
+
   // ── mutations: apply locally, push undo, schedule autosave ────────────────
   const scheduleSave = useCallback(() => {
     dirtyRef.current = true;
