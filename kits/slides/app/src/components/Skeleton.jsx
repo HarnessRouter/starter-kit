@@ -120,3 +120,26 @@ export function SkeletonTableRows({ count = 6 }) {
     </>
   );
 }
+
+/** The deck page while the agent is still writing deck.json.
+ *
+ *  Shaped like the thing that is coming — a filmstrip of slide thumbs beside a 16:9 stage — so the
+ *  wait reads as "your deck is being built here" rather than as an empty pane with a sentence in
+ *  it. The slide count is NOT guessed: four placeholders is the shape of the layout, not a claim
+ *  about how many slides you will get, so nothing here can turn out to be wrong.
+ */
+export function SkeletonDeck({ note }) {
+  return (
+    <div className="sk-deck" aria-busy="true" aria-live="polite">
+      <div className="sk-deck-rail" aria-hidden="true">
+        {[0, 1, 2, 3].map((i) => (
+          <span key={i} className="sk-deck-thumb"><Skeleton variant="thumbnail" /></span>
+        ))}
+      </div>
+      <div className="sk-deck-stage">
+        <Skeleton variant="thumbnail" className="sk-deck-slide" />
+        {note && <p className="sk-deck-note">{note}</p>}
+      </div>
+    </div>
+  );
+}

@@ -10,11 +10,13 @@ import { HelpCircle, Home, Maximize2, Download } from 'lucide-react';
 import { SlideView, EditorCanvas } from 'reifyui/slides';
 import { Presentation } from 'reifyui/slides';
 import { PaneResizer, useResizablePane } from 'reifyui';
-import { chatHistory, deckStatus, getDeck, saveDeck, markViewed, workspaceFileIndex } from '../lib/sl';
+import { chatHistory, deckStatus, getDeck, getTemplateDetail, saveDeck, markViewed,
+         workspaceFileIndex } from '../lib/sl';
 import { authFetch, getSession } from '../lib/auth';
 import { useDeckCollab } from '../lib/collab';
 import { ChatColumn } from '../components/ChatPanel';
 import { AvatarMenu, LINKS, Wordmark } from '../components/Topbar';
+import { SkeletonDeck } from '../components/Skeleton';
 
 // Images the agent made live in the session workspace, so a deck's `src` is a path there rather
 // than a URL. Resolve it against the session's file list; until that arrives, leave the path
@@ -50,7 +52,7 @@ async function downloadExport(id, title, kind, setBusy) {
   } finally { setBusy(''); }
 }
 
-export function DeckPage({ id: routeId, seed }) {
+export function DeckPage({ id: routeId, seed, template }) {
   // The session id lives in state, not in the route. A deck starts as "new:<template>" and
   // becomes a session when its first turn opens one — and that arrives WHILE the copilot is
   // streaming. Re-keying this component off the URL at that moment unmounted it mid-stream and
@@ -87,6 +89,17 @@ export function DeckPage({ id: routeId, seed }) {
   });
 
   const [noDeck, setNoDeck] = useState(null);
+  // The template the deck was created from. Its brief travels invisibly in `instructions`, but the
+  // CHOICE is the person's and they should be able to see it — including after a reload.
+  const [tplName, setTplName] = useState('');
+  useEffect(() => {
+    if (!template) { setTplName(''); return undefined; }
+    let dead = false;
+    getTemplateDetail(template)
+      .then((t) => { if (!dead) setTplName(t?.name || ''); })
+      .catch(() => {});
+    return () => { dead = true; };
+  }, [template]);
 
   const adoptSession = useCallback((sid) => {
     if (!sid || sid === id) return;
@@ -284,20 +297,22 @@ export function DeckPage({ id: routeId, seed }) {
                 peers={collab.peers}
               />
             ) : (
-              <div className="empty-note" style={{ paddingTop: 80 }}>
-                {deck ? 'This deck has no slides.'
-                  : noDeck ? (
-                    <>
-                      <div>{noDeck.text}</div>
-                      {noDeck.detail && <pre className="deck-empty-detail">{noDeck.detail}</pre>}
-                      {!noDeck.working && (
-                        <div style={{ marginTop: 14 }}>
-                          Ask the copilot again on the right — the conversation is still here.
-                        </div>
-                      )}
-                    </>
-                  ) : 'Loading deck…'}
-              </div>
+              deck ? (
+                <div className="empty-note" style={{ paddingTop: 80 }}>This deck has no slides.</div>
+              ) : noDeck && !noDeck.working ? (
+                <div className="empty-note" style={{ paddingTop: 80 }}>
+                  <div>{noDeck.text}</div>
+                  {noDeck.detail && <pre className="deck-empty-detail">{noDeck.detail}</pre>}
+                  <div style={{ marginTop: 14 }}>
+                    Ask the copilot again on the right — the conversation is still here.
+                  </div>
+                </div>
+              ) : (
+                // Still coming: show the shape of a deck rather than a sentence in an empty pane.
+                <SkeletonDeck note={noDeck?.working
+                  ? (tplName ? `Designing your deck in ${tplName}…` : 'Designing your deck…')
+                  : 'Loading deck…'} />
+              )
             )}
           </div>
         </div>

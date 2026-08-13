@@ -836,3 +836,22 @@
   font-size: 13px; font-family: inherit; color: var(--ink); padding: 8px 10px; border-radius: 7px;
 }
 .sl-export-menu button:hover { background: var(--surface-2, var(--brand-50)); color: var(--brand); }
+
+/* ── Deck skeleton: the shape of a deck page while the agent writes deck.json ─── */
+.sk-deck { display: flex; flex: 1; min-height: 0; }
+.sk-deck-rail {
+  flex: 0 0 168px; display: flex; flex-direction: column; gap: 10px;
+  padding: 12px; border-right: 1px solid var(--line); overflow: hidden;
+}
+.sk-deck-thumb { display: block; width: 100%; aspect-ratio: 16/9; }
+.sk-deck-thumb .sk { display: block; width: 100%; height: 100%; border-radius: 6px; }
+.sk-deck-stage {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 16px; padding: 28px; background: var(--bg);
+}
+/* 16:9, capped so it never outgrows the pane — the same box the real stage occupies. */
+.sk-deck-slide {
+  width: min(100%, 980px); aspect-ratio: 16/9; height: auto !important; border-radius: 10px;
+}
+.sk-deck-note { margin: 0; font-size: 13px; color: var(--mute); }
+@media (max-width: 820px) { .sk-deck-rail { display: none; } }
