@@ -53,8 +53,8 @@ Non-negotiable, because each of these silently renders nothing:
   edit so the canvas keeps selection; never renumber a whole deck.
 - Paint order IS z-order: later elements in `elements[]` sit on top. There is
   no `z` property.
-- `type` is one of `text`, `shape`, `image`, `table`, `chart`, `diagram`,
-  `code`. Shapes carry their colour in `style.fill`; images use
+- `type` is one of `text`, `shape`, `image`, `table`, `chart`, `flowchart`,
+  `code`, `embed`. Shapes carry their colour in `style.fill`; images use
   `content.src` + `content.alt` + `content.fit`.
 
 Read `deck.json` before every change and write it back WHOLE. It is the single
@@ -162,7 +162,18 @@ Decide ONCE, before building — then every slide obeys it:
 
 ## 4. Review pass (mandatory)
 
-Reread the file you just wrote, as a designer:
+FIRST, check it renders at all. From your working directory:
+
+```
+python3 ~/.harness/skills/slide_design/validate_deck.py deck.json
+```
+
+It prints the exact path of anything the renderer will drop, and what to write
+instead. **Fix and re-run until it exits clean** — a deck that fails this
+renders as blank coloured rectangles for the user, and you cannot see that from
+here. Never end a turn on a failing deck.
+
+Then reread the file you just wrote, as a designer:
 - Consistent title positions/sizes across sibling slides? Same margins?
 - Any slide with > 5 elements or > 60% coverage → split or cut.
 - Any orphan default styling (wrong ink on custom background)?
