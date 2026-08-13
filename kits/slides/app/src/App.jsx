@@ -15,7 +15,9 @@ function parseHash() {
   const raw = window.location.hash.replace(/^#\/?/, '');
   const [path, query = ''] = raw.split('?');
   const params = new URLSearchParams(query);
-  if (path === 'print') return { page: 'print' };
+  if (path === 'print') {
+    return { page: 'print', handoff: params.get('h') || '', id: params.get('deck') || '' };
+  }
   if (path.startsWith('d/')) {
     return { page: 'deck', id: decodeURIComponent(path.slice(2)),
              seed: params.get('seed') || '', template: params.get('tpl') || '' };
@@ -32,7 +34,7 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
 
-  if (route.page === 'print') return <PrintPage />;
+  if (route.page === 'print') return <PrintPage handoff={route.handoff} id={route.id} />;
   if (route.page === 'deck') {
     return <DeckPage key={route.id} id={route.id} seed={route.seed} template={route.template} />;
   }

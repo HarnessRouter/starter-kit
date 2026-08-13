@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
+import 'highlight.js/styles/atom-one-dark.css';
 import 'reifyui/styles/slides.css';
 import 'reifyui/styles/chat.css';
 import './styles/tokens.css';

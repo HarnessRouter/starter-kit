@@ -10,46 +10,45 @@ import { HelpCircle, Home, Maximize2, Download } from 'lucide-react';
 import { SlideView, EditorCanvas } from 'reifyui/slides';
 import { Presentation } from 'reifyui/slides';
 import { PaneResizer, useResizablePane } from 'reifyui';
-import { chatHistory, deckStatus, getDeck, getTemplateDetail, saveDeck, markViewed,
-         workspaceFileIndex } from '../lib/sl';
+import { chatHistory, deckStatus, getDeck, getTemplateDetail, saveDeck, markViewed } from '../lib/sl';
 import { authFetch, getSession } from '../lib/auth';
 import { useDeckCollab } from '../lib/collab';
 import { ChatColumn } from '../components/ChatPanel';
 import { AvatarMenu, LINKS, Wordmark } from '../components/Topbar';
+import { AlertDialog } from '../components/Dialog';
 import { SkeletonDeck } from '../components/Skeleton';
+import { useSrcResolver } from '../lib/srcResolver';
 
-// Images the agent made live in the session workspace, so a deck's `src` is a path there rather
-// than a URL. Resolve it against the session's file list; until that arrives, leave the path
-// untouched so nothing renders a broken image with a guessed URL.
-function useSrcResolver(id) {
-  const [index, setIndex] = useState(null);
-  useEffect(() => {
-    if (!id || String(id).startsWith('new:')) { setIndex(null); return undefined; }
-    let dead = false;
-    workspaceFileIndex(id).then((m) => { if (!dead) setIndex(m); }).catch(() => {});
-    return () => { dead = true; };
-  }, [id]);
-  return useCallback((src) => {
-    if (!src) return src;
-    if (/^(https?:|data:|blob:)/.test(src)) return src;
-    return index?.[src.replace(/^\.?\//, '')] || src;
-  }, [index]);
+// Export dispatch. Both formats are produced in the browser: there is no export service in this
+// deployment, and the hosted product's endpoint this used to call went away with SL_API — which
+// is why the button threw ReferenceError on its first line and the catch swallowed it into a
+// silent no-op.
+async function runExport(kind, { id, deck, resolveSrc, setBusy, setErr, setNote }) {
+  setBusy(kind);
+  setErr('');
+  try {
+    if (kind === 'pdf') {
+      const { openPrintView } = await import('../lib/exportPdf');
+      openPrintView(id, deck);           // opens a tab that prints itself once the deck has settled
+    } else {
+      const { downloadPptx } = await import('../lib/exportPptx');
+      const report = await downloadPptx(deck, resolveSrc,
+                                        (n, total) => setBusy(`pptx:${n}/${total}`));
+      if (report.notes.length) setNote(report.notes);
+    }
+  } catch (e) {
+    setErr(e?.message || `Could not export ${kind === 'pdf' ? 'PDF' : 'PowerPoint'}.`);
+  } finally {
+    setBusy('');
+  }
 }
 
-async function downloadExport(id, title, kind, setBusy) {
-  setBusy(kind);
-  try {
-    const res = await authFetch(`${SL_API}/v1/sl/decks/${encodeURIComponent(id)}/export.${kind}`);
-    if (!res.ok) throw new Error(`export failed (${res.status})`);
-    const blob = await res.blob();
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `${(title || 'slides').replace(/[\\/:*?"<>|]+/g, ' ').trim()}.${kind}`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  } catch (e) {
-    console.error(e);
-  } finally { setBusy(''); }
+// Honest states only: PDF opens a tab (instant), PPTX reports the slide it is actually on.
+function exportLabel(busy) {
+  if (!busy) return 'Export';
+  if (busy === 'pdf') return 'Opening print view…';
+  const m = /^pptx:(\d+)\/(\d+)$/.exec(String(busy));
+  return m ? `Building PowerPoint — slide ${m[1]} of ${m[2]}` : 'Building PowerPoint…';
 }
 
 export function DeckPage({ id: routeId, seed, template }) {
@@ -64,7 +63,9 @@ export function DeckPage({ id: routeId, seed, template }) {
   const [sel, setSel] = useState(0);
   const [selEl, setSelEl] = useState(null);
   const [presenting, setPresenting] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const [exporting, setExporting] = useState('');
+  const [exportErr, setExportErr] = useState('');
+  const [exportNote, setExportNote] = useState(null);
   const [saveState, setSaveState] = useState('');       // '' | 'saving' | 'saved' | 'error'
   const [copilotBusy, setCopilotBusy] = useState(false);
   const chatPane = useResizablePane({ initial: 380, min: 300, maxFraction: 0.6, fromRight: true, storageKey: 'slides.chat.w' });
@@ -256,7 +257,7 @@ export function DeckPage({ id: routeId, seed, template }) {
   if (err) {
     return (
       <div className="gp-root"><div className="gp-main">
-        <DeckBanner deck={deck} onPresent={() => {}} onExport={() => {}} peers={[]} />
+        <DeckBanner deck={deck} onPresent={null} onExport={null} peers={[]} />
         <div className="page-note">{err}</div>
       </div></div>
     );
@@ -270,7 +271,10 @@ export function DeckPage({ id: routeId, seed, template }) {
       <div className="gp-main">
         <DeckBanner deck={deck}
                     onPresent={() => slides.length && setPresenting(true)}
-                    onExport={(kind) => deck && !exporting && downloadExport(id, deck.meta?.title, kind, setExporting)}
+                    onExport={(kind) => deck && !exporting && runExport(kind, {
+                      id, deck, resolveSrc, setBusy: setExporting,
+                      setErr: setExportErr, setNote: setExportNote,
+                    })}
                     exporting={exporting} peers={collab.peers} live={collab.live}
                     saveState={saveState} copilotBusy={copilotBusy} />
         <div className="sl-body">
@@ -335,6 +339,12 @@ export function DeckPage({ id: routeId, seed, template }) {
         width={chatPane.width}
       />
 
+      {exportErr && (
+        <AlertDialog title="Export didn’t finish" body={exportErr} onClose={() => setExportErr('')} />
+      )}
+      {exportNote && (
+        <AlertDialog title="PowerPoint saved" body={exportNote} onClose={() => setExportNote(null)} />
+      )}
       {presenting && (
         <Presentation deck={deck} resolveSrc={resolveSrc} startIndex={sel} onExit={() => setPresenting(false)} />
       )}
@@ -355,22 +365,26 @@ function DeckBanner({ deck, onPresent, onExport, exporting, peers = [], live, sa
       <a className="wordmark" href="#/"><Wordmark size={15} /></a>
       <a className="pane-btn gp-home" href="#/" title="Home" aria-label="Home"><Home size={16} /></a>
       <div className="sl-banner-actions">
-        <button className="btn" onClick={onPresent} title="Present fullscreen">
-          <Maximize2 size={15} /> Slideshow
-        </button>
+        {onPresent && (
+          <button className="btn" onClick={onPresent} title="Present fullscreen">
+            <Maximize2 size={15} /> Slideshow
+          </button>
+        )}
+        {onExport && (
         <div className="sl-export-wrap">
           <button className="btn" disabled={!!exporting}
                   onClick={(e) => { e.stopPropagation(); setMenu((v) => !v); }}
                   title="Export this deck">
-            <Download size={15} /> {exporting === 'pdf' ? 'Exporting PDF…' : exporting === 'pptx' ? 'Exporting PPTX…' : 'Export'}
+            <Download size={15} /> {exportLabel(exporting)}
           </button>
           {menu && !exporting && (
             <div className="sl-export-menu" onClick={(e) => e.stopPropagation()}>
-              <button onClick={() => { setMenu(false); onExport('pdf'); }}>PDF document (.pdf)</button>
+              <button onClick={() => { setMenu(false); onExport('pdf'); }}>Print to PDF…</button>
               <button onClick={() => { setMenu(false); onExport('pptx'); }}>PowerPoint (.pptx)</button>
             </div>
           )}
         </div>
+        )}
         {saveState && (
           <span className={'sl-save-chip ' + saveState}>
             {saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : 'Save failed — retrying on next edit'}
