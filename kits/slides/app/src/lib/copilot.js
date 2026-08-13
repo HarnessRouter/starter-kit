@@ -42,12 +42,22 @@ export async function streamTurn(deckId, message, h) {
     if (templateId && templateId !== 'blank') {
       const t = await getTemplateDetail(templateId).catch(() => null);
       if (t) {
+        // Two real slides from the template, verbatim. The theme alone only fixes the colours —
+        // these carry the layout system (grid, type scale, accent move) AND demonstrate the exact
+        // element shape, which is the thing a deck gets wrong in a way that renders blank.
+        const exemplars = (t.slides || []).slice(0, 2);
         input = [
           `Design this deck in the "${t.name}" style.`,
           t.context || t.description || '',
           '',
           'Use exactly this theme in deck.json:',
           JSON.stringify(t.theme || {}, null, 2),
+          ...(exemplars.length ? [
+            '',
+            'Follow these slides from the template — match their grid, type scale and accent'
+            + ' treatment, and copy their element shape exactly:',
+            JSON.stringify(exemplars, null, 2),
+          ] : []),
           '',
           `The brief: ${message}`,
         ].filter(Boolean).join('\n');
