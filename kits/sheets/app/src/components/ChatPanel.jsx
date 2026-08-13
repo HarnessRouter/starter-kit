@@ -1,19 +1,15 @@
-// Copilot chat column — the workflow page's full-height right panel.
-// Adapted from ContextualGraph's ChatPanel: the conversational surface is the
-// shared UI Core package; the broker transport is Sheets's (lib/copilot.js
-// streaming with the non-streaming /chat fallback). On mount it replays the
-// member's prior conversation over this workflow; the landing prompt's ?seed=
-// fires exactly ONCE (stripped from the URL immediately, skipped when history
-// already exists).
+// The copilot column — the sheet page's full-height right panel.
+//
+// On mount it replays the conversation so far; the landing prompt's ?seed= fires exactly once,
+// stripped from the URL immediately and skipped when there is already history.
 import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ArrowUp, Mic, PanelRight, Plus, Sparkles } from 'lucide-react';
-import { ChatMessages, ChatMessagesSkeleton } from 'reifyui';
-import { Composer } from 'reifyui';
-import { withReasoning, withResult, withStep, withText } from 'reifyui';
-import { chatHistory, sendChat } from '../lib/sh';
-import { streamTurn } from '../lib/copilot';
+import { ArrowUp, PanelRight, Sparkles } from 'lucide-react';
+import { ChatMessages, ChatMessagesSkeleton, Composer, withReasoning, withResult, withStep, withText } from 'reifyui';
+import { sessionTurns, turnsToMessages } from 'reifyui/harness';
+import { isPending } from '../lib/sh';
+import { runCopilotTurn } from '../lib/copilot';
 
 const RETRY_MS = 20000;
 
@@ -31,28 +27,13 @@ function stripSeedFromHash() {
   const params = new URLSearchParams(query);
   params.delete('seed');
   const rest = params.toString();
-  window.history.replaceState(null, '', window.location.pathname + window.location.search + path + (rest ? `?${rest}` : ''));
+  window.history.replaceState(null, '', window.location.pathname + window.location.search
+    + path + (rest ? `?${rest}` : ''));
 }
 
-/** Broker history turns -> the shared component's message shape. */
-function turnsToMessages(turns) {
-  const m = [];
-  for (const t of turns || []) {
-    if (t.user) m.push({ role: 'user', text: t.user });
-    const steps = (t.tools || []).map((x) => ({ name: x.name, args: x.arguments, result: x.result }));
-    const blocks = [];
-    if (steps.length) blocks.push({ kind: 'tools', reasoning: '', steps });
-    if (t.assistant) blocks.push({ kind: 'text', text: t.assistant });
-    const st = (t.status === 'failed' || t.status === 'error') ? 'failed'
-      : t.status === 'cancelled' ? 'cancelled'
-        : (t.status === 'incomplete' || t.status === 'max_turns' || t.status === 'timeout') ? 'incomplete'
-          : 'done';
-    if (blocks.length || st !== 'done') m.push({ role: 'assistant', blocks, status: st });
-  }
-  return m;
-}
+const history = (id) => (isPending(id) ? Promise.resolve([]) : sessionTurns(id));
 
-export function ChatColumn({ sheetId, seed, title, copilotBuilding, collapsed, onToggle, onSheetMaybeChanged, width }) {
+export function ChatColumn({ sheetId, seed, title, agentBusy, onSheetMaybeChanged, onSessionStarted, width }) {
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -61,7 +42,6 @@ export function ChatColumn({ sheetId, seed, title, copilotBuilding, collapsed, o
   const pendingRef = useRef(null);
   const bodyRef = useRef(null);
   const seededRef = useRef(false);
-  const streamOkRef = useRef(true);
 
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight });
@@ -70,7 +50,7 @@ export function ChatColumn({ sheetId, seed, title, copilotBuilding, collapsed, o
   function updateLastAsst(fn) {
     setMessages((m) => {
       const out = m.slice();
-      for (let i = out.length - 1; i >= 0; i--) {
+      for (let i = out.length - 1; i >= 0; i -= 1) {
         if (out[i].role === 'assistant') { out[i] = fn({ ...out[i] }); break; }
       }
       return out;
@@ -82,37 +62,13 @@ export function ChatColumn({ sheetId, seed, title, copilotBuilding, collapsed, o
       ? m.slice(0, -1) : m));
   }
 
-  async function legacyDeliver(text) {
-    try {
-      const res = await sendChat(sheetId, text);
-      if (res.status === 404 || res.status === 503) {
-        dropRunningAsst();
-        pendingRef.current = text;
-        setConnecting(true);
-        return;
-      }
-      const body = await res.json().catch(() => null);
-      const reply = (body && (body.reply || body.message)) || (res.ok ? '...' : `Something went wrong (${res.status}). Please try again.`);
-      updateLastAsst((a) => ({ ...a, blocks: withText(a.blocks, reply), status: res.ok ? 'done' : 'failed' }));
-      pendingRef.current = null;
-      setConnecting(false);
-      onSheetMaybeChanged?.();
-    } catch {
-      dropRunningAsst();
-      pendingRef.current = text;
-      setConnecting(true);
-    }
-  }
-
   async function deliver(text) {
     setBusy(true);
     setMessages((m) => [...m, { role: 'assistant', blocks: [], status: 'running' }]);
     try {
-      if (!streamOkRef.current) {
-        await legacyDeliver(text);
-        return;
-      }
-      const out = await streamTurn(sheetId, text, {
+      const out = await runCopilotTurn(sheetId, text, {
+        // A sheet created from the landing page has no session until this turn makes one.
+        onSession: (sid) => onSessionStarted?.(sid),
         onReasoningDelta: (d) => updateLastAsst((a) => ({ ...a, blocks: withReasoning(a.blocks, d) })),
         onToolCall: (name, args, callId) => updateLastAsst((a) => ({ ...a, blocks: withStep(a.blocks, { name, args, callId }) })),
         onToolResult: (callId, output) => updateLastAsst((a) => ({ ...a, blocks: withResult(a.blocks, callId, output) })),
@@ -124,11 +80,6 @@ export function ChatColumn({ sheetId, seed, title, copilotBuilding, collapsed, o
           status: 'failed',
         })),
       });
-      if (out.unsupported) {
-        streamOkRef.current = false;
-        await legacyDeliver(text);
-        return;
-      }
       if (out.connecting) {
         dropRunningAsst();
         pendingRef.current = text;
@@ -156,11 +107,21 @@ export function ChatColumn({ sheetId, seed, title, copilotBuilding, collapsed, o
     deliver(t);
   }
 
-  // Mount: strip ?seed FIRST, then replay history; seed fires only when empty.
+  // Mount: strip ?seed FIRST, then replay history; the seed fires only when there is none.
+  //
+  // Keyed on sheetId, and a pending sheet CHANGES its id mid-stream: it starts as
+  // "new:<template>" and adopts the real session id the moment the first turn opens one.
+  // Re-running then refetches history and setMessages() over the blocks streaming in — the panel
+  // shows the user bubble and nothing else while the agent is visibly working. It is the same
+  // conversation, so the resolve is not a reason to reload it.
+  const prevId = useRef(sheetId);
   useEffect(() => {
+    const resolved = isPending(prevId.current) && !isPending(sheetId);
+    prevId.current = sheetId;
+    if (resolved) return undefined;
     stripSeedFromHash();
     let dead = false;
-    chatHistory(sheetId).then(({ turns }) => {
+    history(sheetId).then((turns) => {
       if (dead) return;
       const hist = turnsToMessages(turns);
       if (hist.length) setMessages(hist);
@@ -175,7 +136,7 @@ export function ChatColumn({ sheetId, seed, title, copilotBuilding, collapsed, o
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sheetId]);
 
-  // While the broker is not live, retry the pending message on an interval.
+  // Retry a message the gateway was not up to receive.
   useEffect(() => {
     if (!connecting) return undefined;
     const iv = window.setInterval(() => {
@@ -185,46 +146,52 @@ export function ChatColumn({ sheetId, seed, title, copilotBuilding, collapsed, o
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connecting, busy]);
 
-  if (collapsed) {
-    return (
-      <aside className="gp-chat collapsed">
-        <div className="gp-chat-h">
-          <button className="top-side-toggle" type="button" onClick={onToggle}
-                  title="Show copilot" aria-label="Show copilot">
-            <PanelRight size={17} />
-          </button>
-        </div>
-      </aside>
-    );
-  }
+  // A turn may be running that this tab did not start — reopened mid-turn, or another window.
+  // Poll history while that is true and nothing local is streaming, then reload once when it
+  // ends so the final answer and its edits land here without a refresh.
+  const prevBusyRef = useRef(false);
+  useEffect(() => {
+    let dead = false;
+    let poll;
+    const reload = () => history(sheetId).then((turns) => {
+      if (dead) return;
+      const hist = turnsToMessages(turns);
+      if (hist.length && !busy && !pendingRef.current) setMessages(hist);
+    });
+    if (agentBusy && messages.length === 0 && !busy) poll = window.setInterval(reload, 3000);
+    if (prevBusyRef.current && !agentBusy) {
+      reload();
+      onSheetMaybeChanged?.();
+    }
+    prevBusyRef.current = agentBusy;
+    return () => { dead = true; if (poll) window.clearInterval(poll); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agentBusy, messages.length, busy]);
 
   const empty = messages.length === 0;
 
   return (
     <aside className="gp-chat" style={width ? { flex: `0 0 ${width}px` } : undefined}>
       <div className="gp-chat-h">
-        <button className="top-side-toggle" type="button" onClick={onToggle}
-                title="Hide copilot" aria-label="Hide copilot">
-          <PanelRight size={17} />
-        </button>
+        <PanelRight size={16} className="gp-chat-ic" aria-hidden="true" />
         <span className="gp-chat-title" title={title || undefined}>{title || 'Copilot'}</span>
-        {/* Copilot status: pulses while a turn runs — fed by the realtime
-            channel, so it also shows for turns started in another window. */}
-        {copilotBuilding && (
-          <span className="gp-chat-cop" title="Copilot is building">
-            <Sparkles size={12} />
-          </span>
-        )}
+        {agentBusy && <span className="gp-chat-cop" title="The agent is working"><Sparkles size={12} /></span>}
         {connecting && <span className="stat-lbl">connecting</span>}
       </div>
       <div className="chat-body scroll" ref={bodyRef}>
         {histLoading ? (
           <ChatMessagesSkeleton />
+        ) : empty && agentBusy ? (
+          <div className="pane-empty">
+            <span className="pulse-dot" />
+            <div className="big">Building your sheet…</div>
+            <div>Working through the columns now. Your conversation will appear here.</div>
+          </div>
         ) : empty ? (
           <div className="pane-empty">
             <Sparkles size={26} />
             <div className="big">Your sheet copilot</div>
-            <div>Describe the sheet you want and your copilot will build it and fill it, row by row.</div>
+            <div>Describe the columns you want, and it will build and refine the sheet with you.</div>
           </div>
         ) : (
           <ChatMessages
@@ -238,7 +205,7 @@ export function ChatColumn({ sheetId, seed, title, copilotBuilding, collapsed, o
         {connecting && (
           <div className="chat-status">
             <span className="pulse" />
-            Copilot is connecting. Your message will be delivered as soon as it is online.
+            Still connecting. Your message will be sent as soon as it is online.
           </div>
         )}
       </div>
@@ -247,20 +214,10 @@ export function ChatColumn({ sheetId, seed, title, copilotBuilding, collapsed, o
         onChange={setDraft}
         onSend={() => send(draft)}
         disabled={histLoading}
-        placeholder="What would you want to change?"
+        placeholder="What should this sheet do?"
         rows={2}
         autoGrow={false}
         classNames={{ root: 'cmp', input: '', row: 'cmp-row' }}
-        accessoriesLeft={(
-          <span title="Attachments are coming soon">
-            <button type="button" className="cmp-icon" disabled aria-label="Add an attachment"><Plus size={16} /></button>
-          </span>
-        )}
-        accessoriesRight={(
-          <span title="Voice input is coming soon">
-            <button type="button" className="cmp-icon" disabled aria-label="Voice input"><Mic size={15} /></button>
-          </span>
-        )}
         renderSend={() => (
           <button type="button" className="cmp-send" onClick={() => send(draft)}
                   disabled={busy || histLoading || !draft.trim()} aria-label="Send message">

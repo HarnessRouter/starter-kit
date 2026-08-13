@@ -1,14 +1,14 @@
 // Identity, borrowed rather than built.
 //
 // The hosted product ships its own sign-in, JWT and sliding-refresh. This app has none of that on
-// purpose: it is served by the HarnessRouter console at /kits/slides, so the console's middleware
+// purpose: it is served by the HarnessRouter console at /kits/sheets, so the console's middleware
 // has already authenticated whoever is looking at it, and the browser carries that session on
 // every same-origin request. There is nothing left for the app to do — no token to hold, no login
 // screen to render, no refresh to schedule.
 //
 // The module still exists because the pages import from it. Each export is the honest local answer
 // to the question the hosted version answers with a token.
-export const SESSION_EVENT = 'slides:session';
+export const SESSION_EVENT = 'sheets:session';
 
 /** Same-origin: the console session rides along, and its proxy attaches the internal key. */
 export function authFetch(url, init = {}) {

@@ -1,72 +1,52 @@
-// The Sheets data layer, backed by HarnessRouter.
+// The Sheets data layer.
 //
-// This is the only file that differs in any interesting way from the hosted product. The pages and
-// components are the ones sheets.wrapper.work runs; they call the functions below, and here a
-// sheet is a session on this kit's Harness rather than a row in a product database:
+// Everything about talking to HarnessRouter — routes, session semantics, the 409 on a busy
+// workspace — lives in `reifyui/harness`. This file is only what "sheet" adds on top of it:
 //
-//   sheet           = session          list -> GET /sessions?harness=…
-//   sheet content   = sheet.json in that session's workspace
-//   chat with agent = POST /responses with the session id
+//   a sheet          = a session on this kit's Harness
+//   its content      = ./sheet.json in that session's workspace
+//   an agent column  = a turn on a DIFFERENT harness, one per row
 //
 // There is no database, no per-product auth and no billing. The app is served by the console at
 // /kits/sheets, so it is same-origin with the console's API proxy: the browser sends the console
 // session it already has and the proxy attaches the internal key server-side.
-//
-// Every route below is one the OSS gateway actually implements. The slides kit shipped five bugs
-// that were all the same bug — a call kept from the hosted product to an endpoint that does not
-// exist here — so the rule for this file is: no route goes in without checking gateway/app.py.
-const API = '/api/harness/v1';
+import {
+  configureKit, kitHarness, listHarnesses, listSessions, sessionDetail, patchSession,
+  deleteSession, readJsonFile, writeFile, sessionTurns, containerFileUrl,
+} from 'reifyui/harness';
 
-async function readError(res) {
-  try {
-    const body = await res.json();
-    const d = body?.error?.message ?? body?.detail;
-    return typeof d === 'string' ? d : `request failed (${res.status})`;
-  } catch {
-    return `request failed (${res.status})`;
-  }
-}
+configureKit({ kitId: 'sheets' });
 
-async function hr(path, init = {}) {
-  const res = await fetch(`${API}${path}`, { cache: 'no-store', ...init });
-  if (!res.ok) {
-    const err = new Error(await readError(res));
-    err.status = res.status;
-    throw err;
-  }
-  return res.status === 204 ? null : res.json();
-}
+export const SHEET_FILE = 'sheet.json';
 
-function jsonInit(method, body) {
-  return { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) };
-}
+export { containerFileUrl, sessionTurns };
 
-// ── the Harness this kit launched ──────────────────────────────────────────
-let _harness = null;
-export async function sheetsHarness() {
-  if (_harness) return _harness;
-  const { harnesses = [] } = await hr('/harnesses');
-  _harness = harnesses.find((h) => h.kit === 'sheets') || null;
-  return _harness;
-}
+/** The Harness this kit launched, or null when it was never launched. */
+export const sheetsHarness = kitHarness;
 
-/** Every Harness a harness COLUMN may run.
+/** Every Harness an agent COLUMN may run.
  *
  *  Deliberately excludes this kit's own Harness. A sheet whose column runs the sheet's own agent
  *  would have that agent editing sheet.json while the app is driving a run over it — recursion
  *  with a file-write race inside it. Excluded at the source of the list rather than validated at
- *  run time, so the choice is never offered in the first place. */
+ *  run time, so the choice is never offered in the first place.
+ *
+ *  Also excludes harnesses that require request headers: their turns are refused without those
+ *  headers, and this app has nowhere to hold them. They are returned marked rather than dropped,
+ *  so the picker can say why instead of silently having fewer entries than the console shows. */
 export async function runnableHarnesses() {
-  const [{ harnesses = [] }, mine] = await Promise.all([hr('/harnesses'), sheetsHarness()]);
+  const [harnesses, mine] = await Promise.all([listHarnesses(), sheetsHarness()]);
   return harnesses
     .filter((h) => h.id !== mine?.id)
-    .map((h) => ({ id: h.id, name: h.name, base: h.base, model: h.defaultModel, kit: h.kit || '' }));
-}
-
-export async function subscribe() {
-  const h = await sheetsHarness();
-  if (!h) throw new Error('Sheets has not been launched yet — open Starter Kits and launch it.');
-  return { ok: true };
+    .map((h) => ({
+      id: h.id,
+      name: h.name,
+      base: h.base,
+      model: h.defaultModel,
+      unusable: Object.keys(h.additionalHeaders || {}).length
+        ? 'needs request headers this app can’t send'
+        : '',
+    }));
 }
 
 // ── sheets (= sessions) ────────────────────────────────────────────────────
@@ -74,7 +54,6 @@ function toSheet(s) {
   const id = s.id || s.session_id;
   return {
     id,
-    sheet_id: id,
     name: s.title || s.name || 'Untitled sheet',
     updated_at: s.updated_at || s.created_at || null,
     status: s.status || '',
@@ -82,115 +61,53 @@ function toSheet(s) {
 }
 
 export async function listSheets() {
-  const h = await sheetsHarness();
-  if (!h) return [];
-  // The filter is `harness`, not `harness_id` — with the wrong name the server ignores it and
-  // answers with every session in the org.
-  const body = await hr(`/sessions?harness=${encodeURIComponent(h.id)}&limit=100`);
-  return (body.sessions ?? body.data ?? []).map(toSheet);
+  const { sessions } = await listSessions({ limit: 100 });
+  return sessions.map(toSheet);
 }
 
-/** A sheet is created by its first turn, so this records the intent; the first message opens the
- *  session and the app adopts the real id from the stream. */
-export async function createSheet(name, template = 'blank') {
-  const h = await sheetsHarness();
-  if (!h) throw new Error('Sheets has not been launched yet.');
-  const id = `new:${template}`;
-  return { id, sheet_id: id, name: name || 'Untitled sheet', template };
-}
+/** A pending id: a sheet that has been chosen but not yet created.
+ *
+ *  Nothing but a turn creates a session, so a new sheet has no id until its first message opens
+ *  one. The id carries the template so the first turn knows what to build, and the page adopts
+ *  the real id from the stream. */
+export const PENDING = 'new:';
+export const isPending = (id) => String(id || '').startsWith(PENDING);
+export const pendingTemplate = (id) => (isPending(id) ? String(id).slice(PENDING.length) : '');
+export const newSheetId = (template = 'blank') => `${PENDING}${template || 'blank'}`;
 
-/** Rename. PATCH /v1/sessions/{id} also rewrites the trace manifest the LIST renders from, and
- *  marks the title as chosen so the next turn does not regenerate it from your message. */
-export async function renameSheet(id, name) {
-  return hr(`/sessions/${encodeURIComponent(id)}`, jsonInit('PATCH', { title: name }));
-}
+/** Rename. This also rewrites the trace manifest the sheet LIST renders from, and marks the title
+ *  as chosen so the next turn stops regenerating it from the latest message. */
+export const renameSheet = (id, name) => patchSession(id, { title: name });
 
-/** Delete the sheet AND the conversation underneath it. The route is /traces/{id}: there is no
- *  DELETE on the session path, and this one removes the trace, the durable workspace tarball
- *  (sheet.json included) and tombstones the session. */
-export async function deleteSheet(id) {
-  return hr(`/traces/${encodeURIComponent(id)}`, { method: 'DELETE' });
-}
+/** Delete the sheet and the conversation underneath it. */
+export const deleteSheet = deleteSession;
 
-/** The sheet JSON: { sheet_id, sheet }. Null sheet means the agent has not written one yet.
+/** The sheet document, or null when the agent has not written one yet.
  *
  *  Read by path, which reads the LIVE workspace, so a sheet appears as soon as it is written —
  *  mid-turn. The file LISTING answers from the checkpoint tarball, which only exists once a turn
- *  ends. */
+ *  ends, and would show a spinner over a file already on disk. */
 export async function getSheet(id) {
-  const r = await fetch(`${API}/sessions/${encodeURIComponent(id)}/files/sheet.json`,
-                        { cache: 'no-store' });
-  if (!r.ok) return { sheet_id: id, sheet: null };
-  return { sheet_id: id, sheet: await r.json().catch(() => null) };
+  if (isPending(id)) return null;
+  return readJsonFile(id, SHEET_FILE);
 }
 
-/** Write sheet.json back. Refused with 409 while a turn is running — the agent owns the file
- *  until it finishes, and a write that appears to succeed and is then overwritten by the agent's
- *  checkpoint is the worst of the three outcomes. */
-export async function saveSheet(id, sheet) {
-  return hr(`/sessions/${encodeURIComponent(id)}/files/sheet.json`,
-            jsonInit('PUT', { content: JSON.stringify(sheet, null, 2) }));
+/** Write the document back. Refused 409 while a turn is running: the agent owns the file until
+ *  it finishes. The caller must re-arm rather than drop the write — see SheetPage's save queue. */
+export function saveSheet(id, sheet) {
+  return writeFile(id, SHEET_FILE, JSON.stringify(sheet, null, 2));
 }
 
 /** Current turn state, so the grid knows when to lock and when to re-read. */
 export async function sheetStatus(id) {
-  const d = await hr(`/sessions/${encodeURIComponent(id)}`).catch(() => null);
+  if (isPending(id)) return '';
+  const d = await sessionDetail(id).catch(() => null);
   return d?.turn_status || d?.status || '';
 }
 
-// ── talking to the agent ───────────────────────────────────────────────────
-export async function sendChat(id, message) {
-  const h = await sheetsHarness();
-  return hr('/responses', jsonInit('POST', {
-    input: message,
-    metadata: { harness_id: h?.id, ...(id && !String(id).startsWith('new:') ? { session_id: id } : {}) },
-    stream: false,
-  }));
-}
-
-/** The conversation so far: `{ turns }`, oldest first — the shape ChatPanel destructures. The
- *  route is /turns; there is no /events. */
-export async function chatHistory(id) {
-  if (!id || String(id).startsWith('new:')) return { turns: [] };
-  const body = await hr(`/sessions/${encodeURIComponent(id)}/turns`).catch(() => null);
-  return { turns: body?.turns ?? [] };
-}
-
-// ── workspace files (artifacts) ────────────────────────────────────────────
-/** Workspace path -> a URL that serves it, for artifacts a cell references by path. */
-export async function workspaceFileIndex(id) {
-  const doc = await hr(`/sessions/${encodeURIComponent(id)}/files`).catch(() => null);
-  const out = {};
-  for (const f of doc?.files || []) {
-    const path = f.path || f.filename;
-    if (path && f.id) {
-      out[path] = `${API}/containers/${encodeURIComponent(id)}/files/${encodeURIComponent(f.id)}/content`;
-    }
-  }
-  return out;
-}
-
-/** One workspace file's bytes, by path, from the LIVE workspace. */
-export async function readWorkspaceFile(id, path) {
-  const r = await fetch(`${API}/sessions/${encodeURIComponent(id)}/files/${encodeURIComponent(path)}`,
-                        { cache: 'no-store' });
-  if (!r.ok) return null;
-  return r.text();
-}
-
-/** Put a file into a session's workspace — how a harness cell hands an artifact to the agent. */
-export async function writeWorkspaceFile(id, path, content) {
-  return hr(`/sessions/${encodeURIComponent(id)}/files/${encodeURIComponent(path)}`,
-            jsonInit('PUT', { content }));
-}
-
-// ── thumbnails ─────────────────────────────────────────────────────────────
-// The hosted product caches a rendered PNG per sheet. Here the grid renders live, which is
-// accurate and needs no capture pipeline or blob store — so these are inert rather than
-// pretending to store something.
-export function putThumbnail() { return Promise.resolve(null); }
-export function fetchThumbUrl() { return Promise.resolve(null); }
-export function sheetThumbPath() { return null; }
+/** The console's deep link to one conversation — where "open the full conversation" goes. */
+export const consoleSessionUrl = (harnessId, sessionId) =>
+  `/tasks?h=${encodeURIComponent(harnessId || '')}&sid=${encodeURIComponent(sessionId || '')}`;
 
 // ── last viewed (local record) ─────────────────────────────────────────────
 const LV_KEY = 'sheets.lastViewed';

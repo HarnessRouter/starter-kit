@@ -43,6 +43,26 @@
   --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 }
 
+/* The shared components (the grid, the chat surface, the dialogs) read --uic-* tokens. Mapping
+   them here is the single place this app's palette meets the library's: set a token once and the
+   grid, the conversation and the dialogs all follow. */
+:root {
+  --uic-surface: var(--surface);
+  --uic-surface-2: var(--surface-2);
+  --uic-line: var(--line);
+  --uic-line-soft: var(--line-soft);
+  --uic-ink: var(--ink);
+  --uic-ink-2: var(--ink-2);
+  --uic-mute: var(--mute);
+  --uic-mute-2: var(--mute-2);
+  --uic-brand: var(--brand);
+  --uic-brand-ink: var(--brand-ink);
+  --uic-brand-soft: var(--brand-soft);
+  --uic-brand-faint: var(--brand-50);
+  --uic-fail-bg: var(--hot-soft);
+  --uic-mono: var(--mono);
+}
+
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 body { font-family: var(--font); color: var(--ink); background: var(--bg); -webkit-font-smoothing: antialiased; }
