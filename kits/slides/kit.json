@@ -2,24 +2,36 @@
   "id": "slides",
   "title": "Slides",
   "tagline": "Design presentations by conversation, then edit them by hand.",
-  "description": "A deck is one conversation. Ask for a presentation and the agent designs it — structure first, then a style system, then slide by slide. Everything it makes is editable on the canvas: drag, resize, retype, add. Ships with 46 templates.",
+  "description": "A deck is one conversation. Ask for a presentation and the agent designs it \u2014 structure first, then a style system, then slide by slide. Everything it makes is editable on the canvas: drag, resize, retype, add. Ships with 46 templates.",
   "icon": "tabler:presentation",
   "accent": "#6E55FF",
-
   "harness": {
     "name": "Slides",
-    "base": "claude-code",
-    "system_prompt": "You design and edit presentation decks. The deck is deck.json in your working directory — the single source of truth, and the only file the app reads. Read it before every change and write it back whole. Follow the slide-design skill for every deck request, before touching deck.json.",
-    "skills": ["slide-design"]
+    "recommended": [
+      {
+        "base": "hermes",
+        "model": "deepseek-v4-pro"
+      },
+      {
+        "base": "codex",
+        "model": "gpt-5.6-sol"
+      },
+      {
+        "base": "claude-code",
+        "model": "claude-opus-5"
+      }
+    ],
+    "system_prompt": "You design and edit presentation decks. The deck is deck.json in your working directory \u2014 the single source of truth, and the only file the app reads. Read it before every change and write it back whole. Follow the slide-design skill for every deck request, before touching deck.json.",
+    "skills": [
+      "slide-design"
+    ]
   },
-
   "app": {
     "dir": "app",
     "build": "npm ci && npm run build",
     "dist": "dist",
     "route": "/kits/slides"
   },
-
   "session": {
     "$comment": "One session is one deck. The app lists this harness's sessions as the deck list.",
     "artifact": "deck.json",
