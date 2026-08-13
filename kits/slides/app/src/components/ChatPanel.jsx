@@ -52,7 +52,8 @@ function turnsToMessages(turns) {
   return m;
 }
 
-export function ChatColumn({ deckId, seed, title, copilotBuilding, collapsed, onToggle, onDeckMaybeChanged, width }) {
+export function ChatColumn({ deckId, seed, title, copilotBuilding, collapsed, onToggle, onDeckMaybeChanged,
+                             onSessionStarted, width }) {
   const [messages, setMessages] = useState([]);
   const [draft, setDraft] = useState('');
   const [attaching, setAttaching] = useState(false);
@@ -129,6 +130,8 @@ export function ChatColumn({ deckId, seed, title, copilotBuilding, collapsed, on
         return;
       }
       const out = await streamTurn(deckId, text, {
+        // A deck created from the landing page has no session until this turn makes one.
+        onSession: (sid) => onSessionStarted?.(sid),
         onReasoningDelta: (d) => updateLastAsst((a) => ({ ...a, blocks: withReasoning(a.blocks, d) })),
         onToolCall: (name, args, callId) => updateLastAsst((a) => ({ ...a, blocks: withStep(a.blocks, { name, args, callId }) })),
         onToolResult: (callId, output) => updateLastAsst((a) => ({ ...a, blocks: withResult(a.blocks, callId, output) })),

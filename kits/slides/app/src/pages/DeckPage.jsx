@@ -80,6 +80,14 @@ export function DeckPage({ id, seed }) {
     onCopilot: setCopilotBusy,
   });
 
+  const adoptSession = useCallback((sid) => {
+    if (!sid || sid === id) return;
+    const [, query = ''] = (window.location.hash || '').split('?');
+    window.history.replaceState({}, '', `#/d/${sid}${query ? `?${query}` : ''}`);
+    // App keys DeckPage on the id, so dispatching the change remounts it against the real session.
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+  }, [id]);
+
   const load = useCallback(() => getDeck(id)
     .then((r) => {
       revRef.current = Number(r.deck?.meta?.rev || 0);
@@ -250,6 +258,7 @@ export function DeckPage({ id, seed }) {
         collapsed={false}
         onToggle={() => {}}
         onDeckMaybeChanged={load}
+        onSessionStarted={adoptSession}
         width={chatPane.width}
       />
 

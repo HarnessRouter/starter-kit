@@ -10,7 +10,7 @@
 // reported through onSession before being handed to the dispatcher.
 import { createResponsesDispatcher, readSSEStream } from 'reifyui';
 import { authFetch } from './auth';
-import { slidesHarness } from './sl';
+import { getTemplateDetail, slidesHarness } from './sl';
 
 const API = '/api/harness/v1';
 
@@ -30,13 +30,36 @@ export async function streamTurn(deckId, message, h) {
   const harness = await slidesHarness();
   if (!harness) throw new Error('Slides has not been launched yet.');
   // A pending deck id ("new:<template>") is not a session — omit it and let the turn create one.
-  const existing = deckId && !String(deckId).startsWith('new:') ? String(deckId) : '';
+  const pending = String(deckId || '').startsWith('new:');
+  const existing = deckId && !pending ? String(deckId) : '';
+
+  // The template the person picked only exists client-side, so the first turn is where it becomes
+  // real: hand the agent the design brief and the exact theme to build on. Without this the
+  // choice would be silently discarded and every deck would come out looking the same.
+  let input = message;
+  if (pending) {
+    const templateId = String(deckId).slice(4);
+    if (templateId && templateId !== 'blank') {
+      const t = await getTemplateDetail(templateId).catch(() => null);
+      if (t) {
+        input = [
+          `Design this deck in the "${t.name}" style.`,
+          t.context || t.description || '',
+          '',
+          'Use exactly this theme in deck.json:',
+          JSON.stringify(t.theme || {}, null, 2),
+          '',
+          `The brief: ${message}`,
+        ].filter(Boolean).join('\n');
+      }
+    }
+  }
 
   const res = await authFetch(`${API}/responses`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
     body: JSON.stringify({
-      input: message,
+      input,
       metadata: { harness_id: harness.id, ...(existing ? { session_id: existing } : {}) },
       stream: true,
     }),
