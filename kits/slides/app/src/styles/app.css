@@ -636,6 +636,13 @@
   border: 2px solid var(--line); background: var(--surface-2);
 }
 .sl-rail-item.active .sl-rail-thumb { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-soft); }
+/* Selection is `.active` and nothing else. A click leaves DOM focus on that button, so the UA's
+   focus ring kept painting the previously clicked thumb as if it were still selected — arrow-key
+   navigation then showed two "selected" slides at once. Keyboard users still get a ring, but only
+   ever on the thumb that is genuinely selected. */
+.sl-rail-item:focus { outline: none; }
+.sl-rail-item:focus-visible .sl-rail-thumb { border-color: var(--brand); }
+.sl-rail-item.active:focus-visible .sl-rail-thumb { box-shadow: 0 0 0 2px var(--brand-soft), 0 0 0 5px rgba(15, 23, 42, .16); }
 .sl-canvas { flex: 1; min-width: 0; display: flex; padding: 28px; background: var(--bg); }
 .thumb-ph2 { display: block; width: 100%; aspect-ratio: 16/9; background: var(--surface-2); }
 /* deck-card thumbnails render a live SlideView; give the box the slide ratio */
