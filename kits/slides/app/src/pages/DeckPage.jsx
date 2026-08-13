@@ -10,7 +10,7 @@ import { HelpCircle, Home, Maximize2, Download } from 'lucide-react';
 import { SlideView, EditorCanvas } from 'reifyui/slides';
 import { Presentation } from 'reifyui/slides';
 import { PaneResizer, useResizablePane } from 'reifyui';
-import { getDeck, saveDeck, markViewed, workspaceFileIndex } from '../lib/sl';
+import { chatHistory, deckStatus, getDeck, saveDeck, markViewed, workspaceFileIndex } from '../lib/sl';
 import { authFetch, getSession } from '../lib/auth';
 import { useDeckCollab } from '../lib/collab';
 import { ChatColumn } from '../components/ChatPanel';
@@ -80,6 +80,8 @@ export function DeckPage({ id, seed }) {
     onCopilot: setCopilotBusy,
   });
 
+  const [noDeck, setNoDeck] = useState(null);
+
   const adoptSession = useCallback((sid) => {
     if (!sid || sid === id) return;
     const [, query = ''] = (window.location.hash || '').split('?');
@@ -88,10 +90,31 @@ export function DeckPage({ id, seed }) {
     window.dispatchEvent(new HashChangeEvent('hashchange'));
   }, [id]);
 
+  // "No deck" is three different situations and they must not look alike. The deck only exists
+  // once a turn has written deck.json AND checkpointed, so a turn that is still going, and a turn
+  // that died having written nothing, both arrive here as `deck: null`. Reporting both as
+  // "Loading deck…" is how this page sat pretending to load a deck that was never coming.
   const load = useCallback(() => getDeck(id)
-    .then((r) => {
+    .then(async (r) => {
       revRef.current = Number(r.deck?.meta?.rev || 0);
       setDeckState(r.deck);
+      if (r.deck) { setNoDeck(null); return; }
+      const st = await deckStatus(id).catch(() => '');
+      if (['running', 'starting'].includes(st)) {
+        setNoDeck({ working: true, text: 'Designing your deck…' });
+        return;
+      }
+      // Finished without producing one: the turn's own last words are the only honest
+      // explanation we have, so show them rather than a generic failure.
+      const { turns } = await chatHistory(id).catch(() => ({ turns: [] }));
+      const last = turns[turns.length - 1];
+      setNoDeck({
+        working: false,
+        text: last?.status && last.status !== 'completed'
+          ? `The last turn ended as "${last.status}" without writing a deck.`
+          : 'No deck was written for this conversation yet.',
+        detail: String(last?.assistant || '').slice(0, 400),
+      });
     })
     .catch((e) => setErr(e.message || 'Could not open this deck.')), [id]);
 
@@ -243,7 +266,20 @@ export function DeckPage({ id, seed }) {
                 peers={collab.peers}
               />
             ) : (
-              <div className="empty-note" style={{ paddingTop: 80 }}>{deck ? 'This deck has no slides.' : 'Loading deck…'}</div>
+              <div className="empty-note" style={{ paddingTop: 80 }}>
+                {deck ? 'This deck has no slides.'
+                  : noDeck ? (
+                    <>
+                      <div>{noDeck.text}</div>
+                      {noDeck.detail && <pre className="deck-empty-detail">{noDeck.detail}</pre>}
+                      {!noDeck.working && (
+                        <div style={{ marginTop: 14 }}>
+                          Ask the copilot again on the right — the conversation is still here.
+                        </div>
+                      )}
+                    </>
+                  ) : 'Loading deck…'}
+              </div>
             )}
           </div>
         </div>

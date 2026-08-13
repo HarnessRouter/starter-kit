@@ -121,15 +121,14 @@ export async function deleteDeck(id) {
   return hr(`/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
 
-/** The deck JSON: { deck_id, deck }. Null deck means the agent has not written one yet. */
+/** The deck JSON: { deck_id, deck }. Null deck means the agent has not written one yet.
+ *
+ *  Read by path, which reads the LIVE workspace — so a deck appears as soon as the agent writes
+ *  it, mid-turn. The file listing next to it answers from the checkpoint tarball, which is only
+ *  written when a turn ends: polling that showed a spinner for a deck that was already on disk. */
 export async function getDeck(id) {
-  const doc = await hr(`/sessions/${encodeURIComponent(id)}/files`).catch(() => null);
-  const file = (doc?.files || []).find((f) => (f.path || f.filename) === 'deck.json');
-  if (!file) return { deck_id: id, deck: null };
-  const r = await fetch(
-    `${API}/containers/${encodeURIComponent(id)}/files/${encodeURIComponent(file.id)}/content`,
-    { cache: 'no-store' },
-  );
+  const r = await fetch(`${API}/sessions/${encodeURIComponent(id)}/files/deck.json`,
+                        { cache: 'no-store' });
   if (!r.ok) return { deck_id: id, deck: null };
   return { deck_id: id, deck: await r.json().catch(() => null) };
 }
