@@ -109,8 +109,8 @@ export async function listDecks() {
 export async function createDeck(name, template = 'blank') {
   const h = await slidesHarness();
   if (!h) throw new Error('Slides has not been launched yet.');
-  const pending = { deck_id: `new:${template}`, name: name || 'Untitled deck', template };
-  return pending;
+  const id = `new:${template}`;
+  return { id, deck_id: id, name: name || 'Untitled deck', template };
 }
 
 export async function renameDeck(id, name) {
