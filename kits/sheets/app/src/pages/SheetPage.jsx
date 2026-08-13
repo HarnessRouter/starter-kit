@@ -105,6 +105,7 @@ export function SheetPage({ id: routeId, seed, template }) {
   idRef.current = id;
   const runnerRef = useRef(null);
   const exportRef = useRef(null);
+  const mirrored = useRef('');      // the session title we last asserted
   const save = useRef({ timer: null, inFlight: false, backoff: 0, wanted: null });
 
   // ── the one writer ────────────────────────────────────────────────────────
@@ -209,7 +210,10 @@ export function SheetPage({ id: routeId, seed, template }) {
   // Once the turn ends, write whatever accumulated while the file was locked.
   const prevAgentBusy = useRef(false);
   useEffect(() => {
-    if (prevAgentBusy.current && !agentBusy) { load().then(() => flush()); }
+    if (prevAgentBusy.current && !agentBusy) {
+      mirrored.current = '';          // the turn just renamed the session; re-assert the real name
+      load().then(() => flush());
+    }
     prevAgentBusy.current = agentBusy;
   }, [agentBusy, load, flush]);
 
@@ -434,9 +438,14 @@ export function SheetPage({ id: routeId, seed, template }) {
     commit({ ...doc, meta: { ...doc.meta, title: name.trim() } });
   }, [dialog, commit]);
 
-  // The agent may rename the sheet from inside the document; the session title is then stale, and
-  // one direction of reconciliation is stated rather than two racing.
-  const mirrored = useRef('');
+  // meta.title is the truth and the session title is its mirror — the sheet LIST renders the
+  // session title, because it cannot read the file.
+  //
+  // The mirror has to be re-asserted after every turn, not just when meta.title changes. A turn
+  // regenerates the session title from the latest user message, so a sheet called "Competitor
+  // scan" appeared in the list as "Add a plain text column called Owner at the end." — the name
+  // was right in the document and wrong everywhere the person looks for it. Re-asserting once per
+  // turn is exactly as often as something can undo it.
   useEffect(() => {
     const title = sheet?.meta?.title;
     if (!title || isPending(id) || mirrored.current === title) return;
