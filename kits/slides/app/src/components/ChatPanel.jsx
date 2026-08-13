@@ -177,7 +177,18 @@ export function ChatColumn({ deckId, seed, title, copilotBuilding, collapsed, on
   }
 
   // Mount: strip ?seed FIRST, then replay history; seed fires only when empty.
+  //
+  // Keyed on deckId, and a pending deck CHANGES its id mid-stream: it starts as "new:<template>"
+  // and adopts the real session id the moment the first turn opens one. Re-running then refetched
+  // history and setMessages() over the blocks that were streaming in — the panel showed the user
+  // bubble and nothing else while the console showed the whole turn. It is the same conversation,
+  // so the resolve is not a reason to reload it.
+  const prevDeckId = useRef(deckId);
   useEffect(() => {
+    const resolved = String(prevDeckId.current || '').startsWith('new:')
+      && !String(deckId || '').startsWith('new:');
+    prevDeckId.current = deckId;
+    if (resolved) return undefined;
     stripSeedFromHash();
     let dead = false;
     chatHistory(deckId).then(({ turns }) => {

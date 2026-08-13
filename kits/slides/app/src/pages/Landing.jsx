@@ -19,9 +19,15 @@ import { Dialog, ConfirmDialog } from '../components/Dialog';
 import { TemplatePreviewModal } from '../components/TemplatePreviewModal';
 import { SkeletonTableRows, SkeletonTemplateCards } from '../components/Skeleton';
 
-function openDeck(id, seed) {
-  const q = seed ? `?seed=${encodeURIComponent(seed)}` : '';
-  window.location.hash = `#/d/${id}${q}`;
+function openDeck(id, seed, template) {
+  // `seed` is consumed and stripped on arrival; `template` stays, because it is a property of the
+  // deck the person created and they should be able to see which one they picked — including
+  // after a reload.
+  const q = new URLSearchParams();
+  if (seed) q.set('seed', seed);
+  if (template && template !== 'blank') q.set('tpl', template);
+  const qs = q.toString();
+  window.location.hash = `#/d/${id}${qs ? `?${qs}` : ''}`;
 }
 
 function useTypewriter(active) {
@@ -178,7 +184,7 @@ export function LandingPage() {
           await uploadRef(res.id, refFile);
           if (text) seed += `\n\nI attached ${refFile.name} — use it as the starting point for both content and style.`;
         }
-        openDeck(res.id, seed);
+        openDeck(res.id, seed, tpl ? tpl.id : '');
       } catch (e) { setCreating(false); setCreateErr(e.message || 'Could not create the deck.'); }
     });
   }
