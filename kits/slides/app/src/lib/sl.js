@@ -157,10 +157,12 @@ export async function sendChat(id, message) {
   }));
 }
 
+/** The conversation so far: `{ turns }`, oldest first — the shape ChatPanel destructures.
+ *  The route is /turns; there is no /events, and calling one 404s history away silently. */
 export async function chatHistory(id) {
-  if (!id || String(id).startsWith('new:')) return [];
-  const body = await hr(`/sessions/${encodeURIComponent(id)}/events`).catch(() => null);
-  return body?.events ?? body?.data ?? [];
+  if (!id || String(id).startsWith('new:')) return { turns: [] };
+  const body = await hr(`/sessions/${encodeURIComponent(id)}/turns`).catch(() => null);
+  return { turns: body?.turns ?? [] };
 }
 
 /** Attachments land in the session workspace, where the agent can open them by name. */
