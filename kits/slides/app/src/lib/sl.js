@@ -117,8 +117,15 @@ export async function renameDeck(id, name) {
   return hr(`/sessions/${encodeURIComponent(id)}`, jsonInit('PATCH', { title: name }));
 }
 
+/** Delete the deck AND the conversation underneath it.
+ *
+ *  The route is /traces/{id}, not /sessions/{id} — there is no DELETE on the session path, so the
+ *  obvious call silently did nothing and the deck came back on the next load. This one removes the
+ *  trace, the durable workspace tarball (deck.json included) and tombstones the session, which is
+ *  what "delete" has to mean here: a deck IS its session, so leaving the session behind would
+ *  leave the deck recoverable and the storage held. */
 export async function deleteDeck(id) {
-  return hr(`/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  return hr(`/traces/${encodeURIComponent(id)}`, { method: 'DELETE' });
 }
 
 /** The deck JSON: { deck_id, deck }. Null deck means the agent has not written one yet.
