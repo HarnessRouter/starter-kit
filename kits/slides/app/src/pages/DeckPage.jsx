@@ -50,7 +50,13 @@ async function downloadExport(id, title, kind, setBusy) {
   } finally { setBusy(''); }
 }
 
-export function DeckPage({ id, seed }) {
+export function DeckPage({ id: routeId, seed }) {
+  // The session id lives in state, not in the route. A deck starts as "new:<template>" and
+  // becomes a session when its first turn opens one — and that arrives WHILE the copilot is
+  // streaming. Re-keying this component off the URL at that moment unmounted it mid-stream and
+  // threw away the turn: the console showed eleven tool calls and this panel showed nothing.
+  const [id, setId] = useState(routeId);
+  useEffect(() => { setId(routeId); }, [routeId]);
   const [deck, setDeckState] = useState(null);
   const [err, setErr] = useState('');
   const [sel, setSel] = useState(0);
@@ -85,9 +91,10 @@ export function DeckPage({ id, seed }) {
   const adoptSession = useCallback((sid) => {
     if (!sid || sid === id) return;
     const [, query = ''] = (window.location.hash || '').split('?');
+    // Silent: replaceState does not fire hashchange, so App never re-keys and the live stream
+    // survives. The pending id addresses nothing, so it must not become a Back target either.
     window.history.replaceState({}, '', `#/d/${sid}${query ? `?${query}` : ''}`);
-    // App keys DeckPage on the id, so dispatching the change remounts it against the real session.
-    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    setId(sid);
   }, [id]);
 
   // "No deck" is three different situations and they must not look alike. The deck only exists
