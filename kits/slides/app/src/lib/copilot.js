@@ -34,32 +34,26 @@ export async function streamTurn(deckId, message, h) {
   const existing = deckId && !pending ? String(deckId) : '';
 
   // The template the person picked only exists client-side, so the first turn is where it becomes
-  // real: hand the agent the design brief and the exact theme to build on. Without this the
-  // choice would be silently discarded and every deck would come out looking the same.
-  let input = message;
+  // real. It rides in `instructions`, NOT in the message: the gateway records the raw user text
+  // for the transcript, so the chat keeps showing the sentence they typed instead of a wall of
+  // theme JSON. Scaffolding should be invisible.
+  let instructions = '';
   if (pending) {
     const templateId = String(deckId).slice(4);
     if (templateId && templateId !== 'blank') {
       const t = await getTemplateDetail(templateId).catch(() => null);
       if (t) {
-        // Two real slides from the template, verbatim. The theme alone only fixes the colours —
-        // these carry the layout system (grid, type scale, accent move) AND demonstrate the exact
-        // element shape, which is the thing a deck gets wrong in a way that renders blank.
-        const exemplars = (t.slides || []).slice(0, 2);
-        input = [
+        // The style brief and the theme, and nothing else. Embedding two full template slides as
+        // schema exemplars added ~10KB to the FIRST request and pushed deepseek-v4-pro past the
+        // runner's 90s no-first-token watchdog — the turn died having written nothing. The schema
+        // those exemplars were teaching now lives in the slide-design skill, where it costs
+        // nothing per turn and applies to every turn rather than only the first.
+        instructions = [
           `Design this deck in the "${t.name}" style.`,
           t.context || t.description || '',
           '',
           'Use exactly this theme in deck.json:',
           JSON.stringify(t.theme || {}, null, 2),
-          ...(exemplars.length ? [
-            '',
-            'Follow these slides from the template — match their grid, type scale and accent'
-            + ' treatment, and copy their element shape exactly:',
-            JSON.stringify(exemplars, null, 2),
-          ] : []),
-          '',
-          `The brief: ${message}`,
         ].filter(Boolean).join('\n');
       }
     }
@@ -69,7 +63,8 @@ export async function streamTurn(deckId, message, h) {
     method: 'POST',
     headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
     body: JSON.stringify({
-      input,
+      input: message,
+      ...(instructions ? { instructions } : {}),
       metadata: { harness_id: harness.id, ...(existing ? { session_id: existing } : {}) },
       stream: true,
     }),
