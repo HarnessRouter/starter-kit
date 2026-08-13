@@ -354,11 +354,18 @@ export function DeckPage({ id: routeId, seed, template }) {
 
 function DeckBanner({ deck, onPresent, onExport, exporting, peers = [], live, saveState, copilotBusy }) {
   const [menu, setMenu] = useState(false);
+  const menuRef = useRef(null);
+  // Close on a click OUTSIDE the menu, on mousedown — the same pattern AvatarMenu already uses.
+  //
+  // The old version listened for `click` on window with no containment check, and the menu could
+  // never open: React 18 flushes state and effects synchronously during a discrete event, so this
+  // listener was attached while the very click that opened the menu was still propagating, and it
+  // immediately closed it again. Export looked like a dead button for that reason alone.
   useEffect(() => {
     if (!menu) return undefined;
-    const close = () => setMenu(false);
-    window.addEventListener('click', close);
-    return () => window.removeEventListener('click', close);
+    const onDown = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenu(false); };
+    window.addEventListener('mousedown', onDown);
+    return () => window.removeEventListener('mousedown', onDown);
   }, [menu]);
   return (
     <header className="gp-banner">
@@ -371,7 +378,7 @@ function DeckBanner({ deck, onPresent, onExport, exporting, peers = [], live, sa
           </button>
         )}
         {onExport && (
-        <div className="sl-export-wrap">
+        <div className="sl-export-wrap" ref={menuRef}>
           <button className="btn" disabled={!!exporting}
                   onClick={(e) => { e.stopPropagation(); setMenu((v) => !v); }}
                   title="Export this deck">
