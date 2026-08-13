@@ -59,3 +59,18 @@ export function NameDialog({ title, body, defaultValue = '', confirmLabel = 'Cre
     </Dialog>
   );
 }
+
+/** A message the person must acknowledge. In-app, never window.alert — a browser popup is the
+ *  clearest signal a product was not finished, and it cannot carry detail or styling. */
+export function AlertDialog({ title, body, detail, onClose }) {
+  return (
+    <Dialog onClose={onClose}>
+      <h3>{title}</h3>
+      <div className="body">
+        {Array.isArray(body) ? body.map((line, i) => <p key={i}>{line}</p>) : body}
+      </div>
+      {detail && <pre className="dlg-detail">{detail}</pre>}
+      <div className="foot"><button className="btn primary" onClick={onClose}>OK</button></div>
+    </Dialog>
+  );
+}
