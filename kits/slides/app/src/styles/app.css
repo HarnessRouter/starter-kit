@@ -1,0 +1,326 @@
+/* Slides — the paint this app owns.
+ *
+ * Everything shared now comes from the package's stylesheets (see main.jsx): the library page
+ * (shell, topbar, hero, prompt box, sections, search, carousel, cards, table, notes, skeleton
+ * block, icon buttons), chips and popovers, the Modal shell, the in-app dialogs, the
+ * conversation column, and the slide renderer/editor layer. What is left in this file is the
+ * part that is genuinely Slides': the deck page's own chrome, the slide rail, the template art,
+ * and the print surface.
+ *
+ * The bridge below is the whole theming story: the product's tokens (styles/tokens.css) are
+ * published under the --uic-* names the package reads, so one palette drives both.
+ */
+:root {
+  --uic-font: var(--font);
+  --uic-mono: var(--mono);
+  --uic-bg: var(--bg);
+  --uic-surface: var(--surface);
+  --uic-surface-2: var(--surface-2);
+  --uic-line: var(--line);
+  --uic-line-soft: var(--line-soft);
+  --uic-line-strong: #CBD0DA;
+  --uic-ink: var(--ink);
+  --uic-ink-2: var(--ink-2);
+  --uic-mute: var(--mute);
+  --uic-mute-2: var(--mute-2);
+  --uic-brand: var(--brand);
+  --uic-brand-ink: var(--brand-ink);
+  --uic-brand-soft: var(--brand-soft);
+  --uic-brand-faint: var(--brand-50);
+  --uic-on-brand: #FFFFFF;
+  --uic-ok: var(--ok);
+  --uic-warn: var(--warm);
+  --uic-shadow-1: var(--shadow-1);
+  --uic-shadow-2: var(--shadow-2);
+  --uic-shadow-3: -16px 0 40px rgba(15, 23, 42, .22);
+  /* One focus glow and one status pulse, both derived from the brand — a hand-written rgba() is
+     how an indigo product ends up ringing another product's teal on every focused input. */
+  --uic-focus-ring: color-mix(in srgb, var(--brand) 14%, transparent);
+  --uic-hover-wash: rgba(0, 0, 0, .05);
+  --uic-scrim: rgba(17, 24, 39, .42);
+  --uic-skel: var(--line);
+  --uic-fail-ink: #B91C1C; --uic-fail-line: #FCA5A5; --uic-fail-bg: var(--hot-soft);
+  --uic-cancel-ink: #52525B; --uic-cancel-line: #E4E4E7; --uic-cancel-bg: #FAFAFA;
+  --uic-incomplete-ink: #92400E; --uic-incomplete-line: #FDE68A; --uic-incomplete-bg: var(--warm-soft);
+  --uic-r-card: var(--r-card);
+  --uic-r-input: var(--r-input);
+  --uic-r-pill: var(--r-pill);
+  /* Everything that floats over the page — dialogs, modals, popovers — on ONE layer, so their
+     order is the order they opened in rather than a race between two stylesheets. */
+  --uic-z-overlay: 9000;
+}
+
+/* ── Account menu (topbar right) ────────────────────────────────────────── */
+.avmenu-wrap { position: relative; }
+.avmenu {
+  position: absolute; right: 0; top: 40px; width: 220px; z-index: 60;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: var(--shadow-2); padding: 6px; display: flex; flex-direction: column;
+}
+.avmenu .who { padding: 10px 12px 8px; }
+.avmenu .who .nm { font-size: 13px; font-weight: 600; color: var(--ink); }
+.avmenu a, .avmenu button.item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px; border-radius: 8px; font-size: 13px; color: var(--ink-2);
+  text-decoration: none; background: none; border: none; cursor: pointer;
+  font-family: inherit; text-align: left; width: 100%;
+}
+.avmenu a:hover, .avmenu button.item:hover { background: var(--line-soft); }
+.avmenu button.item.out { color: #B91C1C; }
+.avmenu button.item.out:hover { background: var(--hot-soft); }
+
+/* ── Segmented switcher (list | grid) ───────────────────────────────────── */
+.wb-tabs {
+  display: flex; gap: 4px; background: var(--brand-50); border: 1px solid var(--line);
+  border-radius: 10px; padding: 4px; width: fit-content;
+}
+.wb-tab {
+  font-size: 13px; font-weight: 600; padding: 6px 16px; border-radius: 7px;
+  cursor: pointer; color: var(--mute); border: none; background: transparent; font-family: inherit;
+}
+.wb-tab.active { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-1); }
+/* Icon-only variant */
+.wb-tabs.vt { padding: 3px; gap: 2px; border-radius: 8px; }
+.wb-tabs.vt .wb-tab { padding: 4px 9px; border-radius: 6px; display: inline-flex; align-items: center; }
+
+/* ── Landing: the pieces the package does not own ───────────────────────── */
+/* Inline rename, inside a card's title row or a table cell. */
+.sl-rename { font-size: 13px; font-weight: 600; padding: 3px 8px; }
+/* Template category filter row. */
+.sl-cats { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+/* The preview eye that floats over a template card's art (Card's `overlay` slot). It needs its
+   own surface: uic-iconbtn is transparent, and this sits on top of a rendered slide. */
+.sl-eye {
+  width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink-2); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; box-shadow: var(--shadow-1);
+}
+.sl-eye:hover { border-color: var(--brand); color: var(--brand); }
+/* A deck whose first slide has not loaded yet — the box, and nothing invented inside it. */
+.sl-thumb-ph { display: block; width: 100%; height: 100%; background: var(--surface-2); }
+
+/* Template card art: the real first slide, shrunk (the honest thumbnail); the palette card is
+   the fallback for a template that ships no starter slides. */
+.sl-tpl-cover { display: block; width: 100%; height: 100%; overflow: hidden; }
+.sl-tpl-cover .sl-fit > div { border-radius: 0 !important; box-shadow: none !important; }
+.sl-tpl-art {
+  display: flex; flex-direction: column; justify-content: center; gap: 8px;
+  width: 100%; height: 100%; padding: 14px 16px; text-align: left;
+}
+.sl-tpl-art-title {
+  font-size: 13px; font-weight: 700; line-height: 1.2; letter-spacing: -0.01em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.sl-tpl-art-rule { width: 34px; height: 4px; border-radius: 2px; }
+.sl-tpl-art-row { display: flex; gap: 5px; margin-top: 2px; }
+.sl-tpl-art-chip { width: 22px; height: 10px; border-radius: 3px; }
+
+/* Skeleton shapes (the pulsing block itself is .uic-skel, from the package). */
+.uic-card.is-skel:hover { border-color: var(--line); box-shadow: var(--shadow-1); }
+.sl-skel-row { cursor: default; }
+.sl-skel-row:hover { background: transparent; }
+
+/* ── Deck page: banner · rail · canvas · conversation ───────────────────── */
+/* The conversation column owns the FULL viewport height, its own header level with the banner. */
+.gp-root { height: 100vh; display: flex; overflow: hidden; background: var(--bg); }
+.gp-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.gp-banner {
+  height: 52px; flex-shrink: 0; position: relative;
+  display: flex; align-items: center; gap: 10px; padding: 0 16px;
+  background: var(--surface); border-bottom: 1px solid var(--line);
+}
+.gp-banner a.uic-iconbtn { text-decoration: none; color: var(--ink-2); }
+.gp-banner-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+.sl-banner-actions { display: flex; align-items: center; gap: 8px; margin-left: 18px; }
+.sl-banner-actions .btn { display: inline-flex; align-items: center; gap: 6px; }
+
+/* Copilot building status (status, not presence): a soft pulsing ring beside the session title
+   while a turn runs — including one started in another window. */
+.sl-chat-cop {
+  width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--brand-ink); background: var(--brand-soft);
+  animation: sl-cop-pulse 1.6s ease-in-out infinite;
+}
+@keyframes sl-cop-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand) 45%, transparent); }
+  55% { box-shadow: 0 0 0 5px transparent; }
+}
+@media (prefers-reduced-motion: reduce) { .sl-chat-cop { animation: none; } }
+
+.sl-body { flex: 1; min-height: 0; display: flex; }
+.sl-rail {
+  flex: 0 0 208px; min-height: 0; overflow-y: auto; padding: 12px;
+  background: var(--surface); border-right: 1px solid var(--line);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.sl-rail-item {
+  display: flex; align-items: flex-start; gap: 8px; width: 100%;
+  background: transparent; border: none; padding: 0; cursor: pointer; font-family: inherit;
+}
+.sl-rail-num { font-size: 11px; color: var(--mute-2); width: 16px; text-align: right; padding-top: 4px; flex-shrink: 0; }
+.sl-rail-thumb {
+  flex: 1; aspect-ratio: 16 / 9; border-radius: 6px; overflow: hidden;
+  border: 2px solid var(--line); background: var(--surface-2);
+}
+.sl-rail-item.active .sl-rail-thumb { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-soft); }
+/* Selection is `.active` and nothing else. A click leaves DOM focus on that button, so the UA's
+   focus ring kept painting the previously clicked thumb as if it were still selected — arrow-key
+   navigation then showed two "selected" slides at once. Keyboard users still get a ring, but only
+   ever on the thumb that is genuinely selected. */
+.sl-rail-item:focus { outline: none; }
+.sl-rail-item:focus-visible .sl-rail-thumb { border-color: var(--brand); }
+.sl-rail-item.active:focus-visible .sl-rail-thumb { box-shadow: 0 0 0 2px var(--brand-soft), 0 0 0 5px rgba(15, 23, 42, .16); }
+.sl-canvas { flex: 1; min-width: 0; display: flex; padding: 28px; background: var(--bg); }
+
+/* The turn's own last words, when it ended without writing a deck. */
+.sl-deck-detail {
+  margin: 10px auto 0; padding: 10px; max-width: 620px; max-height: 180px; overflow: auto;
+  text-align: left; background: var(--surface-2); border-radius: 8px;
+  font: 12px/1.5 var(--mono); white-space: pre-wrap;
+}
+
+/* Peer presence on the banner (empty in this build — see lib/collab.js). */
+.sl-peer-stack { display: inline-flex; margin-right: 4px; }
+.sl-peer-av {
+  width: 26px; height: 26px; border-radius: 50%; color: #fff; font-size: 12px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 2px solid var(--surface); margin-left: -6px;
+}
+
+/* Autosave / copilot status chip. */
+.sl-save-chip {
+  font-size: 12px; color: var(--mute); padding: 4px 10px; border-radius: 999px;
+  background: var(--surface-2); border: 1px solid var(--line);
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.sl-save-chip.error { color: #B42318; border-color: #F0B4AC; }
+.sl-save-chip.copilot { color: var(--brand); border-color: var(--brand-soft); }
+.sl-save-chip .pulse {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--brand);
+  animation: sl-pulse 1.2s ease-in-out infinite;
+}
+@keyframes sl-pulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .sl-save-chip .pulse { animation: none; } }
+
+/* Export menu (PDF / PowerPoint) */
+.sl-export-wrap { position: relative; display: inline-block; }
+.sl-export-menu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 30; min-width: 190px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: var(--shadow-2); padding: 5px; display: flex; flex-direction: column;
+}
+.sl-export-menu button {
+  text-align: left; background: transparent; border: none; cursor: pointer;
+  font-size: 13px; font-family: inherit; color: var(--ink); padding: 8px 10px; border-radius: 7px;
+}
+.sl-export-menu button:hover { background: var(--surface-2); color: var(--brand); }
+
+/* ── Deck skeleton: the shape of a deck page while the agent writes deck.json ─── */
+.sl-skel-deck { display: flex; flex: 1; min-height: 0; }
+.sl-skel-rail {
+  flex: 0 0 168px; display: flex; flex-direction: column; gap: 10px;
+  padding: 12px; border-right: 1px solid var(--line); overflow: hidden;
+}
+.sl-skel-thumb { display: block; width: 100%; aspect-ratio: 16/9; }
+.sl-skel-stage {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 16px; padding: 28px; background: var(--bg);
+}
+/* 16:9, capped so it never outgrows the pane — the same box the real stage occupies. */
+.sl-skel-slide { width: min(100%, 980px); aspect-ratio: 16/9; }
+.sl-skel-note { margin: 0; font-size: 13px; color: var(--mute); }
+@media (max-width: 820px) { .sl-skel-rail { display: none; } }
+
+/* ── Template preview: the side panel the package's Modal shell does not own ── */
+.sl-prev-loading { flex: 1; display: flex; padding: 16px; }
+.sl-prev-skel { flex: 1; border-radius: 12px; }
+/* The slide takes the room the canvas has; the note sits under it. */
+.sl-prev-canvas > .sl-fit { flex: 1; min-height: 0; }
+.sl-prev-cat {
+  display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: .07em;
+  text-transform: uppercase; color: var(--brand); background: var(--brand-50);
+  padding: 3px 10px; border-radius: 999px; margin-bottom: 16px;
+}
+.sl-prev-sec { margin-bottom: 22px; }
+.sl-prev-strip {
+  display: flex; height: 34px; border-radius: 10px; overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .06);
+}
+.sl-prev-stop { flex: 1; }
+.sl-prev-legend { display: flex; gap: 14px; margin-top: 8px; }
+.sl-prev-legend span { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--mute); }
+.sl-prev-legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.sl-prev-font { margin-top: 12px; font-size: 22px; color: var(--ink); display: flex; align-items: baseline; gap: 10px; }
+.sl-prev-font em { font-style: normal; font-size: 12px; color: var(--mute); }
+.sl-prev-context { margin: 0; font-size: 13px; line-height: 1.6; color: var(--ink-2); white-space: pre-wrap; }
+
+/* ── Narrow widths ───────────────────────────────────────────────────────
+   STANDING RULE: every surface must degrade cleanly — verified at 1440 / 1024 / 768 / 390.
+   The library page's own responsive layer lives in the package (library.css); the conversation
+   column becomes a drawer there too (chat.css), and it can now be collapsed, which is what makes
+   that drawer dismissable on a phone.
+
+   The banner is a size container because its width depends on the resizable conversation column,
+   not the viewport. Keep-priority as space runs out: actions > right cluster (help folds into the
+   account menu) > wordmark text > wordmark. */
+.gp-banner { container-type: inline-size; }
+@container (max-width: 800px) { .gp-banner .wm-text { display: none; } }
+@container (max-width: 750px) { .gp-banner .gp-help { display: none; } }
+@container (max-width: 430px) { .gp-banner .uic-wordmark { display: none; } }
+/* The banner cannot container-query its own padding; a tiny viewport is a reliable proxy. */
+@media (max-width: 480px) { .gp-banner { padding: 0 10px; gap: 6px; } }
+
+/* The rail becomes a horizontal filmstrip above the canvas rather than a squeezed column. */
+@media (max-width: 900px) {
+  .sl-body { flex-direction: column; }
+  .sl-rail {
+    flex: 0 0 auto; flex-direction: row; overflow-x: auto; overflow-y: hidden;
+    border-right: none; border-bottom: 1px solid var(--line); padding: 10px 12px;
+  }
+  .sl-rail-item { width: auto; flex: 0 0 148px; }
+  .sl-rail-num { display: none; }
+  .sl-canvas { padding: 14px; min-height: 320px; }
+}
+
+/* ── print surface ────────────────────────────────────────────────────────────
+   @page fixes the geometry: without it Chrome prints Letter, scales to ~0.67 and
+   clips the right third of every slide. print-color-adjust overrides the print
+   dialog's "Background graphics" checkbox, which is OFF by default — without it
+   every slide background disappears and a dark deck prints as white on white. */
+@page { size: 1920px 1080px; margin: 0; }
+
+@media screen {
+  .sl-print-root {
+    background: #0b0e14; padding: 24px 0;
+    display: flex; flex-direction: column; align-items: center; gap: 24px;
+  }
+  .sl-print-page {
+    width: 1920px; height: 1080px; position: relative; overflow: hidden; flex: 0 0 auto;
+    transform: scale(var(--sl-print-scale, 1)); transform-origin: top center;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, .45);
+  }
+  .sl-print-bar {
+    position: sticky; top: 0; z-index: 10; display: flex; gap: 12px; align-items: center;
+    padding: 10px 16px; background: #11151f; color: #e7ebf3;
+    font: 500 13px/1.4 system-ui, -apple-system, sans-serif;
+  }
+  .sl-print-bar .btn { background: #232a3a; color: #e7ebf3; border-color: #2f3850; }
+}
+
+@media print {
+  html, body { margin: 0; padding: 0; background: #fff; }
+  .sl-print-bar { display: none !important; }
+  .sl-print-root { display: block; padding: 0; background: none; }
+  .sl-print-page {
+    width: 1920px; height: 1080px; position: relative; overflow: hidden;
+    transform: none !important; box-shadow: none !important;
+    break-after: page; page-break-after: always;
+    break-inside: avoid; page-break-inside: avoid;
+  }
+  .sl-print-page:last-child { break-after: auto; page-break-after: auto; }
+  .sl-print-root, .sl-print-root * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

@@ -1,0 +1,47 @@
+HarnessRouter Starter Repository License Notice
+
+Copyright (c) 2026 HarnessRouter.
+
+This repository contains materials under different licenses.
+
+1. A license file located within a directory governs the files in that
+   directory and its subdirectories. If licenses conflict, the license closest
+   to the file controls.
+
+2. The materials under `kits/slides/` are not licensed under the MIT License.
+   They are governed by `kits/slides/LICENSE.md` and, for any Commercial Use,
+   the HarnessRouter Commercial Use and Deployment Agreement and applicable
+   Order Form.
+
+3. Except for files governed by a more specific directory license and
+   third-party materials identified in their notices, all other files in this
+   repository are licensed under the MIT License below.
+
+4. Third-party materials remain governed by their respective licenses and
+   notices. Nothing in a HarnessRouter license limits rights granted directly
+   by a third-party licensor.
+
+5. This notice applies to the repository version that first includes it and to
+   later versions. It does not revoke any license that was validly granted for
+   an earlier copy under the license displayed with that earlier copy.
+
+MIT License
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of the software and associated documentation files governed by the MIT License
+under this notice (the "MIT Materials"), to deal in the MIT Materials without
+restriction, including without limitation the rights to use, copy, modify,
+merge, publish, distribute, sublicense, and/or sell copies of the MIT
+Materials, and to permit persons to whom the MIT Materials are furnished to do
+so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the MIT Materials.
+
+THE MIT MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE MIT MATERIALS OR THE USE OR OTHER DEALINGS IN
+THE MIT MATERIALS.

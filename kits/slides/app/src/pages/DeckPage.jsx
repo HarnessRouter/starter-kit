@@ -1,0 +1,464 @@
+// Deck page — the editor, on the CG/Flowness IA (one banner row): wordmark +
+// home left, Slideshow + Export center, presence avatars + credits + avatar
+// right. Body: LEFT slide rail (live mini-renders, auto-scrolled to the
+// active slide), CENTER the EditorCanvas (direct manipulation: drag/resize/
+// inline text/delete/nudge), RIGHT the copilot chat. Edits autosave (debounced
+// PUT -> rev bump -> realtime publish); undo/redo is a snapshot stack; peers
+// and copilot edits arrive over the Yjs channel and render live.
+import { useCallback, useEffect, useRef, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { HelpCircle, Home, Maximize2, Download, Sparkles } from 'lucide-react';
+import { SlideView, EditorCanvas } from 'reifyui/slides';
+import { Presentation } from 'reifyui/slides';
+import { ChatPanel, PaneResizer, createDictation, useDialog, useResizablePane } from 'reifyui';
+import { fileToInputBlock } from 'reifyui/harness';
+import { chatHistory, deckStatus, getDeck, getTemplateDetail, saveDeck, markViewed } from '../lib/sl';
+import { loadHistory, runTurn } from '../lib/copilot';
+import { getSession } from '../lib/auth';
+import { useDeckCollab } from '../lib/collab';
+import { AvatarMenu, LINKS, Wordmark } from '../components/Topbar';
+import { SkeletonDeck } from '../components/Skeleton';
+import { useSrcResolver } from '../lib/srcResolver';
+
+/** Drop ?seed= from the hash in place so refresh/back/bookmark never resend the landing prompt. */
+function stripSeedFromHash() {
+  const h = window.location.hash || '';
+  if (!/[?&]seed=/.test(h)) return;
+  const [path, query = ''] = h.split('?');
+  const params = new URLSearchParams(query);
+  params.delete('seed');
+  const rest = params.toString();
+  window.history.replaceState(null, '',
+    window.location.pathname + window.location.search + path + (rest ? `?${rest}` : ''));
+}
+
+// Export dispatch. Both formats are produced in the browser: there is no export service in this
+// deployment, and the hosted product's endpoint this used to call went away with SL_API — which
+// is why the button threw ReferenceError on its first line and the catch swallowed it into a
+// silent no-op.
+async function runExport(kind, { id, deck, resolveSrc, setBusy, dialog }) {
+  setBusy(kind);
+  try {
+    if (kind === 'pdf') {
+      const { openPrintView } = await import('../lib/exportPdf');
+      openPrintView(id, deck);           // opens a tab that prints itself once the deck has settled
+    } else {
+      const { downloadPptx } = await import('../lib/exportPptx');
+      const report = await downloadPptx(deck, resolveSrc,
+                                        (n, total) => setBusy(`pptx:${n}/${total}`));
+      // What PowerPoint could not carry over, named — a silent lossy export is the worse lie.
+      if (report.notes.length) {
+        dialog.alert({
+          title: 'PowerPoint saved',
+          message: <>{report.notes.map((line, i) => <p key={i}>{line}</p>)}</>,
+        });
+      }
+    }
+  } catch (e) {
+    dialog.alert({
+      title: 'Export didn’t finish',
+      message: e?.message || `Could not export ${kind === 'pdf' ? 'PDF' : 'PowerPoint'}.`,
+      variant: 'error',
+    });
+  } finally {
+    setBusy('');
+  }
+}
+
+// Honest states only: PDF opens a tab (instant), PPTX reports the slide it is actually on.
+function exportLabel(busy) {
+  if (!busy) return 'Export';
+  if (busy === 'pdf') return 'Opening print view…';
+  const m = /^pptx:(\d+)\/(\d+)$/.exec(String(busy));
+  return m ? `Building PowerPoint — slide ${m[1]} of ${m[2]}` : 'Building PowerPoint…';
+}
+
+export function DeckPage({ id: routeId, seed, template }) {
+  // The session id lives in state, not in the route. A deck starts as "new:<template>" and
+  // becomes a session when its first turn opens one — and that arrives WHILE the copilot is
+  // streaming. Re-keying this component off the URL at that moment unmounted it mid-stream and
+  // threw away the turn: the console showed eleven tool calls and this panel showed nothing.
+  const [id, setId] = useState(routeId);
+  useEffect(() => { setId(routeId); }, [routeId]);
+  const [deck, setDeckState] = useState(null);
+  const [err, setErr] = useState('');
+  const [sel, setSel] = useState(0);
+  const [selEl, setSelEl] = useState(null);
+  const [presenting, setPresenting] = useState(false);
+  const [exporting, setExporting] = useState('');
+  const [saveState, setSaveState] = useState('');       // '' | 'saving' | 'saved' | 'error'
+  const [copilotBusy, setCopilotBusy] = useState(false);
+  const [chatCollapsed, setChatCollapsed] = useState(false);
+  const dialog = useDialog();
+  // Built ONCE: a fresh recogniser object every render would stop dictation on every keystroke.
+  // Null where the browser has none, and then the panel renders no microphone at all.
+  const [dictation] = useState(() => createDictation());
+  const chatPane = useResizablePane({ initial: 380, min: 300, maxFraction: 0.6, fromRight: true, storageKey: 'slides.chat.w' });
+  const resolveSrc = useSrcResolver(id);
+  const railRef = useRef(null);
+
+  const revRef = useRef(0);
+  const dirtyRef = useRef(false);
+  const saveTimer = useRef(null);
+  const undoStack = useRef([]);
+  const redoStack = useRef([]);
+  const deckRef = useRef(null);
+  deckRef.current = deck;
+  const selRef = useRef(0);
+  selRef.current = sel;
+
+  const me = getSession()?.member || { id: 'me', name: 'You' };
+  const collab = useDeckCollab({
+    resourceId: id, me, revRef, dirtyRef,
+    onRemoteDeck: (remote) => { setDeckState(remote); },
+    onCopilot: setCopilotBusy,
+  });
+
+  const [noDeck, setNoDeck] = useState(null);
+  // The template the deck was created from. Its brief travels invisibly in `instructions`, but the
+  // CHOICE is the person's and they should be able to see it — including after a reload.
+  const [tplName, setTplName] = useState('');
+  useEffect(() => {
+    if (!template) { setTplName(''); return undefined; }
+    let dead = false;
+    getTemplateDetail(template)
+      .then((t) => { if (!dead) setTplName(t?.name || ''); })
+      .catch(() => {});
+    return () => { dead = true; };
+  }, [template]);
+
+  const adoptSession = useCallback((sid) => {
+    if (!sid || sid === id) return;
+    const [, query = ''] = (window.location.hash || '').split('?');
+    // Silent: replaceState does not fire hashchange, so App never re-keys and the live stream
+    // survives. The pending id addresses nothing, so it must not become a Back target either.
+    window.history.replaceState({}, '', `#/d/${sid}${query ? `?${query}` : ''}`);
+    setId(sid);
+  }, [id]);
+
+  // "No deck" is three different situations and they must not look alike. The deck only exists
+  // once a turn has written deck.json AND checkpointed, so a turn that is still going, and a turn
+  // that died having written nothing, both arrive here as `deck: null`. Reporting both as
+  // "Loading deck…" is how this page sat pretending to load a deck that was never coming.
+  const load = useCallback(() => getDeck(id)
+    .then(async (r) => {
+      revRef.current = Number(r.deck?.meta?.rev || 0);
+      setDeckState(r.deck);
+      if (r.deck) { setNoDeck(null); return; }
+      const st = await deckStatus(id).catch(() => '');
+      if (['running', 'starting'].includes(st)) {
+        setNoDeck({ working: true, text: 'Designing your deck…' });
+        return;
+      }
+      // Finished without producing one: the turn's own last words are the only honest
+      // explanation we have, so show them rather than a generic failure.
+      const { turns } = await chatHistory(id).catch(() => ({ turns: [] }));
+      const last = turns[turns.length - 1];
+      setNoDeck({
+        working: false,
+        text: last?.status && last.status !== 'completed'
+          ? `The last turn ended as "${last.status}" without writing a deck.`
+          : 'No deck was written for this conversation yet.',
+        detail: String(last?.assistant || '').slice(0, 400),
+      });
+    })
+    .catch((e) => setErr(e.message || 'Could not open this deck.')), [id]);
+
+  useEffect(() => {
+    markViewed(id);
+    load();
+  }, [id, load]);
+
+  // Keep looking while the agent is working. The deck is a file it writes DURING the turn, and
+  // reads now hit the live workspace, so slides appear as they are written instead of after the
+  // turn ends. Without this the page shows "Designing your deck…" over a deck that is already on
+  // disk — which is exactly what it did, because the only other refresh is the stream ending, and
+  // a reloaded tab has no stream.
+  useEffect(() => {
+    if (!noDeck?.working && deck) return undefined;
+    const t = window.setInterval(() => { void load(); }, 4000);
+    return () => window.clearInterval(t);
+  }, [noDeck?.working, deck, load]);
+
+  // ── mutations: apply locally, push undo, schedule autosave ────────────────
+  const scheduleSave = useCallback(() => {
+    dirtyRef.current = true;
+    setSaveState('saving');
+    window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(async () => {
+      const d = deckRef.current;
+      if (!d) return;
+      try {
+        const r = await saveDeck(id, d);
+        revRef.current = Number(r.rev || revRef.current + 1);
+        // keep local meta.rev in step so our own publish doesn't bounce back
+        setDeckState((cur) => (cur ? { ...cur, meta: { ...cur.meta, rev: revRef.current } } : cur));
+        dirtyRef.current = false;
+        setSaveState('saved');
+        window.setTimeout(() => setSaveState((v) => (v === 'saved' ? '' : v)), 1800);
+      } catch {
+        setSaveState('error');
+      }
+    }, 900);
+  }, [id]);
+
+  const mutate = useCallback((fn) => {
+    setDeckState((cur) => {
+      if (!cur) return cur;
+      undoStack.current.push(JSON.stringify(cur));
+      if (undoStack.current.length > 60) undoStack.current.shift();
+      redoStack.current = [];
+      return fn(structuredClone(cur));
+    });
+    scheduleSave();
+  }, [scheduleSave]);
+
+  const patchElement = useCallback((elementId, patch) => {
+    mutate((d) => {
+      const s = d.slides[selRef.current];
+      const el = (s?.elements || []).find((x) => x.id === elementId);
+      if (el) Object.entries(patch).forEach(([k, v]) => { el[k] = v; });
+      return d;
+    });
+  }, [mutate]);
+
+  const deleteElement = useCallback((elementId) => {
+    mutate((d) => {
+      const s = d.slides[selRef.current];
+      if (s) s.elements = (s.elements || []).filter((x) => x.id !== elementId);
+      return d;
+    });
+    setSelEl(null);
+  }, [mutate]);
+
+  // undo / redo (Cmd/Ctrl+Z, Shift for redo)
+  useEffect(() => {
+    const onKey = (e) => {
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        const from = e.shiftKey ? redoStack.current : undoStack.current;
+        const to = e.shiftKey ? undoStack.current : redoStack.current;
+        const snap = from.pop();
+        if (snap && deckRef.current) {
+          to.push(JSON.stringify(deckRef.current));
+          setDeckState(JSON.parse(snap));
+          scheduleSave();
+        }
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [scheduleSave]);
+
+  // Up/Down switch slides — only when no element is selected (the editor owns
+  // arrows for nudging while one is).
+  useEffect(() => {
+    const onKey = (e) => {
+      if (presenting || selEl) return;
+      const t = e.target;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); setSel((v) => Math.min(v + 1, Math.max(0, (deckRef.current?.slides?.length || 1) - 1))); }
+      else if (e.key === 'ArrowUp' || e.key === 'PageUp') { e.preventDefault(); setSel((v) => Math.max(0, v - 1)); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [presenting, selEl]);
+
+  // Devil in the details: keep the active slide's thumb inside the rail.
+  useEffect(() => {
+    const item = railRef.current?.querySelectorAll('.sl-rail-item')?.[sel];
+    item?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }, [sel]);
+
+  // selection presence for peers
+  useEffect(() => {
+    const slide = deckRef.current?.slides?.[sel];
+    collab.setSelection(slide ? { slideId: slide.id, elId: selEl } : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sel, selEl]);
+
+  if (err) {
+    return (
+      <div className="gp-root"><div className="gp-main">
+        <DeckBanner deck={deck} onPresent={null} onExport={null} peers={[]} />
+        <div className="uic-note">{err}</div>
+      </div></div>
+    );
+  }
+
+  const slides = deck?.slides || [];
+  const slide = slides[Math.min(sel, Math.max(0, slides.length - 1))];
+
+  return (
+    <div className="gp-root">
+      <div className="gp-main">
+        <DeckBanner deck={deck}
+                    onPresent={() => slides.length && setPresenting(true)}
+                    onExport={(kind) => deck && !exporting && runExport(kind, {
+                      id, deck, resolveSrc, setBusy: setExporting, dialog,
+                    })}
+                    exporting={exporting} peers={collab.peers} live={collab.live}
+                    saveState={saveState} copilotBusy={copilotBusy} />
+        <div className="sl-body">
+          {/* No deck yet: the skeleton IS the body. Rendering it inside the canvas left
+              the real rail sitting empty beside it — two rails and a white gutter. */}
+          {!deck && (!noDeck || noDeck.working) ? (
+            <SkeletonDeck note={noDeck?.working
+              ? (tplName ? `Designing your deck in ${tplName}…` : 'Designing your deck…')
+              : 'Loading deck…'} />
+          ) : (<>
+          <aside className="sl-rail scroll" ref={railRef}>
+            {slides.map((s, i) => (
+              <button key={s.id} className={'sl-rail-item' + (i === sel ? ' active' : '')}
+                      onClick={(e) => { setSel(i); setSelEl(null); e.currentTarget.blur(); }}>
+                <span className="sl-rail-num">{i + 1}</span>
+                <span className="sl-rail-thumb">
+                  <SlideView slide={s} theme={deck.theme} resolveSrc={resolveSrc} />
+                </span>
+              </button>
+            ))}
+            {!slides.length && deck && <div className="uic-note" style={{ padding: 16 }}>No slides yet.</div>}
+          </aside>
+          <div className="sl-canvas">
+            {slide ? (
+              <EditorCanvas
+                slide={slide} theme={deck.theme} resolveSrc={resolveSrc}
+                selectedId={selEl} onSelect={setSelEl}
+                onPatchElement={patchElement}
+                onDeleteElement={deleteElement}
+                onDragState={(elId, frame) => collab.setDrag(elId, frame, slide.id)}
+                peers={collab.peers}
+              />
+            ) : deck ? (
+              <div className="uic-note" style={{ paddingTop: 80 }}>This deck has no slides.</div>
+            ) : (
+              // The only case left here: a turn finished without writing a deck. Its own last
+              // words are the only honest explanation we have.
+              <div className="uic-note" style={{ paddingTop: 80 }}>
+                <div>{noDeck?.text}</div>
+                {noDeck?.detail && <pre className="sl-deck-detail">{noDeck.detail}</pre>}
+                <div style={{ marginTop: 14 }}>
+                  Ask the copilot again on the right — the conversation is still here.
+                </div>
+              </div>
+            )}
+          </div>
+          </>)}
+        </div>
+      </div>
+
+      <PaneResizer pane={chatPane} />
+      {/* The conversation column is the package's. What stays here is what is Slides': the
+          transport (lib/copilot.js), the prose, and where the panel sits on this page. */}
+      <ChatPanel
+        sessionId={id}
+        runTurn={runTurn}
+        loadHistory={loadHistory}
+        onSessionStarted={adoptSession}
+        onChanged={load}
+        seed={seed}
+        onSeedConsumed={stripSeedFromHash}
+        externalBusy={copilotBusy}
+        title={deck?.meta?.title || 'Copilot'}
+        headerRight={copilotBusy ? (
+          <span className="sl-chat-cop" title="Copilot is building">
+            <Sparkles size={12} />
+          </span>
+        ) : null}
+        collapsed={chatCollapsed}
+        onToggleCollapse={() => setChatCollapsed((v) => !v)}
+        width={chatPane.width}
+        placeholder="What would you want to change?"
+        attachments={{ prepare: fileToInputBlock,
+                       accept: '.pdf,.pptx,.docx,.md,.txt,.png,.jpg,.jpeg' }}
+        dictation={dictation}
+        renderMarkdown={(t) => <ReactMarkdown remarkPlugins={[remarkGfm]}>{t}</ReactMarkdown>}
+        emptyState={(
+          <div className="uic-chat-empty">
+            <Sparkles size={26} />
+            <div className="uic-chat-empty-t">Your slides copilot</div>
+            <div>Describe what this deck should do, and your copilot will build and refine it with you.</div>
+          </div>
+        )}
+        busyState={(
+          <div className="uic-chat-empty">
+            <span className="uic-chat-pulse" aria-hidden="true" />
+            <div className="uic-chat-empty-t">Copilot is building your deck…</div>
+            <div>Working through the slides now — this can take a minute. Your conversation will appear here.</div>
+          </div>
+        )}
+      />
+
+      {presenting && (
+        <Presentation deck={deck} resolveSrc={resolveSrc} startIndex={sel} onExit={() => setPresenting(false)} />
+      )}
+    </div>
+  );
+}
+
+function DeckBanner({ deck, onPresent, onExport, exporting, peers = [], live, saveState, copilotBusy }) {
+  const [menu, setMenu] = useState(false);
+  const menuRef = useRef(null);
+  // Close on a click OUTSIDE the menu, on mousedown — the same pattern AvatarMenu already uses.
+  //
+  // The old version listened for `click` on window with no containment check, and the menu could
+  // never open: React 18 flushes state and effects synchronously during a discrete event, so this
+  // listener was attached while the very click that opened the menu was still propagating, and it
+  // immediately closed it again. Export looked like a dead button for that reason alone.
+  useEffect(() => {
+    if (!menu) return undefined;
+    const onDown = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setMenu(false); };
+    window.addEventListener('mousedown', onDown);
+    return () => window.removeEventListener('mousedown', onDown);
+  }, [menu]);
+  return (
+    <header className="gp-banner">
+      <a className="uic-wordmark" href="#/"><Wordmark size={15} /></a>
+      <a className="uic-iconbtn" href="#/" title="Home" aria-label="Home"><Home size={16} /></a>
+      <div className="sl-banner-actions">
+        {onPresent && (
+          <button className="btn" onClick={onPresent} title="Present fullscreen">
+            <Maximize2 size={15} /> Slideshow
+          </button>
+        )}
+        {onExport && (
+        <div className="sl-export-wrap" ref={menuRef}>
+          <button className="btn" disabled={!!exporting}
+                  onClick={(e) => { e.stopPropagation(); setMenu((v) => !v); }}
+                  title="Export this deck">
+            <Download size={15} /> {exportLabel(exporting)}
+          </button>
+          {menu && !exporting && (
+            <div className="sl-export-menu" onClick={(e) => e.stopPropagation()}>
+              <button onClick={() => { setMenu(false); onExport('pdf'); }}>Print to PDF…</button>
+              <button onClick={() => { setMenu(false); onExport('pptx'); }}>PowerPoint (.pptx)</button>
+            </div>
+          )}
+        </div>
+        )}
+        {saveState && (
+          <span className={'sl-save-chip ' + saveState}>
+            {saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? 'Saved' : 'Save failed — retrying on next edit'}
+          </span>
+        )}
+        {copilotBusy && <span className="sl-save-chip copilot"><span className="pulse" /> Copilot is editing…</span>}
+      </div>
+      <div className="gp-banner-right">
+        {live && peers.length > 0 && (
+          <span className="sl-peer-stack" title={peers.map((p) => p.name).join(', ')}>
+            {peers.slice(0, 4).map((p) => (
+              <span key={p.key} className="sl-peer-av" style={{ background: p.color }}>
+                {String(p.name || '?').trim().charAt(0).toUpperCase()}
+              </span>
+            ))}
+          </span>
+        )}
+        <a className="uic-iconbtn gp-help" href={LINKS.docs} target="_blank" rel="noreferrer" title="Documentation"><HelpCircle size={16} /></a>
+        <AvatarMenu />
+      </div>
+    </header>
+  );
+}

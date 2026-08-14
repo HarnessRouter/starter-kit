@@ -1,0 +1,19 @@
+{
+  "$comment": [
+    "Starter Kits the HarnessRouter console can launch. One folder per kit under kits/.",
+    "",
+    "A kit is a whole product in a folder: the Harness it needs (base, skills, tools) and a UI",
+    "that talks to that Harness as its backend. Launching one provisions the Harness and opens",
+    "the app; there is no separate service to deploy and no database to configure.",
+    "",
+    "include        — build this kit into the image. false leaves it in the repo and out of the",
+    "                 image, which is how a kit under development stays unshipped.",
+    "",
+    "Everything else a kit needs lives in kits/<name>/kit.json, next to the code it describes,",
+    "so adding a kit does not mean editing this file beyond one line."
+  ],
+  "kits": [
+    { "name": "slides", "include": true },
+    { "name": "sheets", "include": true }
+  ]
+}
