@@ -59,7 +59,7 @@ export function DashboardPage({ id: routeId, seed }) {
   const [states, setStates] = useState(() => new Map());
   const [refreshing, setRefreshing] = useState(false);
   const [ranAt, setRanAt] = useState(0);
-  const [chatOpen, setChatOpen] = useState(() => window.innerWidth > 900);
+  const [chatOpen, setChatOpen] = useState(true);
 
   const dialog = useDialog();
   const chatPane = useResizablePane({
@@ -150,6 +150,20 @@ export function DashboardPage({ id: routeId, seed }) {
 
   useEffect(() => { markViewed(id); load(); }, [id, load]);
   useEffect(() => { datasource().then(setConn).catch(() => setConn(null)); }, []);
+
+  // Below 900px the conversation is a full-height drawer (chat.css) that covers the board, so it
+  // must start closed there. Deciding that from one `window.innerWidth` read at mount is a race:
+  // during the first paint that read can still be the window's width rather than the viewport's,
+  // and the drawer lands open over the dashboard the person just asked for — which is exactly
+  // what it did on a 390px viewport. matchMedia is an event, so it cannot be read too early.
+  // Narrowing closes it; widening does not force it open, because by then the choice is theirs.
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 900px)');
+    const apply = () => { if (mq.matches) setChatOpen(false); };
+    apply();
+    mq.addEventListener('change', apply);
+    return () => mq.removeEventListener('change', apply);
+  }, []);
 
   // Keep looking while the agent works: the file is written DURING the turn and reads hit the
   // live workspace, so panels appear as they are built. Without this the page shows "Building

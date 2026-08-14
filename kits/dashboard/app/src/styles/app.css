@@ -82,12 +82,21 @@
   white-space: pre-wrap; overflow-wrap: anywhere; color: var(--ink-2);
 }
 
-/* A stat: one number, as large as its box allows and no larger. clamp() rather than a media
-   query because the box is a grid cell, and its width has nothing to do with the viewport's. */
-.db-stat { height: 100%; display: flex; align-items: center; padding: 2px 14px 12px; }
+/* A stat: one number, as large as its box allows and no larger.
+ *
+ * The size is a container query, not a media query: the box is a grid cell three columns wide,
+ * and its width has nothing to do with the viewport's. That needs a declared container — without
+ * this line `cqw` has nothing to resolve against, the clamp pins to its maximum, and a
+ * six-figure number ellipsises to "$262,1…" in a panel with room to spare. */
+/* `size`, not `inline-size`: the number has to fit the box in BOTH directions. Sized on width
+   alone, a two-row stat panel that goes full-width when the board stacks pushes the digits past
+   the maximum and crops them horizontally — "$262,148.00" with its bottom third sliced off. The
+   panel has a definite height from the grid, so size containment is available and `cqh` resolves. */
+.db-panel { container-type: size; }
+.db-stat { height: 100%; display: flex; align-items: center; padding: 0 2px; min-height: 0; }
 .db-stat-v {
-  font-size: clamp(22px, 7cqw, 40px); font-weight: 650; letter-spacing: -.02em;
-  color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1.1;
+  font-size: clamp(16px, min(9cqw, 26cqh), 40px); font-weight: 650; letter-spacing: -.02em;
+  color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1.15;
   min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 

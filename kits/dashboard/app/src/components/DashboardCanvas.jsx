@@ -108,20 +108,22 @@ export function DashboardCanvas({ doc, states, editable = false, onLayoutChange 
           // The statement that failed, folded away under the message. A query error is a thing
           // people copy into the conversation to get it fixed, and the error alone is half of it.
           const sql = st.status === 'error' ? doc.queries.get(p.query)?.sql : null;
+          // The Panel IS the grid child — no wrapper. A div in between is auto-height, and the
+          // panel's `height: 100%` then resolves against it and collapses: every chart rendered
+          // into a zero-height box and the board came back as a page of empty titles.
           return (
-            <div key={p.id}>
-              <Panel
-                title={p.title}
-                meta={meta || undefined}
-                loading={st.status === 'loading'}
-                error={st.status === 'error' ? st.error : undefined}
-                errorDetail={sql ? <pre className="db-panel-sql">{sql}</pre> : undefined}
-                detailLabel="The query"
-                className={`db-panel is-${p.viz.kind || 'unknown'}`}
-              >
-                <Body panel={p} state={st} theme={theme} />
-              </Panel>
-            </div>
+            <Panel
+              key={p.id}
+              title={p.title}
+              meta={meta || undefined}
+              loading={st.status === 'loading'}
+              error={st.status === 'error' ? st.error : undefined}
+              errorDetail={sql ? <pre className="db-panel-sql">{sql}</pre> : undefined}
+              detailLabel="The query"
+              className={`db-panel is-${p.viz.kind || 'unknown'}`}
+            >
+              <Body panel={p} state={st} theme={theme} />
+            </Panel>
           );
         })}
       </PanelGrid>
