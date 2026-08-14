@@ -7,6 +7,11 @@
   "accent": "#2563EB",
   "harness": {
     "name": "Dashboards",
+    "datasource": {
+      "$comment": "This kit reads a database, so the launch dialog asks for one. Without this the kit launches with no connection and every panel it builds has nothing to read.",
+      "required": true,
+      "engines": ["postgres", "mysql"]
+    },
     "recommended": [
       {
         "base": "hermes",
