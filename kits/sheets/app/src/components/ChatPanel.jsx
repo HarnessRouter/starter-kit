@@ -5,11 +5,13 @@
 import { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ArrowUp, PanelRight, Sparkles } from 'lucide-react';
+import { ArrowUp, Mic, PanelRight, Paperclip, Sparkles, X } from 'lucide-react';
 import { ChatMessages, ChatMessagesSkeleton, Composer, withReasoning, withResult, withStep, withText } from 'reifyui';
 import { sessionTurns, turnsToMessages } from 'reifyui/harness';
 import { isPending } from '../lib/sh';
 import { runCopilotTurn } from '../lib/copilot';
+import { bytesLabel, fileToInput } from '../lib/attach';
+import { createDictation } from '../lib/dictate';
 
 const RETRY_MS = 20000;
 
@@ -40,9 +42,44 @@ export function ChatColumn({ sheetId, seed, title, agentBusy, onSheetMaybeChange
   const [busy, setBusy] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const [histLoading, setHistLoading] = useState(true);
+  const [staged, setStaged] = useState([]);        // files picked, not yet sent
+  const [attachErr, setAttachErr] = useState('');
+  const [listening, setListening] = useState(false);
   const pendingRef = useRef(null);
   const bodyRef = useRef(null);
   const seededRef = useRef(false);
+  const fileRef = useRef(null);
+  // Voice input is the browser's own recogniser, and it is null where the browser has none — the
+  // button is then not rendered at all, rather than rendered disabled. Built once: createDictation
+  // returns null on an unsupported build, so a ref-with-null-sentinel would rebuild every render.
+  const [dictation] = useState(() => createDictation());
+
+  useEffect(() => () => dictation?.stop(), [dictation]);
+
+  async function pickFiles(list) {
+    setAttachErr('');
+    const next = [];
+    for (const f of list) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        next.push(await fileToInput(f));
+      } catch (e) {
+        setAttachErr(e.message);
+      }
+    }
+    if (next.length) setStaged((cur) => [...cur, ...next]);
+  }
+
+  function toggleDictation() {
+    if (!dictation) return;
+    if (listening) { dictation.stop(); return; }
+    setListening(true);
+    dictation.start({
+      onText: (text) => setDraft((cur) => (cur ? `${cur.replace(/\s+$/, '')} ${text}` : text)),
+      onEnd: () => setListening(false),
+      onError: () => setListening(false),
+    });
+  }
 
   useEffect(() => {
     bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight });
@@ -63,7 +100,7 @@ export function ChatColumn({ sheetId, seed, title, agentBusy, onSheetMaybeChange
       ? m.slice(0, -1) : m));
   }
 
-  async function deliver(text) {
+  async function deliver(text, files = []) {
     setBusy(true);
     setMessages((m) => [...m, { role: 'assistant', blocks: [], status: 'running' }]);
     try {
@@ -80,7 +117,7 @@ export function ChatColumn({ sheetId, seed, title, agentBusy, onSheetMaybeChange
           blocks: a.blocks.length ? a.blocks : withText([], 'Something went wrong. Please try again.'),
           status: 'failed',
         })),
-      });
+      }, files.map((f) => f.block));
       if (out.connecting) {
         dropRunningAsst();
         pendingRef.current = text;
@@ -103,9 +140,16 @@ export function ChatColumn({ sheetId, seed, title, agentBusy, onSheetMaybeChange
   function send(text) {
     const t = text.trim();
     if (!t || busy || histLoading) return;
-    setMessages((m) => [...m, { role: 'user', text: t }]);
+    if (listening) { dictation?.stop(); setListening(false); }
+    const files = staged;
+    // The names ride on the message so the bubble shows what was sent with it. They are not
+    // replayed from history — the transcript stores the person's text, not the files — so this
+    // is what was attached in this session, not a claim about every past turn.
+    setMessages((m) => [...m, { role: 'user', text: t, files: files.map((f) => f.name) }]);
     setDraft('');
-    deliver(t);
+    setStaged([]);
+    setAttachErr('');
+    deliver(t, files);
   }
 
   // Mount: strip ?seed FIRST, then replay history; the seed fires only when there is none.
@@ -213,6 +257,13 @@ export function ChatColumn({ sheetId, seed, title, agentBusy, onSheetMaybeChange
         ) : (
           <ChatMessages
             messages={messages}
+            userExtras={(m) => (m.files?.length ? (
+              <span className="msg-files">
+                {m.files.map((n) => (
+                  <span key={n} className="msg-file"><Paperclip size={11} />{n}</span>
+                ))}
+              </span>
+            ) : null)}
             renderMarkdown={(t) => <ReactMarkdown remarkPlugins={[remarkGfm]}>{t}</ReactMarkdown>}
             workingLabel="Working..."
             toolLabels={{ workingLabel: 'Working...' }}
@@ -235,6 +286,41 @@ export function ChatColumn({ sheetId, seed, title, agentBusy, onSheetMaybeChange
         rows={2}
         autoGrow={false}
         classNames={{ root: 'cmp', input: '', row: 'cmp-row' }}
+        attachments={(staged.length > 0 || attachErr) && (
+          <div className="cmp-files">
+            {staged.map((f, i) => (
+              <span key={`${f.name}-${i}`} className="cmp-file">
+                <Paperclip size={11} />
+                <span className="cmp-file-n" title={f.name}>{f.name}</span>
+                <span className="cmp-file-s">{bytesLabel(f.size)}</span>
+                <button type="button" aria-label={`Remove ${f.name}`}
+                        onClick={() => setStaged((c) => c.filter((_, j) => j !== i))}>
+                  <X size={11} />
+                </button>
+              </span>
+            ))}
+            {attachErr && <span className="cmp-file-err">{attachErr}</span>}
+          </div>
+        )}
+        accessoriesLeft={(
+          <>
+            <input ref={fileRef} type="file" hidden multiple
+                   onChange={(e) => { pickFiles([...e.target.files]); e.target.value = ''; }} />
+            <button type="button" className="cmp-icon" aria-label="Attach a file"
+                    title="Attach a file — the agent gets it in its working directory"
+                    disabled={busy} onClick={() => fileRef.current?.click()}>
+              <Paperclip size={16} />
+            </button>
+          </>
+        )}
+        accessoriesRight={dictation ? (
+          <button type="button" className={'cmp-icon' + (listening ? ' on' : '')}
+                  aria-label={listening ? 'Stop dictating' : 'Dictate'} aria-pressed={listening}
+                  title={listening ? 'Stop dictating' : 'Dictate'}
+                  disabled={busy} onClick={toggleDictation}>
+            <Mic size={15} />
+          </button>
+        ) : null}
         renderSend={() => (
           <button type="button" className="cmp-send" onClick={() => send(draft)}
                   disabled={busy || histLoading || !draft.trim()} aria-label="Send message">

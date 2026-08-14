@@ -20,7 +20,7 @@ import { materialize } from './model';
  * user text for the transcript, so the chat keeps showing the sentence they typed instead of a
  * wall of starting JSON. Scaffolding should be invisible.
  */
-export async function runCopilotTurn(sheetId, message, handlers) {
+export async function runCopilotTurn(sheetId, message, handlers, attachments = []) {
   const pending = isPending(sheetId);
   let instructions = '';
   if (pending) {
@@ -36,9 +36,13 @@ export async function runCopilotTurn(sheetId, message, handlers) {
     }
   }
 
+  const input = attachments.length
+    ? [{ role: 'user', content: [...attachments, { type: 'input_text', text: message }] }]
+    : message;
+
   return harnessStreamTurn({
     sessionId: pending ? '' : sheetId,
-    input: message,
+    input,
     instructions,
     handlers,
   });

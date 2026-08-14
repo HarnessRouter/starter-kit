@@ -10,6 +10,7 @@
 // for the same job. Live text, where it matters, comes from the turn replay in the cell drawer.
 import { cancelResponse, containerFileUrl, createResponse, getResponse, patchSession } from 'reifyui/harness';
 import { VALUE_MAX, interpolate } from './model.js';
+import { FILE_MAX, bufferToDataUrl } from './attach.js';
 
 const POLL_MS = 2000;
 /** How long a terminal-but-empty response is given to produce its own content.
@@ -22,32 +23,18 @@ const POLL_MS = 2000;
  *  honest rule is to wait for it, bounded. Costs nothing on the normal path — the loop exits the
  *  instant content appears. */
 const SETTLE_MS = 15000;
-/** Refuse an attachment larger than the API accepts rather than truncating a file silently. */
-const FILE_MAX = 25 * 1024 * 1024;
 
 const now = () => Math.floor(Date.now() / 1000);
 
-const MIME = {
-  md: 'text/markdown', txt: 'text/plain', json: 'application/json', csv: 'text/csv',
-  tsv: 'text/tab-separated-values', html: 'text/html', py: 'text/x-python', js: 'text/javascript',
-  png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', svg: 'image/svg+xml',
-  pdf: 'application/pdf',
-};
-const mimeOf = (name) => MIME[String(name).split('.').pop().toLowerCase()] || 'application/octet-stream';
 
-async function fileAsDataUrl(artifact) {
+async function artifactAsDataUrl(artifact) {
   const res = await fetch(containerFileUrl(artifact.container_id, artifact.file_id), { cache: 'no-store' });
   if (!res.ok) throw new Error(`Could not read ${artifact.filename}.`);
   const buf = await res.arrayBuffer();
   if (buf.byteLength > FILE_MAX) {
     throw new Error(`${artifact.filename} is too large to attach (${Math.round(buf.byteLength / 1048576)} MB).`);
   }
-  let bin = '';
-  const bytes = new Uint8Array(buf);
-  for (let i = 0; i < bytes.length; i += 0x8000) {
-    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
-  }
-  return `data:${mimeOf(artifact.filename)};base64,${btoa(bin)}`;
+  return bufferToDataUrl(buf, artifact.filename);
 }
 
 /** A directory per source column, so an agent reading three attachments can tell them apart. */
@@ -111,7 +98,7 @@ export function makeCellDispatcher({ sheetId, runId, sheetTitle, columns, onCell
     for (const u of upstream || []) {
       for (const a of u.cell?.artifacts || []) {
         // eslint-disable-next-line no-await-in-loop
-        const file_data = await fileAsDataUrl(a);
+        const file_data = await artifactAsDataUrl(a);
         content.push({ type: 'input_file', filename: `in/${slug(u.column.name)}/${a.filename}`, file_data });
       }
     }
