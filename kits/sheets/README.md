@@ -59,3 +59,15 @@ npm run build
 
 `model.test.mjs` and `run.test.mjs` cover both. `skills/sheet-design/validate_sheet.py` is the
 agent-side twin of `model.js`'s `validate()`; if the two ever disagree, the app is right.
+
+## License
+
+This kit is governed by the [HarnessRouter Starter Kit License Agreement](../LICENSE.md), not MIT.
+
+- Individual local use is free under that Agreement.
+- Selling, deploying, hosting or providing an End Product to an external customer, and creating
+  paid Client Deliverables, require the
+  [Commercial Use and Deployment Agreement](../COMMERCIAL-DEPLOYMENT-AGREEMENT.md) and an
+  [Order Form](../ORDER-FORM-TEMPLATE.md).
+
+Third-party materials keep their own licenses — see [CREDITS.md](./CREDITS.md).

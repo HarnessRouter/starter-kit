@@ -77,8 +77,9 @@ Licensee legal entity. Internal Use does not include Commercial Use.
 
 **Internal End Product** means an End Product used solely for Internal Use.
 
-**Kit** means the HarnessRouter Slides Starter Kit materials distributed under
-this Agreement, including applicable source code, templates, Skills, schemas,
+**Kit** means the HarnessRouter Starter Kit materials distributed under this
+Agreement — those in the directory containing this Agreement and its
+subdirectories — including applicable source code, templates, Skills, schemas,
 components, and documentation.
 
 **Order Form** means a written or electronic ordering document accepted by

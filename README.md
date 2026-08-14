@@ -94,11 +94,11 @@ Credentials belong in an ignored `.env` file and never in source control. See ea
 This is a mixed-license repository:
 
 - Files without a more specific directory license, including the reference demos, are available under the [repository MIT License](./LICENSE).
-- `kits/slides/` is governed by the [HarnessRouter Slides Starter Kit License Agreement](./kits/slides/LICENSE.md), not MIT.
+- `kits/` is governed by the [HarnessRouter Starter Kit License Agreement](./kits/LICENSE.md), not MIT. This covers every kit — slides, sheets, and any added later.
 - Individual local use is free, including learning, evaluation, personal projects, and the individual's own business operations.
 - Organizations using HarnessRouter Cloud for Internal Use do not pay a separate Kit license fee or have a Direct User limit; Cloud plan and usage charges still apply.
 - Non-Cloud Internal Use is free for up to three Direct Users. A paid entitlement is required before a fourth Direct User begins use or for separately metered automation.
-- **Creating paid Client Deliverables or selling, deploying, hosting, or providing an End Product to an external customer requires the [Commercial Use and Deployment Agreement](./kits/slides/COMMERCIAL-DEPLOYMENT-AGREEMENT.md) and an applicable Order Form.**
+- **Creating paid Client Deliverables or selling, deploying, hosting, or providing an End Product to an external customer requires the [Commercial Use and Deployment Agreement](./kits/COMMERCIAL-DEPLOYMENT-AGREEMENT.md) and an applicable Order Form.**
 - Sharing materials about your own business with investors, customers, advisers, and other counterparties is not Commercial Use merely because an external person receives them.
 - Generated presentations and exported files remain usable subject to the applicable Internal or Commercial Use rights.
 - Third-party components remain governed by their own licenses and notices.
