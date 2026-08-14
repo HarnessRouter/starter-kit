@@ -1,0 +1,93 @@
+// Product topbar: wordmark, which database is connected, account menu.
+//
+// Same bar as the other kits, minus the two things this build does not have. There is no credits
+// badge because there is no billing, and no Sign in button because the console already signed you
+// in — the account menu shows who that is and hands log-out back to the console.
+//
+// The connection chip is the one addition, and it earns its place: every number on this product
+// comes from one database, and a dashboard that does not say WHICH is a dashboard someone will
+// eventually read as being about a different one. It shows engine, database and host — never a
+// credential, because the app is never given one.
+import { useEffect, useRef, useState } from 'react';
+import { BookOpen, Database, LogOut } from 'lucide-react';
+import { Popover } from 'reifyui';
+import { getSession, logout, SESSION_EVENT } from '../lib/auth';
+import { datasourceLabel } from '../lib/query';
+import { DbMark } from './DbMark';
+
+export const LINKS = {
+  // The kit's own folder, not the repository root — someone asking this app for help wants the
+  // Dashboards README and its skill, not a list of every starter kit.
+  docs: 'https://github.com/HarnessRouter/starter-kit/tree/main/kits/dashboard',
+};
+
+export function Wordmark({ size = 18 }) {
+  return (
+    <span className="uic-wordmark" style={{ fontSize: size }}>
+      <DbMark size={size + 2} />
+      <span className="wm-text">Dashboards</span>
+    </span>
+  );
+}
+
+/** What the numbers are read from. `undefined` means not asked yet — which renders nothing,
+ *  rather than a chip that says "no database" for the half second before the answer arrives. */
+export function ConnectionChip({ connection }) {
+  if (connection === undefined) return null;
+  const label = connection ? datasourceLabel(connection) : 'No database connected';
+  return (
+    <span className={'db-conn' + (connection ? '' : ' is-none')} title={label}>
+      <Database size={13} aria-hidden="true" />
+      <span className="db-conn-t">{label}</span>
+    </span>
+  );
+}
+
+export function AvatarMenu() {
+  const [open, setOpen] = useState(false);
+  const [session, setSession] = useState(getSession);
+  const btnRef = useRef(null);
+
+  useEffect(() => {
+    const sync = () => setSession(getSession());
+    window.addEventListener(SESSION_EVENT, sync);
+    return () => window.removeEventListener(SESSION_EVENT, sync);
+  }, []);
+
+  // No session yet (or an ungated instance): show nothing rather than a placeholder identity.
+  const member = session?.member;
+  if (!member) return null;
+  const displayName = member.display_name || member.name || member.email || 'Account';
+  const initial = String(displayName).trim().charAt(0).toUpperCase() || 'U';
+
+  return (
+    <>
+      <button ref={btnRef} className="av" onClick={() => setOpen((v) => !v)}
+              aria-label="Account menu" aria-expanded={open}>{initial}</button>
+      <Popover open={open} anchorRef={btnRef} onClose={() => setOpen(false)}
+               width={220} minHeight={110} label="Account">
+        <div className="db-who">{displayName}</div>
+        <a className="uic-pop-item" href={LINKS.docs} target="_blank" rel="noreferrer">
+          <BookOpen size={15} />Documentation
+        </a>
+        {session.gated && (
+          <button type="button" className="uic-pop-item db-danger" onClick={logout}>
+            <LogOut size={15} />Log out
+          </button>
+        )}
+      </Popover>
+    </>
+  );
+}
+
+export function Topbar({ connection, children }) {
+  return (
+    <header className="uic-topbar">
+      <a className="uic-wordmark" href="#/"><Wordmark size={16} /></a>
+      <div className="uic-topbar-spacer" />
+      {children}
+      <ConnectionChip connection={connection} />
+      <AvatarMenu />
+    </header>
+  );
+}

@@ -1,0 +1,40 @@
+{
+  "id": "dashboard",
+  "title": "Dashboards",
+  "tagline": "Say what you want to understand; your database answers it.",
+  "description": "Connect a PostgreSQL or MySQL database and describe what you want to see. The agent reads your schema, writes a query per question, picks the chart that answers it, and lays the panels out. Opening the dashboard re-runs every query, so what you see is the database now.",
+  "icon": "tabler:chart-histogram",
+  "accent": "#2563EB",
+  "harness": {
+    "name": "Dashboards",
+    "recommended": [
+      {
+        "base": "hermes",
+        "model": "deepseek-v4-pro"
+      },
+      {
+        "base": "codex",
+        "model": "gpt-5.4-mini"
+      },
+      {
+        "base": "claude-code",
+        "model": "claude-opus-5"
+      }
+    ],
+    "system_prompt": "You build dashboards that read a database.\n\nTHE FILE: ./dashboard.json, in your current working directory. That exact path, always. Do not search for it, do not look elsewhere in the tree, and do not treat its absence as a puzzle — on a new dashboard it simply does not exist yet and you create it there. It is the single source of truth and the only file the app reads.\n\nRead it before every change and write it back WHOLE — the person may have moved panels between turns. Its schema, and the mistakes that leave a panel blank, are in the dashboard-design skill: read that skill first, on every request, and validate with its validate_dashboard.py before you finish.\n\nThe database is reachable only through the database tools in your tool list, and only for reading: one statement, SELECT, row-capped and timed out. Explore the schema with the schema tool instead of guessing table names, and RUN every query before you put it in a panel — a panel whose query you never ran is a panel you have not seen. You are never given a connection string; never write one into any file.\n\nNever put a number in the file. Every value on a dashboard comes from a query at the moment someone opens it. There is nowhere in this document to type a figure you already know, and a chart with its data written in is a lie that never refreshes.\n\nWork directly. Every command you spend orienting is a command the person waits through.",
+    "skills": [
+      "dashboard-design"
+    ]
+  },
+  "app": {
+    "dir": "app",
+    "build": "npm ci && npm run build",
+    "dist": "dist",
+    "route": "/kits/dashboard"
+  },
+  "session": {
+    "$comment": "One session is one dashboard. The app lists this harness's sessions as the dashboard list.",
+    "artifact": "dashboard.json",
+    "title_from": "meta.title"
+  }
+}

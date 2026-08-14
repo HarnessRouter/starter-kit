@@ -1,0 +1,1357 @@
+{
+  "$comment": [
+    "Worked dashboards, as reference material for the agent — NOT one-click starting points.",
+    "",
+    "Every query below is written against a schema the person almost certainly does not have.",
+    "Applied verbatim, a template is a screen of error messages: the tables do not exist. What",
+    "each one is actually worth is the ANSWER to 'which panels belong on this kind of dashboard,",
+    "and how are they arranged' — which numbers lead, which chart answers which question, how",
+    "many panels before it stops being readable. The agent reads the real schema first and",
+    "rewrites every query against it.",
+    "",
+    "So: `prompt` is the sentence the person would say, and it is the only part of a template",
+    "that can be used as-is — an app may offer these as starting questions. `assumes` names the",
+    "tables and columns the SQL was written against, so the agent can see what it is mapping",
+    "FROM. `adapt` says what usually differs in a real schema and what to do about it.",
+    "",
+    "`dialect` is postgres throughout. On MySQL, date_trunc('month', x) becomes",
+    "DATE_FORMAT(x, '%Y-%m-01'), INTERVAL '30 days' becomes INTERVAL 30 DAY, and FILTER (WHERE",
+    "…) becomes SUM(CASE WHEN … THEN 1 ELSE 0 END).",
+    "",
+    "Each `dashboard` is a real, valid schema-1 document — run",
+    "skills/dashboard-design/validate_dashboard.py over any of them and it exits clean, so the",
+    "examples the agent copies from cannot quietly drift out of the contract."
+  ],
+  "templates": [
+    {
+      "id": "saas-revenue",
+      "name": "Recurring revenue",
+      "description": "Where revenue stands, where it moved, and which customers carry it.",
+      "prompt": "Show me how our recurring revenue is doing — what it is now, how it has moved over the year, and which plans and customers it comes from.",
+      "dialect": "postgres",
+      "assumes": {
+        "subscriptions": "id, customer_id, plan_id, status, mrr_cents, started_at, canceled_at",
+        "customers": "id, name, created_at",
+        "plans": "id, name",
+        "invoices": "id, customer_id, amount_cents, status, paid_at"
+      },
+      "adapt": "Almost nobody has this schema. What survives is the SHAPE: one row per subscription with a monthly amount, a status, and a start and cancel date. Map onto whatever the real schema calls those — a billing table, a Stripe mirror, an orders table with a recurring flag. Check the real values in `status` before filtering on 'active' (GROUP BY status first). Money is usually an integer of cents: confirm the unit before dividing by 100, and drop the division if the column is already whole currency. If there is no cancellation date anywhere, say so and drop the churn panel rather than inventing it from a status.",
+      "dashboard": {
+        "meta": {
+          "schema": 1,
+          "title": "Recurring revenue"
+        },
+        "datasource": {
+          "engine": "postgres",
+          "ref": ""
+        },
+        "queries": [
+          {
+            "id": "q_headline",
+            "name": "MRR, customers and average revenue per account, now",
+            "sql": "SELECT SUM(mrr_cents) / 100.0 AS mrr,\n       COUNT(DISTINCT customer_id) AS customers,\n       AVG(mrr_cents) / 100.0 AS arpa\nFROM subscriptions\nWHERE status = 'active'"
+          },
+          {
+            "id": "q_churn",
+            "name": "Subscription churn, last 30 days",
+            "sql": "SELECT COUNT(*) FILTER (WHERE canceled_at >= CURRENT_DATE - INTERVAL '30 days') * 100.0\n       / NULLIF(COUNT(*) FILTER (WHERE started_at < CURRENT_DATE - INTERVAL '30 days'), 0)\n       AS churn_pct\nFROM subscriptions"
+          },
+          {
+            "id": "q_collected_by_month",
+            "name": "Collected revenue by month, last 12 months",
+            "sql": "SELECT to_char(date_trunc('month', paid_at), 'YYYY-MM') AS month,\n       SUM(amount_cents) / 100.0 AS collected\nFROM invoices\nWHERE status = 'paid'\n  AND paid_at >= date_trunc('month', CURRENT_DATE) - INTERVAL '11 months'\nGROUP BY 1\nORDER BY 1"
+          },
+          {
+            "id": "q_movement_by_month",
+            "name": "New and churned MRR by month",
+            "sql": "WITH months AS (\n  SELECT generate_series(date_trunc('month', CURRENT_DATE) - INTERVAL '11 months',\n                         date_trunc('month', CURRENT_DATE),\n                         INTERVAL '1 month') AS m\n)\nSELECT to_char(m, 'YYYY-MM') AS month,\n       (SELECT COALESCE(SUM(mrr_cents), 0) / 100.0 FROM subscriptions s\n         WHERE date_trunc('month', s.started_at) = m) AS new_mrr,\n       (SELECT COALESCE(SUM(mrr_cents), 0) / 100.0 FROM subscriptions s\n         WHERE date_trunc('month', s.canceled_at) = m) AS churned_mrr\nFROM months\nORDER BY 1"
+          },
+          {
+            "id": "q_mrr_by_plan",
+            "name": "Active MRR by plan",
+            "sql": "SELECT p.name AS plan,\n       SUM(s.mrr_cents) / 100.0 AS mrr\nFROM subscriptions s\nJOIN plans p ON p.id = s.plan_id\nWHERE s.status = 'active'\nGROUP BY p.name\nORDER BY 2 DESC"
+          },
+          {
+            "id": "q_top_customers",
+            "name": "Largest active customers",
+            "sql": "SELECT c.name AS customer,\n       SUM(s.mrr_cents) / 100.0 AS mrr,\n       MIN(s.started_at)::date AS customer_since\nFROM subscriptions s\nJOIN customers c ON c.id = s.customer_id\nWHERE s.status = 'active'\nGROUP BY c.name\nORDER BY 2 DESC\nLIMIT 10"
+          }
+        ],
+        "panels": [
+          {
+            "id": "p_mrr",
+            "title": "Monthly recurring revenue",
+            "query": "q_headline",
+            "layout": {
+              "x": 0,
+              "y": 0,
+              "w": 3,
+              "h": 2
+            },
+            "viz": {
+              "kind": "stat",
+              "column": "mrr",
+              "format": "currency",
+              "currency": "USD"
+            },
+            "caption": "Active subscriptions only"
+          },
+          {
+            "id": "p_customers",
+            "title": "Paying customers",
+            "query": "q_headline",
+            "layout": {
+              "x": 3,
+              "y": 0,
+              "w": 3,
+              "h": 2
+            },
+            "viz": {
+              "kind": "stat",
+              "column": "customers",
+              "format": "int"
+            }
+          },
+          {
+            "id": "p_arpa",
+            "title": "Average per customer",
+            "query": "q_headline",
+            "layout": {
+              "x": 6,
+              "y": 0,
+              "w": 3,
+              "h": 2
+            },
+            "viz": {
+              "kind": "stat",
+              "column": "arpa",
+              "format": "currency",
+              "currency": "USD"
+            }
+          },
+          {
+            "id": "p_churn",
+            "title": "Churn, last 30 days",
+            "query": "q_churn",
+            "layout": {
+              "x": 9,
+              "y": 0,
+              "w": 3,
+              "h": 2
+            },
+            "viz": {
+              "kind": "stat",
+              "column": "churn_pct",
+              "format": "percent"
+            },
+            "caption": "Of subscriptions older than 30 days"
+          },
+          {
+            "id": "p_collected",
+            "title": "Collected revenue by month",
+            "query": "q_collected_by_month",
+            "layout": {
+              "x": 0,
+              "y": 2,
+              "w": 8,
+              "h": 5
+            },
+            "viz": {
+              "kind": "chart",
+              "option": {
+                "tooltip": {
+                  "trigger": "axis"
+                },
+                "legend": {
+                  "show": false
+                },
+                "xAxis": {
+                  "type": "category"
+                },
+                "yAxis": {
+                  "type": "value"
+                },
+                "series": [
+                  {
+                    "type": "line",
+                    "name": "Collected",
+                    "smooth": true,
+                    "showSymbol": false,
+                    "areaStyle": {
+                      "opacity": 0.12
+                    },
+                    "encode": {
+                      "x": "month",
+                      "y": "collected"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "p_by_plan",
+            "title": "MRR by plan",
+            "query": "q_mrr_by_plan",
+            "layout": {
+              "x": 8,
+              "y": 2,
+              "w": 4,
+              "h": 5
+            },
+            "viz": {
+              "kind": "chart",
+              "option": {
+                "tooltip": {
+                  "trigger": "item"
+                },
+                "legend": {
+                  "type": "scroll",
+                  "bottom": 0,
+                  "icon": "circle"
+                },
+                "series": [
+                  {
+                    "type": "pie",
+                    "radius": [
+                      "46%",
+                      "72%"
+                    ],
+                    "center": [
+                      "50%",
+                      "44%"
+                    ],
+                    "avoidLabelOverlap": true,
+                    "label": {
+                      "show": false
+                    },
+                    "itemStyle": {
+                      "borderWidth": 2
+                    },
+                    "encode": {
+                      "itemName": "plan",
+                      "value": "mrr"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "p_movement",
+            "title": "New and churned MRR",
+            "query": "q_movement_by_month",
+            "layout": {
+              "x": 0,
+              "y": 7,
+              "w": 6,
+              "h": 5
+            },
+            "viz": {
+              "kind": "chart",
+              "option": {
+                "tooltip": {
+                  "trigger": "axis"
+                },
+                "legend": {
+                  "top": 0
+                },
+                "xAxis": {
+                  "type": "category"
+                },
+                "yAxis": {
+                  "type": "value"
+                },
+                "series": [
+                  {
+                    "type": "bar",
+                    "name": "New",
+                    "barMaxWidth": 36,
+                    "itemStyle": {
+                      "borderRadius": [
+                        4,
+                        4,
+                        0,
+                        0
+                      ]
+                    },
+                    "encode": {
+                      "x": "month",
+                      "y": "new_mrr"
+                    }
+                  },
+                  {
+                    "type": "bar",
+                    "name": "Churned",
+                    "barMaxWidth": 36,
+                    "itemStyle": {
+                      "borderRadius": [
+                        4,
+                        4,
+                        0,
+                        0
+                      ]
+                    },
+                    "encode": {
+                      "x": "month",
+                      "y": "churned_mrr"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "p_top",
+            "title": "Largest customers",
+            "query": "q_top_customers",
+            "layout": {
+              "x": 6,
+              "y": 7,
+              "w": 6,
+              "h": 5
+            },
+            "viz": {
+              "kind": "table",
+              "columns": [
+                "customer",
+                "mrr",
+                "customer_since"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "sales-pipeline",
+      "name": "Sales pipeline",
+      "description": "What is in the pipeline, where it stalls, and what is about to close.",
+      "prompt": "Show me the state of the sales pipeline — how much is open, where deals drop off, how we are converting, and what is closing this month.",
+      "dialect": "postgres",
+      "assumes": {
+        "opportunities": "id, name, account_id, owner_id, stage, amount_cents, created_at, expected_close_at, closed_at, won",
+        "accounts": "id, name",
+        "users": "id, name"
+      },
+      "adapt": "The shape that matters: one row per deal, with an amount, a stage, an owner, and dates for created / expected close / actually closed. A CRM mirror will have all of it under other names (`deal`, `opportunity`, `pipeline_item`). Two things to check before charting: what the stage column actually contains (GROUP BY stage), and how a won deal is recorded — a boolean, a stage called 'Closed Won', or a status. The funnel panel here orders stages by value, which only approximates the real order; if the schema has a stage rank or probability column, order by that instead so the funnel reads top to bottom the way the team sells.",
+      "dashboard": {
+        "meta": {
+          "schema": 1,
+          "title": "Sales pipeline"
+        },
+        "datasource": {
+          "engine": "postgres",
+          "ref": ""
+        },
+        "queries": [
+          {
+            "id": "q_pipeline_headline",
+            "name": "Open pipeline value, deal count and average won size",
+            "sql": "SELECT SUM(amount_cents) FILTER (WHERE closed_at IS NULL) / 100.0 AS open_value,\n       COUNT(*) FILTER (WHERE closed_at IS NULL) AS open_deals,\n       AVG(amount_cents) FILTER (WHERE won) / 100.0 AS avg_won_value\nFROM opportunities"
+          },
+          {
+            "id": "q_win_rate",
+            "name": "Win rate, deals closed in the last 90 days",
+            "sql": "SELECT COUNT(*) FILTER (WHERE won) * 100.0 / NULLIF(COUNT(*), 0) AS win_rate_pct\nFROM opportunities\nWHERE closed_at >= CURRENT_DATE - INTERVAL '90 days'"
+          },
+          {
+            "id": "q_by_stage",
+            "name": "Open pipeline by stage",
+            "sql": "SELECT stage,\n       COUNT(*) AS deals,\n       SUM(amount_cents) / 100.0 AS value\nFROM opportunities\nWHERE closed_at IS NULL\nGROUP BY stage\nORDER BY 3 DESC"
+          },
+          {
+            "id": "q_flow_by_week",
+            "name": "Deals created and won by week",
+            "sql": "SELECT to_char(date_trunc('week', created_at), 'YYYY-MM-DD') AS week,\n       COUNT(*) AS created,\n       COUNT(*) FILTER (WHERE won) AS won_deals\nFROM opportunities\nWHERE created_at >= CURRENT_DATE - INTERVAL '12 weeks'\nGROUP BY 1\nORDER BY 1"
+          },
+          {
+            "id": "q_by_owner",
+            "name": "Open pipeline by owner",
+            "sql": "SELECT u.name AS owner,\n       SUM(o.amount_cents) / 100.0 AS pipeline\nFROM opportunities o\nJOIN users u ON u.id = o.owner_id\nWHERE o.closed_at IS NULL\nGROUP BY u.name\nORDER BY 2 DESC\nLIMIT 8"
+          },
+          {
+            "id": "q_closing_soon",
+            "name": "Open deals expected to close in the next 30 days",
+            "sql": "SELECT o.name AS deal,\n       a.name AS account,\n       o.stage,\n       o.amount_cents / 100.0 AS value,\n       o.expected_close_at::date AS expected_close\nFROM opportunities o\nJOIN accounts a ON a.id = o.account_id\nWHERE o.closed_at IS NULL\n  AND o.expected_close_at <= CURRENT_DATE + INTERVAL '30 days'\nORDER BY o.expected_close_at\nLIMIT 10"
+          }
+        ],
+        "panels": [
+          {
+            "id": "p_open_value",
+            "title": "Open pipeline",
+            "query": "q_pipeline_headline",
+            "layout": {
+              "x": 0,
+              "y": 0,
+              "w": 3,
+              "h": 2
+            },
+            "viz": {
+              "kind": "stat",
+              "column": "open_value",
+              "format": "currency",
+              "currency": "USD"
+            }
+          },
+          {
+            "id": "p_open_deals",
+            "title": "Open deals",
+            "query": "q_pipeline_headline",
+            "layout": {
+              "x": 3,
+              "y": 0,
+              "w": 3,
+              "h": 2
+            },
+            "viz": {
+              "kind": "stat",
+              "column": "open_deals",
+              "format": "int"
+            }
+          },
+          {
+            "id": "p_win_rate",
+            "title": "Win rate",
+            "query": "q_win_rate",
+            "layout": {
+              "x": 6,
+              "y": 0,
+              "w": 3,
+              "h": 2
+            },
+            "viz": {
+              "kind": "stat",
+              "column": "win_rate_pct",
+              "format": "percent"
+            },
+            "caption": "Deals closed in the last 90 days"
+          },
+          {
+            "id": "p_avg_deal",
+            "title": "Average won deal",
+            "query": "q_pipeline_headline",
+            "layout": {
+              "x": 9,
+              "y": 0,
+              "w": 3,
+              "h": 2
+            },
+            "viz": {
+              "kind": "stat",
+              "column": "avg_won_value",
+              "format": "currency",
+              "currency": "USD"
+            }
+          },
+          {
+            "id": "p_stages",
+            "title": "Pipeline by stage",
+            "query": "q_by_stage",
+            "layout": {
+              "x": 0,
+              "y": 2,
+              "w": 5,
+              "h": 5
+            },
+            "viz": {
+              "kind": "chart",
+              "option": {
+                "tooltip": {
+                  "trigger": "item"
+                },
+                "legend": {
+                  "bottom": 0,
+                  "icon": "circle"
+                },
+                "series": [
+                  {
+                    "type": "funnel",
+                    "sort": "none",
+                    "gap": 2,
+                    "left": "8%",
+                    "right": "8%",
+                    "label": {
+                      "position": "inside"
+                    },
+                    "encode": {
+                      "itemName": "stage",
+                      "value": "value"
+                    }
+                  }
+                ]
+              }
+            },
+            "caption": "Open deals, by value"
+          },
+          {
+            "id": "p_flow",
+            "title": "Created and won by week",
+            "query": "q_flow_by_week",
+            "layout": {
+              "x": 5,
+              "y": 2,
+              "w": 7,
+              "h": 5
+            },
+            "viz": {
+              "kind": "chart",
+              "option": {
+                "tooltip": {
+                  "trigger": "axis"
+                },
+                "legend": {
+                  "top": 0
+                },
+                "xAxis": {
+                  "type": "category"
+                },
+                "yAxis": {
+                  "type": "value"
+                },
+                "series": [
+                  {
+                    "type": "line",
+                    "name": "Created",
+                    "smooth": true,
+                    "showSymbol": false,
+                    "encode": {
+                      "x": "week",
+                      "y": "created"
+                    }
+                  },
+                  {
+                    "type": "line",
+                    "name": "Won",
+                    "smooth": true,
+                    "showSymbol": false,
+                    "encode": {
+                      "x": "week",
+                      "y": "won_deals"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "p_owners",
+            "title": "Pipeline by owner",
+            "query": "q_by_owner",
+            "layout": {
+              "x": 0,
+              "y": 7,
+              "w": 6,
+              "h": 5
+            },
+            "viz": {
+              "kind": "chart",
+              "option": {
+                "tooltip": {
+                  "trigger": "axis"
+                },
+                "legend": {
+                  "show": false
+                },
+                "grid": {
+                  "left": 8,
+                  "right": 24,
+                  "containLabel": true
+                },
+                "xAxis": {
+                  "type": "value"
+                },
+                "yAxis": {
+                  "type": "category",
+                  "inverse": true
+                },
+                "series": [
+                  {
+                    "type": "bar",
+                    "barMaxWidth": 18,
+                    "itemStyle": {
+                      "borderRadius": [
+                        0,
+                        4,
+                        4,
+                        0
+                      ]
+                    },
+                    "encode": {
+                      "x": "pipeline",
+                      "y": "owner"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "p_closing",
+            "title": "Closing in the next 30 days",
+            "query": "q_closing_soon",
+            "layout": {
+              "x": 6,
+              "y": 7,
+              "w": 6,
+              "h": 5
+            },
+            "viz": {
+              "kind": "table",
+              "columns": [
+                "deal",
+                "account",
+                "stage",
+                "value",
+                "expected_close"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "web-analytics",
+      "name": "Site traffic",
+      "description": "Who arrived, where from, what they read, and whether they converted.",
+      "prompt": "Show me site traffic for the last 30 days — sessions and visitors, where they come from, which pages get read, and the conversion rate.",
+      "dialect": "postgres",
+      "assumes": {
+        "sessions": "id, visitor_id, started_at, utm_source, device, country",
+        "page_views": "id, session_id, path, occurred_at",
+        "conversions": "id, session_id, kind, value_cents, occurred_at"
+      },
+      "adapt": "This assumes first-party event tables. Most schemas have something close enough: an events table with a type column, or a page_views table with no separate session row (in which case derive sessions from a session_id column, and drop the visitor stat unless there is a stable visitor id). If conversions are a column on the session rather than their own table, rewrite the conversion query as a COUNT(*) FILTER over that column. 30 days is a choice, not a law — match the window to how often they look at it.",
+      "dashboard": {
+        "meta": {
+          "schema": 1,
+          "title": "Site traffic"
+        },
+        "datasource": {
+          "engine": "postgres",
+          "ref": ""
+        },
+        "queries": [
+          {
+            "id": "q_traffic_headline",
+            "name": "Sessions and visitors, last 30 days",
+            "sql": "SELECT COUNT(*) AS sessions,\n       COUNT(DISTINCT visitor_id) AS visitors\nFROM sessions\nWHERE started_at >= CURRENT_DATE - INTERVAL '30 days'"
+          },
+          {
+            "id": "q_conversion",
+            "name": "Session conversion rate and depth, last 30 days",
+            "sql": "SELECT COUNT(DISTINCT c.session_id) * 100.0 / NULLIF(COUNT(DISTINCT s.id), 0) AS conversion_pct,\n       COUNT(v.id) * 1.0 / NULLIF(COUNT(DISTINCT s.id), 0) AS pages_per_session\nFROM sessions s\nLEFT JOIN conversions c ON c.session_id = s.id\nLEFT JOIN page_views v ON v.session_id = s.id\nWHERE s.started_at >= CURRENT_DATE - INTERVAL '30 days'"
+          },
+          {
+            "id": "q_sessions_by_day",
+            "name": "Sessions by day, last 30 days",
+            "sql": "SELECT to_char(date_trunc('day', started_at), 'YYYY-MM-DD') AS day,\n       COUNT(*) AS sessions\nFROM sessions\nWHERE started_at >= CURRENT_DATE - INTERVAL '30 days'\nGROUP BY 1\nORDER BY 1"
+          },
+          {
+            "id": "q_by_device",
+            "name": "Sessions by device, last 30 days",
+            "sql": "SELECT device,\n       COUNT(*) AS sessions\nFROM sessions\nWHERE started_at >= CURRENT_DATE - INTERVAL '30 days'\nGROUP BY device\nORDER BY 2 DESC"
+          },
+          {
+            "id": "q_by_source",
+            "name": "Sessions by source, last 30 days",
+            "sql": "SELECT COALESCE(utm_source, 'direct') AS source,\n       COUNT(*) AS sessions\nFROM sessions\nWHERE started_at >= CURRENT_DATE - INTERVAL '30 days'\nGROUP BY 1\nORDER BY 2 DESC\nLIMIT 8"
+          },
+          {
+            "id": "q_top_pages",
+            "name": "Most read pages, last 30 days",
+            "sql": "SELECT path AS page,\n       COUNT(*) AS views,\n       COUNT(DISTINCT session_id) AS sessions\nFROM page_views\nWHERE occurred_at >= CURRENT_DATE - INTERVAL '30 days'\nGROUP BY path\nORDER BY 2 DESC\nLIMIT 10"
+          }
+        ],
+        "panels": [
+          {
+            "id": "p_sessions",
+            "title": "Sessions",
+            "query": "q_traffic_headline",
+            "layout": {
+              "x": 0,
+              "y": 0,
+              "w": 3,
+              "h": 2
+            },
+            "viz": {
+              "kind": "stat",
+              "column": "sessions",
+              "format": "int"
+            },
+            "caption": "Last 30 days"
+          },
+          {
+            "id": "p_visitors",
+            "title": "Unique visitors",
+            "query": "q_traffic_headline",
+            "layout": {
+              "x": 3,
+              "y": 0,
+              "w": 3,
+              "h": 2
+            },
+            "viz": {
+              "kind": "stat",
+              "column": "visitors",
+              "format": "int"
+            },
+            "caption": "Last 30 days"
+          },
+          {
+            "id": "p_conversion",
+            "title": "Conversion rate",
+            "query": "q_conversion",
+            "layout": {
+              "x": 6,
+              "y": 0,
+              "w": 3,
+              "h": 2
+            },
+            "viz": {
+              "kind": "stat",
+              "column": "conversion_pct",
+              "format": "percent"
+            },
+            "caption": "Sessions with a conversion"
+          },
+          {
+            "id": "p_depth",
+            "title": "Pages per session",
+            "query": "q_conversion",
+            "layout": {
+              "x": 9,
+              "y": 0,
+              "w": 3,
+              "h": 2
+            },
+            "viz": {
+              "kind": "stat",
+              "column": "pages_per_session",
+              "format": "decimal"
+            }
+          },
+          {
+            "id": "p_by_day",
+            "title": "Sessions by day",
+            "query": "q_sessions_by_day",
+            "layout": {
+              "x": 0,
+              "y": 2,
+              "w": 8,
+              "h": 5
+            },
+            "viz": {
+              "kind": "chart",
+              "option": {
+                "tooltip": {
+                  "trigger": "axis"
+                },
+                "legend": {
+                  "show": false
+                },
+                "xAxis": {
+                  "type": "category"
+                },
+                "yAxis": {
+                  "type": "value"
+                },
+                "series": [
+                  {
+                    "type": "line",
+                    "name": "Sessions",
+                    "smooth": true,
+                    "showSymbol": false,
+                    "areaStyle": {
+                      "opacity": 0.12
+                    },
+                    "encode": {
+                      "x": "day",
+                      "y": "sessions"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "p_device",
+            "title": "By device",
+            "query": "q_by_device",
+            "layout": {
+              "x": 8,
+              "y": 2,
+              "w": 4,
+              "h": 5
+            },
+            "viz": {
+              "kind": "chart",
+              "option": {
+                "tooltip": {
+                  "trigger": "item"
+                },
+                "legend": {
+                  "type": "scroll",
+                  "bottom": 0,
+                  "icon": "circle"
+                },
+                "series": [
+                  {
+                    "type": "pie",
+                    "radius": [
+                      "46%",
+                      "72%"
+                    ],
+                    "center": [
+                      "50%",
+                      "44%"
+                    ],
+                    "avoidLabelOverlap": true,
+                    "label": {
+                      "show": false
+                    },
+                    "itemStyle": {
+                      "borderWidth": 2
+                    },
+                    "encode": {
+                      "itemName": "device",
+                      "value": "sessions"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "p_source",
+            "title": "Where they came from",
+            "query": "q_by_source",
+            "layout": {
+              "x": 0,
+              "y": 7,
+              "w": 6,
+              "h": 5
+            },
+            "viz": {
+              "kind": "chart",
+              "option": {
+                "tooltip": {
+                  "trigger": "axis"
+                },
+                "legend": {
+                  "show": false
+                },
+                "grid": {
+                  "left": 8,
+                  "right": 24,
+                  "containLabel": true
+                },
+                "xAxis": {
+                  "type": "value"
+                },
+                "yAxis": {
+                  "type": "category",
+                  "inverse": true
+                },
+                "series": [
+                  {
+                    "type": "bar",
+                    "barMaxWidth": 18,
+                    "itemStyle": {
+                      "borderRadius": [
+                        0,
+                        4,
+                        4,
+                        0
+                      ]
+                    },
+                    "encode": {
+                      "x": "sessions",
+                      "y": "source"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "p_pages",
+            "title": "Most read pages",
+            "query": "q_top_pages",
+            "layout": {
+              "x": 6,
+              "y": 7,
+              "w": 6,
+              "h": 5
+            },
+            "viz": {
+              "kind": "table",
+              "columns": [
+                "page",
+                "views",
+                "sessions"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "support-ops",
+      "name": "Support queue",
+      "description": "The size of the queue, how fast it is being answered, and what is aging in it.",
+      "prompt": "Show me how support is doing — how big the queue is, how quickly we answer, whether the backlog is growing, and which tickets have been waiting longest.",
+      "dialect": "postgres",
+      "assumes": {
+        "tickets": "id, subject, channel, priority, status, created_at, first_response_at, resolved_at, assignee_id",
+        "agents": "id, name"
+      },
+      "adapt": "One row per ticket with three timestamps — created, first answered, resolved — is the whole model; everything here is derived from those. If first_response_at does not exist, the response-time and SLA panels cannot be computed: say that rather than substituting resolution time, which measures something else. The 4-hour SLA below is an assumption — ask what theirs is, or read it from an SLA table if they have one. `good: \"down\"` on the response-time stat is deliberate: faster is better, and the colour has to know that.",
+      "dashboard": {
+        "meta": {
+          "schema": 1,
+          "title": "Support queue"
+        },
+        "datasource": {
+          "engine": "postgres",
+          "ref": ""
+        },
+        "queries": [
+          {
+            "id": "q_queue",
+            "name": "Open tickets and how many are still unanswered",
+            "sql": "SELECT COUNT(*) FILTER (WHERE resolved_at IS NULL) AS open_tickets,\n       COUNT(*) FILTER (WHERE resolved_at IS NULL AND first_response_at IS NULL) AS unanswered\nFROM tickets"
+          },
+          {
+            "id": "q_response",
+            "name": "Median minutes to first reply, last 7 days",
+            "sql": "SELECT percentile_cont(0.5) WITHIN GROUP (\n         ORDER BY EXTRACT(EPOCH FROM (first_response_at - created_at)) / 60.0\n       ) AS median_first_reply_min\nFROM tickets\nWHERE first_response_at IS NOT NULL\n  AND created_at >= CURRENT_DATE - INTERVAL '7 days'"
+          },
+          {
+            "id": "q_sla",
+            "name": "Share answered within four hours, last 7 days",
+            "sql": "SELECT COUNT(*) FILTER (WHERE first_response_at <= created_at + INTERVAL '4 hours') * 100.0\n       / NULLIF(COUNT(*), 0) AS within_sla_pct\nFROM tickets\nWHERE created_at >= CURRENT_DATE - INTERVAL '7 days'"
+          },
+          {
+            "id": "q_flow_by_day",
+            "name": "Tickets opened and resolved by day, last 30 days",
+            "sql": "WITH days AS (\n  SELECT generate_series(CURRENT_DATE - INTERVAL '29 days', CURRENT_DATE, INTERVAL '1 day') AS d\n)\nSELECT to_char(d, 'YYYY-MM-DD') AS day,\n       (SELECT COUNT(*) FROM tickets t WHERE date_trunc('day', t.created_at) = d) AS opened,\n       (SELECT COUNT(*) FROM tickets t WHERE date_trunc('day', t.resolved_at) = d) AS resolved\nFROM days\nORDER BY 1"
+          },
+          {
+            "id": "q_by_channel",
+            "name": "Tickets by channel, last 7 days",
+            "sql": "SELECT channel,\n       COUNT(*) AS tickets\nFROM tickets\nWHERE created_at >= CURRENT_DATE - INTERVAL '7 days'\nGROUP BY channel\nORDER BY 2 DESC"
+          },
+          {
+            "id": "q_oldest_open",
+            "name": "Open tickets waiting longest",
+            "sql": "SELECT t.subject AS ticket,\n       t.channel,\n       t.priority,\n       ROUND(EXTRACT(EPOCH FROM (NOW() - t.created_at)) / 3600.0) AS hours_waiting\nFROM tickets t\nWHERE t.resolved_at IS NULL\nORDER BY t.created_at\nLIMIT 10"
+          }
+        ],
+        "panels": [
+          {
+            "id": "p_open",
+            "title": "Open tickets",
+            "query": "q_queue",
+            "layout": {
+              "x": 0,
+              "y": 0,
+              "w": 3,
+              "h": 2
+            },
+            "viz": {
+              "kind": "stat",
+              "column": "open_tickets",
+              "format": "int"
+            }
+          },
+          {
+            "id": "p_unanswered",
+            "title": "Waiting for a first reply",
+            "query": "q_queue",
+            "layout": {
+              "x": 3,
+              "y": 0,
+              "w": 3,
+              "h": 2
+            },
+            "viz": {
+              "kind": "stat",
+              "column": "unanswered",
+              "format": "int"
+            }
+          },
+          {
+            "id": "p_response",
+            "title": "Median first reply",
+            "query": "q_response",
+            "layout": {
+              "x": 6,
+              "y": 0,
+              "w": 3,
+              "h": 2
+            },
+            "viz": {
+              "kind": "stat",
+              "column": "median_first_reply_min",
+              "format": "decimal"
+            },
+            "caption": "Minutes, last 7 days"
+          },
+          {
+            "id": "p_sla",
+            "title": "Answered within 4 hours",
+            "query": "q_sla",
+            "layout": {
+              "x": 9,
+              "y": 0,
+              "w": 3,
+              "h": 2
+            },
+            "viz": {
+              "kind": "stat",
+              "column": "within_sla_pct",
+              "format": "percent"
+            },
+            "caption": "Last 7 days"
+          },
+          {
+            "id": "p_flow",
+            "title": "Opened and resolved",
+            "query": "q_flow_by_day",
+            "layout": {
+              "x": 0,
+              "y": 2,
+              "w": 8,
+              "h": 5
+            },
+            "viz": {
+              "kind": "chart",
+              "option": {
+                "tooltip": {
+                  "trigger": "axis"
+                },
+                "legend": {
+                  "top": 0
+                },
+                "xAxis": {
+                  "type": "category"
+                },
+                "yAxis": {
+                  "type": "value"
+                },
+                "series": [
+                  {
+                    "type": "line",
+                    "name": "Opened",
+                    "smooth": true,
+                    "showSymbol": false,
+                    "encode": {
+                      "x": "day",
+                      "y": "opened"
+                    }
+                  },
+                  {
+                    "type": "line",
+                    "name": "Resolved",
+                    "smooth": true,
+                    "showSymbol": false,
+                    "encode": {
+                      "x": "day",
+                      "y": "resolved"
+                    }
+                  }
+                ]
+              }
+            },
+            "caption": "A gap that stays open is a backlog that is growing"
+          },
+          {
+            "id": "p_channel",
+            "title": "By channel",
+            "query": "q_by_channel",
+            "layout": {
+              "x": 8,
+              "y": 2,
+              "w": 4,
+              "h": 5
+            },
+            "viz": {
+              "kind": "chart",
+              "option": {
+                "tooltip": {
+                  "trigger": "item"
+                },
+                "legend": {
+                  "type": "scroll",
+                  "bottom": 0,
+                  "icon": "circle"
+                },
+                "series": [
+                  {
+                    "type": "pie",
+                    "radius": [
+                      "46%",
+                      "72%"
+                    ],
+                    "center": [
+                      "50%",
+                      "44%"
+                    ],
+                    "avoidLabelOverlap": true,
+                    "label": {
+                      "show": false
+                    },
+                    "itemStyle": {
+                      "borderWidth": 2
+                    },
+                    "encode": {
+                      "itemName": "channel",
+                      "value": "tickets"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "p_oldest",
+            "title": "Waiting longest",
+            "query": "q_oldest_open",
+            "layout": {
+              "x": 0,
+              "y": 7,
+              "w": 12,
+              "h": 5
+            },
+            "viz": {
+              "kind": "table",
+              "columns": [
+                "ticket",
+                "channel",
+                "priority",
+                "hours_waiting"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "executive-summary",
+      "name": "Executive summary",
+      "description": "One number per part of the business, and the two trends behind them.",
+      "prompt": "Give me a one-screen summary of the business: revenue, new customers, pipeline and support load, plus how revenue and sign-ups have moved this year.",
+      "dialect": "postgres",
+      "assumes": {
+        "subscriptions": "id, customer_id, status, mrr_cents",
+        "customers": "id, created_at",
+        "invoices": "id, amount_cents, status, paid_at",
+        "opportunities": "id, amount_cents, closed_at",
+        "tickets": "id, resolved_at"
+      },
+      "adapt": "This one is deliberately thin: four numbers and two trends, because an executive view is read in seconds between meetings. It reaches across four subject areas, so it is the template most likely to need panels REMOVED — if the schema has no CRM tables, three panels is a better dashboard than four with one showing an error. Choose the four numbers with the person: the right four are the ones they would ask about in a board meeting, not the ones that are easiest to query.",
+      "dashboard": {
+        "meta": {
+          "schema": 1,
+          "title": "Executive summary"
+        },
+        "datasource": {
+          "engine": "postgres",
+          "ref": ""
+        },
+        "queries": [
+          {
+            "id": "q_mrr",
+            "name": "Recurring revenue now",
+            "sql": "SELECT SUM(mrr_cents) / 100.0 AS mrr\nFROM subscriptions\nWHERE status = 'active'"
+          },
+          {
+            "id": "q_new_customers",
+            "name": "Customers added this month",
+            "sql": "SELECT COUNT(*) AS new_customers\nFROM customers\nWHERE created_at >= date_trunc('month', CURRENT_DATE)"
+          },
+          {
+            "id": "q_pipeline",
+            "name": "Open pipeline value",
+            "sql": "SELECT SUM(amount_cents) / 100.0 AS open_pipeline\nFROM opportunities\nWHERE closed_at IS NULL"
+          },
+          {
+            "id": "q_support",
+            "name": "Unresolved tickets",
+            "sql": "SELECT COUNT(*) AS open_tickets\nFROM tickets\nWHERE resolved_at IS NULL"
+          },
+          {
+            "id": "q_revenue_by_month",
+            "name": "Collected revenue by month, last 12 months",
+            "sql": "SELECT to_char(date_trunc('month', paid_at), 'YYYY-MM') AS month,\n       SUM(amount_cents) / 100.0 AS collected\nFROM invoices\nWHERE status = 'paid'\n  AND paid_at >= date_trunc('month', CURRENT_DATE) - INTERVAL '11 months'\nGROUP BY 1\nORDER BY 1"
+          },
+          {
+            "id": "q_signups_by_month",
+            "name": "New customers by month, last 12 months",
+            "sql": "SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month,\n       COUNT(*) AS customers\nFROM customers\nWHERE created_at >= date_trunc('month', CURRENT_DATE) - INTERVAL '11 months'\nGROUP BY 1\nORDER BY 1"
+          }
+        ],
+        "panels": [
+          {
+            "id": "p_mrr",
+            "title": "Recurring revenue",
+            "query": "q_mrr",
+            "layout": {
+              "x": 0,
+              "y": 0,
+              "w": 3,
+              "h": 2
+            },
+            "viz": {
+              "kind": "stat",
+              "column": "mrr",
+              "format": "currency",
+              "currency": "USD"
+            },
+            "caption": "Active subscriptions"
+          },
+          {
+            "id": "p_new",
+            "title": "New customers this month",
+            "query": "q_new_customers",
+            "layout": {
+              "x": 3,
+              "y": 0,
+              "w": 3,
+              "h": 2
+            },
+            "viz": {
+              "kind": "stat",
+              "column": "new_customers",
+              "format": "int"
+            }
+          },
+          {
+            "id": "p_pipeline",
+            "title": "Open pipeline",
+            "query": "q_pipeline",
+            "layout": {
+              "x": 6,
+              "y": 0,
+              "w": 3,
+              "h": 2
+            },
+            "viz": {
+              "kind": "stat",
+              "column": "open_pipeline",
+              "format": "currency",
+              "currency": "USD"
+            }
+          },
+          {
+            "id": "p_support",
+            "title": "Open support tickets",
+            "query": "q_support",
+            "layout": {
+              "x": 9,
+              "y": 0,
+              "w": 3,
+              "h": 2
+            },
+            "viz": {
+              "kind": "stat",
+              "column": "open_tickets",
+              "format": "int"
+            }
+          },
+          {
+            "id": "p_revenue",
+            "title": "Revenue by month",
+            "query": "q_revenue_by_month",
+            "layout": {
+              "x": 0,
+              "y": 2,
+              "w": 8,
+              "h": 6
+            },
+            "viz": {
+              "kind": "chart",
+              "option": {
+                "tooltip": {
+                  "trigger": "axis"
+                },
+                "legend": {
+                  "show": false
+                },
+                "xAxis": {
+                  "type": "category"
+                },
+                "yAxis": {
+                  "type": "value"
+                },
+                "series": [
+                  {
+                    "type": "line",
+                    "name": "Collected",
+                    "smooth": true,
+                    "showSymbol": false,
+                    "areaStyle": {
+                      "opacity": 0.12
+                    },
+                    "encode": {
+                      "x": "month",
+                      "y": "collected"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "p_signups",
+            "title": "New customers by month",
+            "query": "q_signups_by_month",
+            "layout": {
+              "x": 8,
+              "y": 2,
+              "w": 4,
+              "h": 6
+            },
+            "viz": {
+              "kind": "chart",
+              "option": {
+                "tooltip": {
+                  "trigger": "axis"
+                },
+                "legend": {
+                  "show": false
+                },
+                "xAxis": {
+                  "type": "category"
+                },
+                "yAxis": {
+                  "type": "value"
+                },
+                "series": [
+                  {
+                    "type": "bar",
+                    "name": "Customers",
+                    "barMaxWidth": 36,
+                    "itemStyle": {
+                      "borderRadius": [
+                        4,
+                        4,
+                        0,
+                        0
+                      ]
+                    },
+                    "encode": {
+                      "x": "month",
+                      "y": "customers"
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

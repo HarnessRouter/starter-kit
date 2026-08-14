@@ -39,6 +39,26 @@ const now = () => Math.floor(Date.now() / 1000);
 
 const escapeRe = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+/** A workbook, as tabs of rows, for the file preview.
+ *
+ *  The spreadsheet library is loaded here rather than inside the package: a kit that has never
+ *  heard of a spreadsheet must not have to resolve one to build, and this kit already ships xlsx
+ *  for its exports. Lazy, so it is not in the first bundle either — nobody pays 430 KB until
+ *  they open a .xlsx.
+ *
+ *  sheet_to_json THROWS on a sheet with no '!ref' — an empty one — and letting that escape threw
+ *  away the whole workbook rather than one tab. Tools routinely leave an empty default Sheet1 in
+ *  front of the real data, so that was most spreadsheets. */
+async function parseWorkbook(buffer) {
+  const XLSX = await import('xlsx');
+  const wb = XLSX.read(buffer, { type: 'array' });
+  return wb.SheetNames.map((n) => {
+    const ws = wb.Sheets[n] || {};
+    const filled = Boolean(ws['!ref']);
+    return { name: n, filled, rows: filled ? XLSX.utils.sheet_to_json(ws, { header: 1, raw: false }) : [] };
+  });
+}
+
 /** The first agent column that reads something to its right, if any. */
 function firstBrokenDep(sheet) {
   const columns = sheet.columns || [];
@@ -574,6 +594,7 @@ export function SheetPage({ id: routeId, seed }) {
                 onClose={() => setPreview(null)}
                 officePdfUrl={(u) => u.replace(/\/content(\?|$)/, '/pdf$1')}
                 renderMarkdown={(t) => <ReactMarkdown remarkPlugins={[remarkGfm]}>{t}</ReactMarkdown>}
+                parseWorkbook={parseWorkbook}
               />
             </div>
           )}
