@@ -13,6 +13,7 @@
     "so adding a kit does not mean editing this file beyond one line."
   ],
   "kits": [
-    { "name": "slides", "include": true }
+    { "name": "slides", "include": true },
+    { "name": "sheets", "include": true }
   ]
 }

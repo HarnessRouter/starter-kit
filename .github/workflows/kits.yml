@@ -1,0 +1,34 @@
+# Build every kit app on every PR.
+#
+# Nothing built these before, and a broken kit only showed up at image bake — where the failure is
+# a docker layer, not a diff. An undefined JSX identifier does not even fail there: it is a
+# runtime error, so it ships. This is the cheapest place to catch both.
+name: kits
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        kit: [slides, sheets]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Not `npm ci` at the repo root: install-kits.sh cds into each app and resolves against that
+      # app's own lockfile, so hoisting here would test a tree the image never has.
+      - run: npm ci
+        working-directory: kits/${{ matrix.kit }}/app
+      - run: npm test --if-present
+        working-directory: kits/${{ matrix.kit }}/app
+      - run: npm run build
+        working-directory: kits/${{ matrix.kit }}/app
+      - name: dist exists
+        run: test -d kits/${{ matrix.kit }}/app/dist

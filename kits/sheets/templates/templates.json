@@ -1,0 +1,92 @@
+{
+  "$comment": [
+    "Starter sheets. Each one is a real sheet.json (schema 1) with placeholder ids that the app",
+    "re-mints per sheet, so two sheets made from one template never share a cell key.",
+    "",
+    "Agent columns ship with harness_id: \"\" on purpose. A template cannot know which agents a",
+    "workspace has, and inventing an id would silently run the wrong agent — the app opens that",
+    "column's settings on first load and asks which one to use.",
+    "",
+    "`brief` is what the agent is told about the template on the first turn. It is style and",
+    "intent, not schema: the schema lives in the sheet-design skill, where it costs nothing per",
+    "turn and applies to every turn rather than only the first."
+  ],
+  "templates": [
+    {
+      "id": "competitor-scan",
+      "name": "Competitor scan",
+      "description": "One row per company; an agent reads each site and a second one scores the overlap.",
+      "brief": "A research pipeline read left to right: the person fills in the company and its site, one agent writes a short brief from the site, and a second agent judges how directly it competes. Keep the agent answers to a couple of sentences each.",
+      "sheet": {
+        "meta": { "schema": 1, "title": "Competitor scan" },
+        "columns": [
+          { "id": "c_company", "name": "Company", "type": "text", "width": 200 },
+          { "id": "c_site", "name": "Site", "type": "url", "width": 230 },
+          {
+            "id": "c_brief", "name": "Brief", "type": "harness", "width": 380,
+            "harness": {
+              "harness_id": "",
+              "prompt": "Read {{Site}} and write a three-sentence brief on {{Company}}: what they sell, who they sell it to, and how they price it. Put your full notes in notes.md.",
+              "attach": []
+            }
+          },
+          {
+            "id": "c_fit", "name": "Overlap", "type": "harness", "width": 300,
+            "harness": {
+              "harness_id": "",
+              "prompt": "Score 1-5 how directly this company competes with us, then one line of why.\n\n{{Brief}}",
+              "attach": ["c_brief"]
+            }
+          }
+        ],
+        "rows": [{ "id": "r1" }, { "id": "r2" }, { "id": "r3" }, { "id": "r4" }, { "id": "r5" }],
+        "cells": {}
+      }
+    },
+    {
+      "id": "inbound-triage",
+      "name": "Inbound triage",
+      "description": "Paste a batch of requests; an agent summarises each one and suggests the next step.",
+      "brief": "A triage list. The person pastes raw inbound text one row at a time; one agent turns each into a one-line summary plus a suggested next step, and a Stage column tracks what happened. Keep it to two columns of agent work at most.",
+      "sheet": {
+        "meta": { "schema": 1, "title": "Inbound triage" },
+        "columns": [
+          { "id": "c_from", "name": "From", "type": "text", "width": 180 },
+          { "id": "c_msg", "name": "Message", "type": "text", "width": 380 },
+          {
+            "id": "c_tri", "name": "Triage", "type": "harness", "width": 340,
+            "harness": {
+              "harness_id": "",
+              "prompt": "Summarise this request in one line, then say in one more line what the next step should be.\n\nFrom: {{From}}\n\n{{Message}}",
+              "attach": []
+            }
+          },
+          {
+            "id": "c_stage", "name": "Stage", "type": "select", "width": 140,
+            "options": ["New", "Replied", "Waiting", "Closed"]
+          }
+        ],
+        "rows": [{ "id": "r1" }, { "id": "r2" }, { "id": "r3" }, { "id": "r4" }, { "id": "r5" }],
+        "cells": {}
+      }
+    },
+    {
+      "id": "reading-list",
+      "name": "Reading list",
+      "description": "Links in, summaries out — no agent column until you add one.",
+      "brief": "A plain working list: a link, why it matters, and a status. No agent columns — this one is for someone who wants to get material in first and decide later what to run over it.",
+      "sheet": {
+        "meta": { "schema": 1, "title": "Reading list" },
+        "columns": [
+          { "id": "c_title", "name": "Title", "type": "text", "width": 280 },
+          { "id": "c_url", "name": "Link", "type": "url", "width": 260 },
+          { "id": "c_why", "name": "Why it matters", "type": "text", "width": 320 },
+          { "id": "c_tags", "name": "Tags", "type": "tags", "width": 180 },
+          { "id": "c_read", "name": "Read", "type": "checkbox", "width": 90 }
+        ],
+        "rows": [{ "id": "r1" }, { "id": "r2" }, { "id": "r3" }, { "id": "r4" }, { "id": "r5" }, { "id": "r6" }],
+        "cells": {}
+      }
+    }
+  ]
+}
