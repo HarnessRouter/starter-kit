@@ -9,7 +9,7 @@
 // The page is composed from the package's library primitives (Composer, Carousel, Card, Chip,
 // SearchField, Modal). The topbar sits OUTSIDE the centred column, so the bar spans the viewport
 // instead of being a floating slab inset from both edges.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUp, Eye, LayoutDashboard, Pencil, Trash2 } from 'lucide-react';
 import {
   Card, Carousel, Chip, Composer, IcMic, IcPaperclip, Modal, SearchField,
@@ -22,6 +22,8 @@ import {
 } from '../lib/dash';
 import { datasource, datasourceLabel } from '../lib/query';
 import { listTemplates } from '../lib/templates';
+import { parseDashboard } from '../lib/dashboard';
+import { DashboardCanvas } from '../components/DashboardCanvas';
 import { Topbar } from '../components/Topbar';
 
 // The placeholder cycles through things this product is actually for. They are examples, not
@@ -41,6 +43,31 @@ const PROMPT_IDEAS = [
  *  There is no sample data in it and no invented chart — a preview that showed a plausible line
  *  going up would be showing numbers this dashboard has never seen. The shape is the honest part
  *  and it is also the useful one: it is what the person is choosing between. */
+/** The template, drawn as the board it becomes, with its own illustrative figures.
+ *
+ *  This is the ONE place in the product where a number on a panel did not come from the person's
+ *  database, and it is allowed here for the same reason it is forbidden everywhere else: what
+ *  someone needs from a template preview is what the thing looks like FILLED IN. A grid of empty
+ *  grey rectangles — which is what this was — tells nobody whether a template is worth choosing.
+ *
+ *  Three things keep it honest. The figures live under `sample` in the template file, never under
+ *  `dashboard`. The copilot sends `dashboard` and has no way to reach `sample`, so they cannot
+ *  travel into a real document (lib/copilot.js, and the test that pins it). And the caption below
+ *  says plainly that they are examples. */
+function TemplateBoard({ template, rowHeight = 30, gap = 8 }) {
+  const parsed = useMemo(() => parseDashboard(template.dashboard), [template]);
+  const states = useMemo(() => new Map(
+    Object.entries(template.sample || {})
+      .filter(([k]) => k !== '$comment')
+      .map(([id, result]) => [id, { status: 'ok', result }]),
+  ), [template]);
+  if (!parsed.doc) return null;
+  return (
+    <DashboardCanvas doc={parsed.doc} states={states} rowHeight={rowHeight} gap={gap}
+                     className="db-preview-canvas" />
+  );
+}
+
 function TemplateArt({ template }) {
   const panels = (template.dashboard?.panels || []).slice(0, 10);
   return (
@@ -415,27 +442,22 @@ export function LandingPage() {
             </button>
           )}
         >
+          {/* One child, not two. These were siblings of the Modal's body, which lays its children
+              out in a row — so the board was squeezed into a third of the width and the caption
+              sat in the empty two thirds beside it. */}
           <div className="db-preview">
-            <div className="db-preview-art"><TemplateArt template={preview} /></div>
-            <div className="db-preview-side">
-              <h4>What it answers</h4>
-              <ul>
-                {(preview.dashboard?.panels || []).map((p) => (
-                  <li key={p.id}>
-                    {p.title}
-                    {p.caption ? <span className="db-preview-cap"> — {p.caption}</span> : null}
-                  </li>
-                ))}
-              </ul>
+            <div className="db-preview-board">
+              <TemplateBoard template={preview} />
             </div>
+            <p className="db-preview-note">
+              {/* Both halves of the truth, in the order someone needs them: these numbers are
+                  examples, and the SHAPE is a starting point rather than an assumption about
+                  your schema. The second half is why every template carries `adapt`. */}
+              <strong>The figures above are examples.</strong> Your dashboard shows your own data:
+              the agent reads your schema first and maps each panel onto the tables you actually
+              have — or tells you when something it asks for isn’t there.
+            </p>
           </div>
-          <p className="db-preview-note">
-            {/* The honest caveat, and the reason `adapt` exists in every template: a template is
-                a shape, not a schema. Saying so here stops the first turn from being a surprise. */}
-            A template is a starting shape, not an assumption about your database. The agent reads
-            your schema first and maps each panel onto the tables you actually have — or says so
-            when something it asks for isn’t there.
-          </p>
         </Modal>
       )}
     </div>

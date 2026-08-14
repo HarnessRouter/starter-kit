@@ -424,6 +424,14 @@ def main() -> int:
             if " group by " in f" {sql} " and " limit " not in f" {sql} ":
                 warn(at, "is a stat over a grouped query",
                      "a stat reads the first row only; add ORDER BY … LIMIT 1 so it is the row you mean")
+            # The percent format does the ×100. SQL that also multiplies renders a 2.1% rate as
+            # "210%" — and BOTH readings look plausible, so it survives review by anyone who does
+            # not already know the answer. Every template in this kit shipped with it. A rule that
+            # is only written down is a rule the next person re-breaks.
+            if (p.get("viz") or {}).get("format") == "percent" and re.search(r"\*\s*100(\.0+)?\b", sql):
+                err(f"{at}.viz", "is percent-formatted and its query multiplies by 100",
+                    "the percent format multiplies for you, so this renders 210% for a 2.1% rate "
+                    "— return the ratio (0.021) and drop the * 100.0")
 
     for qid in sorted(qids - used):
         warn(f"queries[{qid}]", "is drawn by no panel",

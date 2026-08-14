@@ -82,7 +82,14 @@ function Body({ panel, state, theme }) {
   return <ChartPanel result={result} viz={panel.viz} theme={theme} label={panel.title} />;
 }
 
-export function DashboardCanvas({ doc, states, editable = false, onLayoutChange }) {
+/**
+ * `rowHeight` and `gap` exist for one caller: the template preview, which draws a whole board
+ * inside a modal and needs it at about half scale to be readable there. They are not a theme —
+ * the live board always uses the defaults.
+ */
+export function DashboardCanvas({
+  doc, states, editable = false, onLayoutChange, rowHeight, gap, className = '',
+}) {
   const [theme, themeRef] = useTheme();
 
   const layout = useMemo(
@@ -91,11 +98,13 @@ export function DashboardCanvas({ doc, states, editable = false, onLayoutChange 
   );
 
   return (
-    <div className="db-canvas" ref={themeRef}>
+    <div className={'db-canvas' + (className ? ' ' + className : '')} ref={themeRef}>
       <PanelGrid
         layout={layout}
         editable={editable}
         onLayoutChange={onLayoutChange}
+        rowHeight={rowHeight}
+        gap={gap}
         resizeLabel={(id) => `Resize ${doc.panels.find((p) => p.id === id)?.title || 'panel'}`}
       >
         {doc.panels.map((p) => {

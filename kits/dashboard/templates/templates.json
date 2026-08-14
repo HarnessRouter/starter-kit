@@ -54,7 +54,7 @@
           {
             "id": "q_churn",
             "name": "Subscription churn, last 30 days",
-            "sql": "SELECT COUNT(*) FILTER (WHERE canceled_at >= CURRENT_DATE - INTERVAL '30 days') * 100.0\n       / NULLIF(COUNT(*) FILTER (WHERE started_at < CURRENT_DATE - INTERVAL '30 days'), 0)\n       AS churn_pct\nFROM subscriptions"
+            "sql": "SELECT COUNT(*) FILTER (WHERE canceled_at >= CURRENT_DATE - INTERVAL '30 days')\n       / NULLIF(COUNT(*) FILTER (WHERE started_at < CURRENT_DATE - INTERVAL '30 days'), 0)\n       AS churn_rate\nFROM subscriptions"
           },
           {
             "id": "q_collected_by_month",
@@ -141,7 +141,7 @@
             },
             "viz": {
               "kind": "stat",
-              "column": "churn_pct",
+              "column": "churn_rate",
               "format": "percent"
             },
             "caption": "Of subscriptions older than 30 days"
@@ -321,6 +321,231 @@
             }
           }
         ]
+      },
+      "sample": {
+        "$comment": "Illustrative figures for the preview card ONLY. They are never written to a dashboard and never reach the agent: the copilot sends `dashboard`, not this. They exist so the preview shows what the shape looks like FILLED IN — an empty grey rectangle tells nobody whether a template is worth choosing.",
+        "q_headline": {
+          "columns": [
+            "mrr",
+            "customers",
+            "arpa"
+          ],
+          "rows": [
+            [
+              "48250.00",
+              312,
+              "154.65"
+            ]
+          ]
+        },
+        "q_churn": {
+          "columns": [
+            "churn_rate"
+          ],
+          "rows": [
+            [
+              0.021
+            ]
+          ]
+        },
+        "q_collected_by_month": {
+          "columns": [
+            "month",
+            "collected"
+          ],
+          "rows": [
+            [
+              "2025-09",
+              "31200.00"
+            ],
+            [
+              "2025-10",
+              "33450.00"
+            ],
+            [
+              "2025-11",
+              "34980.00"
+            ],
+            [
+              "2025-12",
+              "36120.00"
+            ],
+            [
+              "2026-01",
+              "38740.00"
+            ],
+            [
+              "2026-02",
+              "40310.00"
+            ],
+            [
+              "2026-03",
+              "41980.00"
+            ],
+            [
+              "2026-04",
+              "43620.00"
+            ],
+            [
+              "2026-05",
+              "45100.00"
+            ],
+            [
+              "2026-06",
+              "47380.00"
+            ],
+            [
+              "2026-07",
+              "49260.00"
+            ],
+            [
+              "2026-08",
+              "52140.00"
+            ]
+          ]
+        },
+        "q_movement_by_month": {
+          "columns": [
+            "month",
+            "new_mrr",
+            "churned_mrr"
+          ],
+          "rows": [
+            [
+              "2025-09",
+              "3100.00",
+              "-1180.00"
+            ],
+            [
+              "2025-10",
+              "2840.00",
+              "-1420.00"
+            ],
+            [
+              "2025-11",
+              "3620.00",
+              "-980.00"
+            ],
+            [
+              "2025-12",
+              "3010.00",
+              "-1610.00"
+            ],
+            [
+              "2026-01",
+              "4180.00",
+              "-1240.00"
+            ],
+            [
+              "2026-02",
+              "3760.00",
+              "-1530.00"
+            ],
+            [
+              "2026-03",
+              "4420.00",
+              "-1090.00"
+            ],
+            [
+              "2026-04",
+              "3980.00",
+              "-1780.00"
+            ],
+            [
+              "2026-05",
+              "4610.00",
+              "-1320.00"
+            ],
+            [
+              "2026-06",
+              "4230.00",
+              "-1460.00"
+            ],
+            [
+              "2026-07",
+              "5040.00",
+              "-1210.00"
+            ],
+            [
+              "2026-08",
+              "4780.00",
+              "-1640.00"
+            ]
+          ]
+        },
+        "q_mrr_by_plan": {
+          "columns": [
+            "plan",
+            "mrr"
+          ],
+          "rows": [
+            [
+              "Growth",
+              "18400.00"
+            ],
+            [
+              "Business",
+              "14900.00"
+            ],
+            [
+              "Enterprise",
+              "8750.00"
+            ],
+            [
+              "Starter",
+              "6200.00"
+            ]
+          ]
+        },
+        "q_top_customers": {
+          "columns": [
+            "customer",
+            "mrr",
+            "customer_since"
+          ],
+          "rows": [
+            [
+              "Northwind Trading",
+              "2450.00",
+              "2024-03-11"
+            ],
+            [
+              "Contoso Systems",
+              "1980.00",
+              "2023-11-02"
+            ],
+            [
+              "Fathom Logistics",
+              "1720.00",
+              "2024-07-19"
+            ],
+            [
+              "Globex Industrial",
+              "1490.00",
+              "2025-01-23"
+            ],
+            [
+              "Initech Software",
+              "1240.00",
+              "2024-09-05"
+            ],
+            [
+              "Aperture Labs",
+              "1105.00",
+              "2025-04-30"
+            ],
+            [
+              "Vandelay Imports",
+              "980.00",
+              "2023-08-14"
+            ],
+            [
+              "BlueSun Media",
+              "875.00",
+              "2025-06-08"
+            ]
+          ]
+        }
       }
     },
     {
@@ -353,7 +578,7 @@
           {
             "id": "q_win_rate",
             "name": "Win rate, deals closed in the last 90 days",
-            "sql": "SELECT COUNT(*) FILTER (WHERE won) * 100.0 / NULLIF(COUNT(*), 0) AS win_rate_pct\nFROM opportunities\nWHERE closed_at >= CURRENT_DATE - INTERVAL '90 days'"
+            "sql": "SELECT COUNT(*) FILTER (WHERE won) / NULLIF(COUNT(*), 0) AS win_rate\nFROM opportunities\nWHERE closed_at >= CURRENT_DATE - INTERVAL '90 days'"
           },
           {
             "id": "q_by_stage",
@@ -422,7 +647,7 @@
             },
             "viz": {
               "kind": "stat",
-              "column": "win_rate_pct",
+              "column": "win_rate",
               "format": "percent"
             },
             "caption": "Deals closed in the last 90 days"
@@ -608,6 +833,210 @@
             }
           }
         ]
+      },
+      "sample": {
+        "$comment": "Illustrative figures for the preview card ONLY. They are never written to a dashboard and never reach the agent: the copilot sends `dashboard`, not this. They exist so the preview shows what the shape looks like FILLED IN — an empty grey rectangle tells nobody whether a template is worth choosing.",
+        "q_pipeline_headline": {
+          "columns": [
+            "open_value",
+            "open_deals",
+            "avg_won_value"
+          ],
+          "rows": [
+            [
+              "1284000.00",
+              63,
+              "41500.00"
+            ]
+          ]
+        },
+        "q_win_rate": {
+          "columns": [
+            "win_rate"
+          ],
+          "rows": [
+            [
+              0.27
+            ]
+          ]
+        },
+        "q_by_stage": {
+          "columns": [
+            "stage",
+            "deals",
+            "value"
+          ],
+          "rows": [
+            [
+              "Qualified",
+              63,
+              "1284000.00"
+            ],
+            [
+              "Discovery",
+              41,
+              "890000.00"
+            ],
+            [
+              "Proposal",
+              24,
+              "612000.00"
+            ],
+            [
+              "Negotiation",
+              13,
+              "358000.00"
+            ],
+            [
+              "Verbal commit",
+              6,
+              "174000.00"
+            ]
+          ]
+        },
+        "q_flow_by_week": {
+          "columns": [
+            "week",
+            "created",
+            "won_deals"
+          ],
+          "rows": [
+            [
+              "2026-05-25",
+              14,
+              3
+            ],
+            [
+              "2026-06-01",
+              11,
+              2
+            ],
+            [
+              "2026-06-08",
+              17,
+              5
+            ],
+            [
+              "2026-06-15",
+              13,
+              3
+            ],
+            [
+              "2026-06-22",
+              19,
+              6
+            ],
+            [
+              "2026-06-29",
+              15,
+              4
+            ],
+            [
+              "2026-07-06",
+              21,
+              7
+            ],
+            [
+              "2026-07-13",
+              16,
+              5
+            ],
+            [
+              "2026-07-20",
+              23,
+              8
+            ],
+            [
+              "2026-07-27",
+              18,
+              6
+            ],
+            [
+              "2026-08-03",
+              25,
+              9
+            ],
+            [
+              "2026-08-10",
+              20,
+              7
+            ]
+          ]
+        },
+        "q_by_owner": {
+          "columns": [
+            "owner",
+            "pipeline"
+          ],
+          "rows": [
+            [
+              "Dana Whitfield",
+              "412000.00"
+            ],
+            [
+              "Marcus Reyes",
+              "338000.00"
+            ],
+            [
+              "Priya Nair",
+              "276000.00"
+            ],
+            [
+              "Tom Okafor",
+              "161000.00"
+            ],
+            [
+              "Lena Brandt",
+              "97000.00"
+            ]
+          ]
+        },
+        "q_closing_soon": {
+          "columns": [
+            "deal",
+            "account",
+            "stage",
+            "value",
+            "expected_close"
+          ],
+          "rows": [
+            [
+              "Platform renewal",
+              "Northwind Trading",
+              "Negotiation",
+              "185000.00",
+              "2026-08-21"
+            ],
+            [
+              "Seat expansion",
+              "Contoso Systems",
+              "Proposal",
+              "92000.00",
+              "2026-08-24"
+            ],
+            [
+              "Pilot → annual",
+              "Fathom Logistics",
+              "Verbal commit",
+              "74000.00",
+              "2026-08-28"
+            ],
+            [
+              "Data add-on",
+              "Globex Industrial",
+              "Negotiation",
+              "56000.00",
+              "2026-09-02"
+            ],
+            [
+              "Multi-region",
+              "Initech Software",
+              "Proposal",
+              "48000.00",
+              "2026-09-05"
+            ]
+          ]
+        }
       }
     },
     {
@@ -640,7 +1069,7 @@
           {
             "id": "q_conversion",
             "name": "Session conversion rate and depth, last 30 days",
-            "sql": "SELECT COUNT(DISTINCT c.session_id) * 100.0 / NULLIF(COUNT(DISTINCT s.id), 0) AS conversion_pct,\n       COUNT(v.id) * 1.0 / NULLIF(COUNT(DISTINCT s.id), 0) AS pages_per_session\nFROM sessions s\nLEFT JOIN conversions c ON c.session_id = s.id\nLEFT JOIN page_views v ON v.session_id = s.id\nWHERE s.started_at >= CURRENT_DATE - INTERVAL '30 days'"
+            "sql": "SELECT COUNT(DISTINCT c.session_id) / NULLIF(COUNT(DISTINCT s.id), 0) AS conversion_rate,\n       COUNT(v.id) * 1.0 / NULLIF(COUNT(DISTINCT s.id), 0) AS pages_per_session\nFROM sessions s\nLEFT JOIN conversions c ON c.session_id = s.id\nLEFT JOIN page_views v ON v.session_id = s.id\nWHERE s.started_at >= CURRENT_DATE - INTERVAL '30 days'"
           },
           {
             "id": "q_sessions_by_day",
@@ -710,7 +1139,7 @@
             },
             "viz": {
               "kind": "stat",
-              "column": "conversion_pct",
+              "column": "conversion_rate",
               "format": "percent"
             },
             "caption": "Sessions with a conversion"
@@ -728,7 +1157,8 @@
             "viz": {
               "kind": "stat",
               "column": "pages_per_session",
-              "format": "decimal"
+              "format": "decimal",
+              "unit": "pages"
             }
           },
           {
@@ -894,6 +1324,248 @@
             }
           }
         ]
+      },
+      "sample": {
+        "$comment": "Illustrative figures for the preview card ONLY. They are never written to a dashboard and never reach the agent: the copilot sends `dashboard`, not this. They exist so the preview shows what the shape looks like FILLED IN — an empty grey rectangle tells nobody whether a template is worth choosing.",
+        "q_traffic_headline": {
+          "columns": [
+            "sessions",
+            "visitors"
+          ],
+          "rows": [
+            [
+              184320,
+              97460
+            ]
+          ]
+        },
+        "q_conversion": {
+          "columns": [
+            "conversion_rate",
+            "pages_per_session"
+          ],
+          "rows": [
+            [
+              0.032,
+              3.4
+            ]
+          ]
+        },
+        "q_sessions_by_day": {
+          "columns": [
+            "day",
+            "sessions"
+          ],
+          "rows": [
+            [
+              "2026-07-16",
+              5980
+            ],
+            [
+              "2026-07-17",
+              6240
+            ],
+            [
+              "2026-07-18",
+              6110
+            ],
+            [
+              "2026-07-19",
+              5870
+            ],
+            [
+              "2026-07-20",
+              4320
+            ],
+            [
+              "2026-07-21",
+              3980
+            ],
+            [
+              "2026-07-22",
+              6350
+            ],
+            [
+              "2026-07-23",
+              6620
+            ],
+            [
+              "2026-07-24",
+              6480
+            ],
+            [
+              "2026-07-25",
+              6210
+            ],
+            [
+              "2026-07-26",
+              6390
+            ],
+            [
+              "2026-07-27",
+              4510
+            ],
+            [
+              "2026-07-28",
+              4180
+            ],
+            [
+              "2026-07-29",
+              6740
+            ],
+            [
+              "2026-07-30",
+              6910
+            ],
+            [
+              "2026-07-31",
+              6580
+            ],
+            [
+              "2026-08-01",
+              6470
+            ],
+            [
+              "2026-08-02",
+              6820
+            ],
+            [
+              "2026-08-03",
+              4690
+            ],
+            [
+              "2026-08-04",
+              4360
+            ],
+            [
+              "2026-08-05",
+              7010
+            ],
+            [
+              "2026-08-06",
+              7240
+            ],
+            [
+              "2026-08-07",
+              6980
+            ],
+            [
+              "2026-08-08",
+              6830
+            ],
+            [
+              "2026-08-09",
+              7150
+            ],
+            [
+              "2026-08-10",
+              4880
+            ],
+            [
+              "2026-08-11",
+              4520
+            ],
+            [
+              "2026-08-12",
+              7320
+            ],
+            [
+              "2026-08-13",
+              7480
+            ],
+            [
+              "2026-08-14",
+              7190
+            ]
+          ]
+        },
+        "q_by_device": {
+          "columns": [
+            "device",
+            "sessions"
+          ],
+          "rows": [
+            [
+              "mobile",
+              101380
+            ],
+            [
+              "desktop",
+              68200
+            ],
+            [
+              "tablet",
+              14740
+            ]
+          ]
+        },
+        "q_by_source": {
+          "columns": [
+            "source",
+            "sessions"
+          ],
+          "rows": [
+            [
+              "organic",
+              72410
+            ],
+            [
+              "direct",
+              48260
+            ],
+            [
+              "referral",
+              29840
+            ],
+            [
+              "paid",
+              21470
+            ],
+            [
+              "social",
+              12340
+            ]
+          ]
+        },
+        "q_top_pages": {
+          "columns": [
+            "page",
+            "views",
+            "sessions"
+          ],
+          "rows": [
+            [
+              "/pricing",
+              48210,
+              31480
+            ],
+            [
+              "/",
+              44380,
+              38120
+            ],
+            [
+              "/docs/quickstart",
+              27640,
+              19870
+            ],
+            [
+              "/blog/scaling-agents",
+              19420,
+              16240
+            ],
+            [
+              "/changelog",
+              12870,
+              10310
+            ],
+            [
+              "/security",
+              9640,
+              8120
+            ]
+          ]
+        }
       }
     },
     {
@@ -930,7 +1602,7 @@
           {
             "id": "q_sla",
             "name": "Share answered within four hours, last 7 days",
-            "sql": "SELECT COUNT(*) FILTER (WHERE first_response_at <= created_at + INTERVAL '4 hours') * 100.0\n       / NULLIF(COUNT(*), 0) AS within_sla_pct\nFROM tickets\nWHERE created_at >= CURRENT_DATE - INTERVAL '7 days'"
+            "sql": "SELECT COUNT(*) FILTER (WHERE first_response_at <= created_at + INTERVAL '4 hours')\n       / NULLIF(COUNT(*), 0) AS within_sla_rate\nFROM tickets\nWHERE created_at >= CURRENT_DATE - INTERVAL '7 days'"
           },
           {
             "id": "q_flow_by_day",
@@ -994,7 +1666,8 @@
             "viz": {
               "kind": "stat",
               "column": "median_first_reply_min",
-              "format": "decimal"
+              "format": "decimal",
+              "unit": "min"
             },
             "caption": "Minutes, last 7 days"
           },
@@ -1010,7 +1683,7 @@
             },
             "viz": {
               "kind": "stat",
-              "column": "within_sla_pct",
+              "column": "within_sla_rate",
               "format": "percent"
             },
             "caption": "Last 7 days"
@@ -1135,6 +1808,264 @@
             }
           }
         ]
+      },
+      "sample": {
+        "$comment": "Illustrative figures for the preview card ONLY. They are never written to a dashboard and never reach the agent: the copilot sends `dashboard`, not this. They exist so the preview shows what the shape looks like FILLED IN — an empty grey rectangle tells nobody whether a template is worth choosing.",
+        "q_queue": {
+          "columns": [
+            "open_tickets",
+            "unanswered"
+          ],
+          "rows": [
+            [
+              147,
+              23
+            ]
+          ]
+        },
+        "q_response": {
+          "columns": [
+            "median_first_reply_min"
+          ],
+          "rows": [
+            [
+              42
+            ]
+          ]
+        },
+        "q_sla": {
+          "columns": [
+            "within_sla_rate"
+          ],
+          "rows": [
+            [
+              0.918
+            ]
+          ]
+        },
+        "q_flow_by_day": {
+          "columns": [
+            "day",
+            "opened",
+            "resolved"
+          ],
+          "rows": [
+            [
+              "2026-07-16",
+              38,
+              35
+            ],
+            [
+              "2026-07-17",
+              42,
+              40
+            ],
+            [
+              "2026-07-18",
+              35,
+              38
+            ],
+            [
+              "2026-07-19",
+              47,
+              43
+            ],
+            [
+              "2026-07-20",
+              29,
+              32
+            ],
+            [
+              "2026-07-21",
+              18,
+              21
+            ],
+            [
+              "2026-07-22",
+              44,
+              41
+            ],
+            [
+              "2026-07-23",
+              51,
+              47
+            ],
+            [
+              "2026-07-24",
+              39,
+              44
+            ],
+            [
+              "2026-07-25",
+              46,
+              42
+            ],
+            [
+              "2026-07-26",
+              43,
+              45
+            ],
+            [
+              "2026-07-27",
+              22,
+              25
+            ],
+            [
+              "2026-07-28",
+              17,
+              19
+            ],
+            [
+              "2026-07-29",
+              49,
+              46
+            ],
+            [
+              "2026-07-30",
+              53,
+              50
+            ],
+            [
+              "2026-07-31",
+              41,
+              44
+            ],
+            [
+              "2026-08-01",
+              48,
+              45
+            ],
+            [
+              "2026-08-02",
+              45,
+              48
+            ],
+            [
+              "2026-08-03",
+              25,
+              28
+            ],
+            [
+              "2026-08-04",
+              19,
+              22
+            ],
+            [
+              "2026-08-05",
+              52,
+              49
+            ],
+            [
+              "2026-08-06",
+              57,
+              53
+            ],
+            [
+              "2026-08-07",
+              44,
+              47
+            ],
+            [
+              "2026-08-08",
+              50,
+              48
+            ],
+            [
+              "2026-08-09",
+              47,
+              50
+            ],
+            [
+              "2026-08-10",
+              27,
+              29
+            ],
+            [
+              "2026-08-11",
+              21,
+              23
+            ],
+            [
+              "2026-08-12",
+              55,
+              52
+            ],
+            [
+              "2026-08-13",
+              58,
+              56
+            ],
+            [
+              "2026-08-14",
+              49,
+              51
+            ]
+          ]
+        },
+        "q_by_channel": {
+          "columns": [
+            "channel",
+            "tickets"
+          ],
+          "rows": [
+            [
+              "email",
+              612
+            ],
+            [
+              "in-app chat",
+              408
+            ],
+            [
+              "web form",
+              217
+            ],
+            [
+              "phone",
+              94
+            ]
+          ]
+        },
+        "q_oldest_open": {
+          "columns": [
+            "ticket",
+            "channel",
+            "priority",
+            "hours_waiting"
+          ],
+          "rows": [
+            [
+              "Export fails over 50k rows",
+              "email",
+              "high",
+              71
+            ],
+            [
+              "SSO loop after password reset",
+              "in-app chat",
+              "urgent",
+              63
+            ],
+            [
+              "Invoice VAT number wrong",
+              "web form",
+              "normal",
+              58
+            ],
+            [
+              "Webhook retries duplicated",
+              "email",
+              "high",
+              47
+            ],
+            [
+              "Seat count not syncing",
+              "in-app chat",
+              "normal",
+              39
+            ]
+          ]
+        }
       }
     },
     {
@@ -1351,6 +2282,161 @@
             }
           }
         ]
+      },
+      "sample": {
+        "$comment": "Illustrative figures for the preview card ONLY. They are never written to a dashboard and never reach the agent: the copilot sends `dashboard`, not this. They exist so the preview shows what the shape looks like FILLED IN — an empty grey rectangle tells nobody whether a template is worth choosing.",
+        "q_mrr": {
+          "columns": [
+            "mrr"
+          ],
+          "rows": [
+            [
+              "48250.00"
+            ]
+          ]
+        },
+        "q_new_customers": {
+          "columns": [
+            "new_customers"
+          ],
+          "rows": [
+            [
+              38
+            ]
+          ]
+        },
+        "q_pipeline": {
+          "columns": [
+            "open_pipeline"
+          ],
+          "rows": [
+            [
+              "1284000.00"
+            ]
+          ]
+        },
+        "q_support": {
+          "columns": [
+            "open_tickets"
+          ],
+          "rows": [
+            [
+              147
+            ]
+          ]
+        },
+        "q_revenue_by_month": {
+          "columns": [
+            "month",
+            "collected"
+          ],
+          "rows": [
+            [
+              "2025-09",
+              "31200.00"
+            ],
+            [
+              "2025-10",
+              "33450.00"
+            ],
+            [
+              "2025-11",
+              "34980.00"
+            ],
+            [
+              "2025-12",
+              "36120.00"
+            ],
+            [
+              "2026-01",
+              "38740.00"
+            ],
+            [
+              "2026-02",
+              "40310.00"
+            ],
+            [
+              "2026-03",
+              "41980.00"
+            ],
+            [
+              "2026-04",
+              "43620.00"
+            ],
+            [
+              "2026-05",
+              "45100.00"
+            ],
+            [
+              "2026-06",
+              "47380.00"
+            ],
+            [
+              "2026-07",
+              "49260.00"
+            ],
+            [
+              "2026-08",
+              "52140.00"
+            ]
+          ]
+        },
+        "q_signups_by_month": {
+          "columns": [
+            "month",
+            "customers"
+          ],
+          "rows": [
+            [
+              "2025-09",
+              21
+            ],
+            [
+              "2025-10",
+              24
+            ],
+            [
+              "2025-11",
+              22
+            ],
+            [
+              "2025-12",
+              27
+            ],
+            [
+              "2026-01",
+              25
+            ],
+            [
+              "2026-02",
+              31
+            ],
+            [
+              "2026-03",
+              28
+            ],
+            [
+              "2026-04",
+              34
+            ],
+            [
+              "2026-05",
+              30
+            ],
+            [
+              "2026-06",
+              36
+            ],
+            [
+              "2026-07",
+              33
+            ],
+            [
+              "2026-08",
+              38
+            ]
+          ]
+        }
       }
     }
   ]

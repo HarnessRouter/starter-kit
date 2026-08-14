@@ -72,6 +72,16 @@ trust:
 - **`currency` format requires a `currency` code** (`"USD"`, `"EUR"`, …). There
   is no default. Nobody may put a dollar sign in front of a number you did not
   confirm is dollars.
+- **`percent` takes a RATIO, and does the ×100 itself.** Write SQL that returns
+  `0.021`, not `2.1` — do NOT multiply by 100. Every template in this kit
+  shipped with `… * 100.0 AS churn_pct` under a `percent` panel, and a 2.1%
+  churn rendered as **210%**. Both readings are plausible, so nothing looks
+  wrong until someone knows the real number. Name the column for what it holds
+  (`churn_rate`, not `churn_pct`) and the next person will not re-introduce it.
+- **A number with a unit says its unit.** `42` under "Median first reply" is
+  minutes, hours or days depending on who is reading. Set `unit` (`"min"`,
+  `"pages"`, `"days"`) on any `decimal` or `int` stat that is not
+  self-evidently a count of the thing in its title.
 - **`layout` is a 12-column grid**: `x + w` never exceeds 12, `w` and `h` are at
   least 1, and no two panels overlap. Overlapping panels get shoved around by
   the grid and the person sees a layout you did not design.
