@@ -1,4 +1,27 @@
-# HarnessRouter Starter
+<div align="center">
+  <a href="https://harnessrouter.ai">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset=".github/images/logo-dark.png">
+      <source media="(prefers-color-scheme: light)" srcset=".github/images/logo-light.png">
+      <img alt="HarnessRouter" src=".github/images/logo-light.png" width="55%">
+    </picture>
+  </a>
+</div>
+
+<div align="center">
+  <h3>Starter demos and production kits for HarnessRouter.</h3>
+</div>
+
+<div align="center">
+
+[![License](https://img.shields.io/badge/License-MIT_%2B_Commercial-blue.svg)](./LICENSE)
+[![Built on HarnessRouter](https://img.shields.io/badge/Built_on-HarnessRouter-111111)](https://github.com/HarnessRouter/harnessrouter)
+[![Discord](https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white)](https://discord.gg/nPcbwqVPb2)
+[![X](https://img.shields.io/badge/Follow-%40HARNESSROUTER-000000?logo=x&logoColor=white)](https://x.com/HARNESSROUTER)
+
+</div>
+
+<br>
 
 Starter demos and production-ready kits for [HarnessRouter](https://harnessrouter.ai), the unified API for running agent harnesses such as Codex and Claude Code as your product backend.
 
@@ -85,6 +108,13 @@ npm run build        # Build and type-check both workspaces
 ```
 
 Credentials belong in an ignored `.env` file and never in source control. See each demo's README for its configuration and architecture.
+
+## Resources
+
+- **[HarnessRouter](https://github.com/HarnessRouter/harnessrouter)** — the open-source engine these demos and kits run on.
+- **[Documentation and Cloud](https://harnessrouter.ai)** — hosted service, guides, and pricing.
+- **[Unified Harness Protocol](https://unifiedharnessprotocol.org)** — the open standard behind it.
+- **[Discord](https://discord.gg/nPcbwqVPb2)** — community for questions and integrations.
 
 ## Licensing
 
