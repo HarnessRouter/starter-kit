@@ -75,6 +75,10 @@
   background: var(--surface); border: 1px solid var(--line); border-radius: 9px;
   white-space: pre-wrap; overflow-wrap: anywhere; max-height: 200px; overflow: auto;
 }
+/* Wraps rather than squeezes: at 390px two buttons side by side would each be too narrow to read
+   before either would be too narrow to hit. */
+.vd-empty-acts { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 10px; }
+.vd-empty-acts .btn { text-decoration: none; }
 
 .vd-chat-mark { display: inline-flex; color: var(--brand); }
 

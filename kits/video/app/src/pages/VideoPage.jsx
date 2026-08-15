@@ -368,11 +368,34 @@ export function VideoPage({ id: routeId, seed }) {
   }, [dialog]);
 
   // ── rendering ─────────────────────────────────────────────────────────────
+  // A video that will not open. This screen used to be the server's own sentence — "No session with
+  // that id." — in a red bar above nothing at all, which is wrong twice over: the person got here
+  // by clicking a row in their own list, so being told the thing does not exist reads as the list
+  // lying, and a page with no canvas, no cut, no conversation and no way out is a dead end they can
+  // only escape from with the back button.
+  //
+  // So: say which thing is broken (this one video, not the app and not the rest of the list), keep
+  // the server's reason in small print because "it didn't work" is not something anyone can report,
+  // and offer the two things that can actually help — try it again, in case the network blinked,
+  // and go back to the list.
   if (err) {
     return (
       <div className="vd-root"><div className="vd-main">
         <Topbar caps={caps} />
-        <div className="vd-note is-err">{err}</div>
+        <div className="vd-body">
+          <div className="vd-empty">
+            <div className="big">This video can’t be opened</div>
+            <div>It may have been deleted, or it may not be one of your videos. Everything else in
+              your list is fine.</div>
+            <p className="vd-empty-detail">{err}</p>
+            <div className="vd-empty-acts">
+              <button type="button" className="btn" onClick={() => { setErr(''); load(); }}>
+                Try again
+              </button>
+              <a className="btn primary" href="#/">Back to my videos</a>
+            </div>
+          </div>
+        </div>
       </div></div>
     );
   }
