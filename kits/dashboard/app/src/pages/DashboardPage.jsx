@@ -12,7 +12,7 @@
 //   than a number you have to ask for.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
-import { useDialog, useResizablePane } from 'reifyui';
+import { PaneResizer, useDialog, useResizablePane } from 'reifyui';
 import {
   dashboardStatus, getDashboard, isPending, markViewed, renameDashboard, saveDashboard,
   sessionTurns,
@@ -346,6 +346,13 @@ export function DashboardPage({ id: routeId, seed }) {
           )}
         </div>
       </div>
+
+      {/* The grab handle between the board and the conversation. `useResizablePane` computes the
+          width and stores it, but it draws nothing — without this the pane had a width that could
+          only ever be its default, which is how this shipped: the hook was wired, the handle was
+          not, and the conversation looked identical to the other two kits until you tried to drag
+          it. Same component, same place, as slides and sheets. */}
+      <PaneResizer pane={chatPane} />
 
       <ChatColumn
         boardId={id}
