@@ -8,16 +8,16 @@
     "build": "vite build"
   },
   "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "reifyui": "^0.6.1",
     "echarts": "^5.5.1",
-    "mermaid": "^11.4.1",
     "highlight.js": "^11.10.0",
     "lucide-react": "^0.469.0",
+    "mermaid": "^11.4.1",
+    "pptxgenjs": "^4.0.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "react-markdown": "^9.0.1",
-    "remark-gfm": "^4.0.0",
-    "pptxgenjs": "^4.0.1"
+    "reifyui": "^0.8.1",
+    "remark-gfm": "^4.0.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",

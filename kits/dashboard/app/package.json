@@ -9,15 +9,15 @@
     "test": "node --test src/lib/dashboard.test.mjs src/lib/refresh.test.mjs src/lib/templates.test.mjs"
   },
   "dependencies": {
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "reifyui": "^0.8.0",
     "echarts": "^5.5.1",
     "highlight.js": "^11.10.0",
     "lucide-react": "^0.469.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-file-icon": "^1.6.0",
     "react-markdown": "^9.0.1",
-    "remark-gfm": "^4.0.0",
-    "react-file-icon": "^1.6.0"
+    "reifyui": "^0.8.1",
+    "remark-gfm": "^4.0.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",
