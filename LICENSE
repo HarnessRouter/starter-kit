@@ -8,10 +8,11 @@ This repository contains materials under different licenses.
    directory and its subdirectories. If licenses conflict, the license closest
    to the file controls.
 
-2. The materials under `kits/` are not licensed under the MIT License. They are
+2. All files under `kits/` are not licensed under the MIT License. They are
    governed by `kits/LICENSE.md` and, for any Commercial Use, the HarnessRouter
    Commercial Use and Deployment Agreement and applicable Order Form. This
-   applies to every Starter Kit in that directory, including any added later.
+   applies to all current and future contents of that directory, including any
+   Starter Kit added later.
 
 3. Except for files governed by a more specific directory license and
    third-party materials identified in their notices, all other files in this
