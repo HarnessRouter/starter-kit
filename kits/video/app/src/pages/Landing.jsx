@@ -1,0 +1,527 @@
+// Landing: describe a film, start from a template, or reopen one you have.
+//
+// A video is a session on this kit's Harness, so "My videos" is that harness's session list and
+// there is nothing else to store. Creating one costs no network call here: the choice becomes real
+// on the first turn, which is the only thing that opens a session. That is why every path out of
+// this page NAVIGATES — the prompt, the files and the template all ride to #/v/new:… and the
+// copilot sends the first message there.
+//
+// The page is composed from the package's library primitives (Composer, Carousel, Card, Chip,
+// SearchField, Modal). The topbar sits OUTSIDE the centred column, so the bar spans the viewport
+// instead of being a floating slab inset from both edges.
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowUp, Clapperboard, Eye, Pencil, Trash2 } from 'lucide-react';
+import {
+  Card, Carousel, Chip, Composer, IcMic, IcPaperclip, Modal, SearchField,
+  bytesLabel, createDictation, useDialog, useTypewriter,
+} from 'reifyui';
+import { fileToInputBlock } from 'reifyui/harness';
+import {
+  deleteVideo, getScene, lastViewedMap, listVideos, markViewed, mediaAddr, mediaCapabilities,
+  newVideoId, relativeTime, renameVideo, stageAttachments, videoHarness,
+} from '../lib/video';
+import { canMakeVideo, parseCapabilities, videoUnavailableReason } from '../lib/capabilities';
+import { listTemplates, templatePreview, templateShots } from '../lib/templates';
+import { mediaElements, parseScene } from '../lib/scene';
+import { durationLabel, parseTimeline, timelineView, totalSeconds } from '../lib/timeline';
+import { posterUrl } from '../lib/media';
+import { MediaTile } from '../components/MediaTile';
+import { Topbar } from '../components/Topbar';
+
+// The placeholder cycles through things this product is actually for. They are examples, not
+// claims about anything anyone has made.
+const PROMPT_IDEAS = [
+  'A 30-second launch film for my espresso grinder',
+  'Rain on a window at night, four shots, no people',
+  'An explainer: what our app does, in four shots with narration',
+  'A 9:16 teaser for the new season — three shots, fast cuts',
+  'A short story: someone finds a letter, reads it, and leaves',
+  'Six shots of a city waking up, from dark to full daylight',
+];
+
+// How many "My videos" rows are summarised at once. The summary is a real request per video, so
+// they go out a few at a time rather than a hundred at once.
+const SUMMARY_CONCURRENCY = 4;
+
+/** The shape a template makes, drawn from its own shot list: one card per shot, as wide as the
+ *  shot is long.
+ *
+ *  There are no frames in it, deliberately. A poster that looked like real footage would sell the
+ *  template on a picture no model has been asked to make yet, and the person would judge their own
+ *  film against something nobody promised. What a preview can honestly show is the SHAPE — how
+ *  many shots, how long each runs, and the palette the prompts describe — and that is also the
+ *  thing someone is choosing between. */
+function TemplateArt({ template }) {
+  const shots = templateShots(template);
+  const { tones } = templatePreview(template);
+  if (!shots.length) return <span className="vd-tpl-art is-blank" aria-hidden="true"><Clapperboard size={18} /></span>;
+  return (
+    <span className="vd-tpl-art" aria-hidden="true">
+      {shots.map((s, i) => (
+        <span
+          key={s.id || i}
+          className="vd-tpl-cell"
+          // As wide as the shot is long, so the card shows the rhythm of the cut and not just its
+          // length. A template that has no tones still draws its bars — in the brand tint, which
+          // is visible on the card's white; the shape is the point and the colour is the garnish.
+          style={{ flexGrow: Math.max(1, s.seconds || 1), background: tones[i] || undefined }}
+        />
+      ))}
+    </span>
+  );
+}
+
+export function LandingPage() {
+  const [prompt, setPrompt] = useState('');
+  const [templates, setTemplates] = useState(null);   // null = loading
+  const [videos, setVideos] = useState(null);         // null = loading
+  const [launched, setLaunched] = useState(null);     // null = unknown yet
+  const [harness, setHarness] = useState(null);
+  const [caps, setCaps] = useState(null);             // null = not asked yet
+  const [summaries, setSummaries] = useState(() => new Map());
+  const [viewed, setViewed] = useState({});
+  const [tpl, setTpl] = useState(null);               // the template chip on the prompt bar
+  const [preview, setPreview] = useState(null);       // the template open in the eye modal
+  const [staged, setStaged] = useState([]);           // files picked, not yet sent
+  const [attachErr, setAttachErr] = useState('');
+  const [listening, setListening] = useState(false);
+  const [tplQ, setTplQ] = useState('');
+  const [videoQ, setVideoQ] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [editName, setEditName] = useState('');
+
+  const fileRef = useRef(null);
+  const promptRef = useRef(null);
+  const dialog = useDialog();
+  // Built once — a new recogniser per render would stop dictation on every keystroke. Null where
+  // the browser has none, and then there is no microphone at all rather than a dead one.
+  const [dictation] = useState(() => createDictation());
+  const placeholder = useTypewriter(PROMPT_IDEAS, { active: prompt === '' });
+
+  const reload = () => listVideos().then(setVideos).catch(() => setVideos([]));
+
+  useEffect(() => {
+    setViewed(lastViewedMap());
+    listTemplates().then(setTemplates).catch(() => setTemplates([]));
+    videoHarness().then((h) => {
+      setLaunched(!!h);
+      setHarness(h || null);
+      // Not launched is a real answer with a real fix, so it is rendered. Catching it into an
+      // empty list would show "no videos yet" to someone whose actual problem is that nothing is
+      // running.
+      if (h) {
+        reload();
+        mediaCapabilities(h.id).then((r) => setCaps(parseCapabilities(r))).catch(() => setCaps(null));
+      } else {
+        setVideos([]);
+      }
+    }).catch(() => { setLaunched(false); setVideos([]); });
+  }, []);
+
+  // Leaving the page must release the microphone.
+  useEffect(() => () => dictation?.stop(), [dictation]);
+
+  // How long each video is and what its first shot looks like. There is no cheaper source for
+  // this than each video's own canvas, so the requests go out a few at a time and each row fills
+  // in when its own answer lands. A row with no answer yet shows nothing rather than a zero.
+  useEffect(() => {
+    if (!harness || !videos?.length) return undefined;
+    let dead = false;
+    const queue = videos.map((v) => v.id).filter((sid) => !summaries.has(sid));
+    if (!queue.length) return undefined;
+    const worker = async () => {
+      while (!dead && queue.length) {
+        const sid = queue.shift();
+        const res = await getScene(harness.id, sid).catch(() => null);
+        if (dead) return;
+        setSummaries((prev) => new Map(prev).set(sid, res?.scene ? summarise(res.scene, mediaAddr(harness.id, sid)) : null));
+      }
+    };
+    for (let i = 0; i < SUMMARY_CONCURRENCY; i += 1) worker();
+    return () => { dead = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [harness, videos]);
+
+  // ── the prompt bar ────────────────────────────────────────────────────────
+  function pick(list) {
+    setAttachErr('');
+    for (const file of list) {
+      // The chip appears immediately and resolves in place: reading 25 MB into a data URL is a
+      // real wait, and a picker that looks inert is how the same file gets picked twice.
+      const entry = { name: file.name, size: file.size, pending: true };
+      setStaged((cur) => [...cur, entry]);
+      fileToInputBlock(file).then((ready) => {
+        setStaged((cur) => cur.map((s) => (s === entry ? { ...entry, ...ready, pending: false } : s)));
+      }).catch((e) => {
+        setStaged((cur) => cur.filter((s) => s !== entry));
+        setAttachErr(e?.message || `${file.name} could not be attached.`);
+      });
+    }
+  }
+
+  function toggleDictation() {
+    if (!dictation) return;
+    if (listening) { dictation.stop(); setListening(false); return; }
+    setListening(true);
+    dictation.start({
+      onText: (text) => setPrompt((cur) => (cur ? `${cur.replace(/\s+$/, '')} ${text}` : text)),
+      onEnd: () => setListening(false),
+      onError: () => setListening(false),
+    });
+  }
+
+  const preparing = staged.some((f) => f.pending);
+  const canVideo = canMakeVideo(caps);
+  // No video model means no film: the agent would have nothing to render with and would have to
+  // refuse. Blocking here, with the chain it walked, beats letting someone write a paragraph and
+  // then watching a turn end in a refusal.
+  const startBlocked = launched === false || canVideo === false || preparing
+    || (!prompt.trim() && !tpl && staged.length === 0);
+
+  function start() {
+    if (startBlocked) return;
+    if (listening) { dictation?.stop(); setListening(false); }
+    const text = prompt.trim();
+    const id = newVideoId(tpl?.id || 'blank');
+    // The prepared blocks cannot travel in the URL, so they wait in memory under this pending id
+    // and the copilot picks them up on the first turn (lib/video.js).
+    stageAttachments(id, staged.map((f) => f.payload));
+    // The seed becomes the person's first chat message, so it is a sentence — never the template's
+    // scene, which travels as instructions and stays out of the transcript (lib/copilot.js).
+    const seed = text
+      || (tpl ? tpl.prompt || `Make the ${tpl.name} film.`
+        : `Make a short film from ${staged.map((f) => f.name).join(', ')}.`);
+    window.location.hash = `#/v/${id}?seed=${encodeURIComponent(seed)}`;
+  }
+
+  function chooseTemplate(t) {
+    setTpl(t);
+    setPreview(null);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    promptRef.current?.focus();
+  }
+
+  // ── my videos ─────────────────────────────────────────────────────────────
+  const open = (id) => { markViewed(id); window.location.hash = `#/v/${encodeURIComponent(id)}`; };
+
+  async function commitRename(video) {
+    const name = editName.trim();
+    setEditingId(null);
+    if (!name || name === video.name) return;
+    setVideos((list) => list.map((x) => (x.id === video.id ? { ...x, name } : x)));
+    // Put the old name back if the rename did not stick, rather than leaving the list showing a
+    // name the video does not have.
+    renameVideo(video.id, name).catch(() => {
+      setVideos((list) => list.map((x) => (x.id === video.id ? { ...x, name: video.name } : x)));
+    });
+  }
+
+  async function remove(video) {
+    const ok = await dialog.confirm({
+      title: `Delete “${video.name}”?`,
+      message: 'The film, its clips and the conversation all go with it. This cannot be undone, and '
+        + 'the clips cannot be re-rendered without paying for them again.',
+      destructive: true,
+      confirmLabel: 'Delete',
+    });
+    if (!ok) return;
+    await deleteVideo(video.id).catch((e) => dialog.alert({
+      variant: 'error', title: 'Could not delete', message: e.message,
+    }));
+    reload();
+  }
+
+  const tplMatches = (templates || []).filter(
+    (t) => t.name.toLowerCase().includes(tplQ.trim().toLowerCase()),
+  );
+  const videoMatches = (videos || [])
+    .filter((v) => v.name.toLowerCase().includes(videoQ.trim().toLowerCase()))
+    .sort((a, b) => ((viewed[b.id] || 0) - (viewed[a.id] || 0)) || a.name.localeCompare(b.name));
+
+  const unavailable = canVideo === false ? videoUnavailableReason(caps) : '';
+  // The kit's own words about its preview art, when it supplies them.
+  const previewCaption = preview ? templatePreview(preview).caption : '';
+
+  return (
+    <div className="uic-shell">
+      <Topbar caps={caps} />
+      <main className="uic-page">
+        <section className="uic-hero">
+          <h1>What should we make?</h1>
+          <p>
+            Describe the film. The agent plans the shots, agrees them with you, renders each one and
+            lays them out on a canvas you can rearrange.
+          </p>
+
+          <Composer
+            value={prompt}
+            onChange={setPrompt}
+            onSend={start}
+            sendDisabled={startBlocked}
+            placeholder={placeholder}
+            inputAriaLabel="Describe the film you want"
+            rows={3}
+            autoGrow={false}
+            autoFocus
+            inputRef={promptRef}
+            classNames={{ root: 'uic-promptbox', input: 'uic-promptbox-input', row: 'uic-promptbox-row' }}
+            accessoriesLeft={(
+              <>
+                <input ref={fileRef} type="file" hidden multiple
+                       onChange={(e) => { pick([...e.target.files]); e.target.value = ''; }} />
+                <button type="button" className="uic-chat-icon" aria-label="Attach a file"
+                        title="Attach a file — the agent gets it with your first message"
+                        onClick={() => fileRef.current?.click()}>
+                  <IcPaperclip />
+                </button>
+                {staged.map((f, i) => (
+                  <Chip
+                    key={`${f.name}-${i}`}
+                    icon={<IcPaperclip size={11} />}
+                    title={f.name}
+                    label={<>
+                      <span className="uic-chip-t">{f.name}</span>
+                      <span className="uic-chip-meta">{f.pending ? '…' : bytesLabel(f.size)}</span>
+                    </>}
+                    onRemove={() => setStaged((c) => c.filter((_, j) => j !== i))}
+                    removeLabel={`Remove ${f.name}`}
+                  />
+                ))}
+                {tpl && (
+                  <Chip
+                    selected
+                    icon={<Clapperboard size={12} />}
+                    title={tpl.description}
+                    label={`Template: ${tpl.name}`}
+                    onRemove={() => setTpl(null)}
+                    removeLabel={`Remove template ${tpl.name}`}
+                  />
+                )}
+              </>
+            )}
+            accessoriesRight={dictation ? (
+              <button type="button" className={'uic-chat-icon' + (listening ? ' is-on' : '')}
+                      aria-label={listening ? 'Stop dictating' : 'Dictate'} aria-pressed={listening}
+                      onClick={toggleDictation}>
+                <IcMic />
+              </button>
+            ) : null}
+            renderSend={() => (
+              <button type="button" className="btn primary" onClick={start} disabled={startBlocked}>
+                Make it <ArrowUp size={14} />
+              </button>
+            )}
+          />
+          {attachErr && <div className="uic-note is-err">{attachErr}</div>}
+          {launched === false && (
+            <div className="uic-note">
+              Videos hasn’t been launched yet — open Starter Kits and launch it.
+            </div>
+          )}
+          {launched && unavailable && (
+            <div className="uic-note is-err">
+              {/* The server's own words, including which models it tried. Four video models are
+                  listed upstream and on a bad night two of them are broken — without the chain,
+                  this reads as a fault in this product. */}
+              {unavailable} Ask whoever set this up to connect a provider that can make video.
+            </div>
+          )}
+        </section>
+
+        <section className="uic-section">
+          <div className="uic-section-h">
+            <h2>Start from a template</h2>
+            {tplMatches.length > 0 && (
+              <div className="uic-section-tools">
+                <SearchField value={tplQ} onChange={setTplQ} placeholder="Search templates" />
+              </div>
+            )}
+          </div>
+          {templates === null ? (
+            <div className="uic-note">Loading…</div>
+          ) : templates.length === 0 ? (
+            <div className="uic-note">No templates are installed with this kit.</div>
+          ) : tplMatches.length === 0 ? (
+            <div className="uic-note">No templates match your search.</div>
+          ) : (
+            <Carousel label="templates">
+              {tplMatches.map((t) => {
+                const shots = templateShots(t);
+                const secs = shots.reduce((sum, s) => sum + (s.seconds || 0), 0);
+                return (
+                  <Card
+                    key={t.id}
+                    art={<TemplateArt template={t} />}
+                    title={<span title={t.description}>{t.name}</span>}
+                    subtitle={shots.length
+                      ? `${shots.length} shot${shots.length === 1 ? '' : 's'} · ${durationLabel(secs)} · ${t.aspect}`
+                      : t.aspect}
+                    selected={tpl?.id === t.id}
+                    // A card press CHOOSES the template — it does not create anything. The video is
+                    // still made by the first turn, from the prompt bar.
+                    onClick={() => chooseTemplate(t)}
+                    overlay={(
+                      <button type="button" className="uic-iconbtn vd-eye"
+                              aria-label={`Preview ${t.name}`} title={`Preview ${t.name}`}
+                              onClick={() => setPreview(t)}>
+                        <Eye size={14} />
+                      </button>
+                    )}
+                  />
+                );
+              })}
+            </Carousel>
+          )}
+        </section>
+
+        <section className="uic-section">
+          <div className="uic-section-h">
+            <h2>My videos</h2>
+            {videoMatches.length > 0 && (
+              <div className="uic-section-tools">
+                <SearchField value={videoQ} onChange={setVideoQ} placeholder="Search videos" />
+              </div>
+            )}
+          </div>
+          {videos !== null && videos.length === 0 ? (
+            <div className="uic-note">
+              {launched === false ? 'Nothing here yet.' : 'No videos yet — describe one above.'}
+            </div>
+          ) : videos !== null && videoMatches.length === 0 ? (
+            <div className="uic-note">No videos match your search.</div>
+          ) : (
+            <div className="uic-table-wrap">
+              <table className="uic-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th className="vd-col-len">Length</th>
+                    <th className="uic-col-last">Last opened</th>
+                    <th className="uic-table-actions" aria-label="Actions" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {videos === null
+                    ? [0, 1, 2, 3].map((i) => (
+                      <tr key={i} className="vd-skel-row">
+                        <td><span className="uic-skel vd-skel" style={{ width: `${60 - i * 6}%` }} /></td>
+                        <td className="vd-col-len"><span className="uic-skel vd-skel" style={{ width: 40 }} /></td>
+                        <td className="uic-col-last"><span className="uic-skel vd-skel" style={{ width: 64 }} /></td>
+                        <td className="uic-table-actions" />
+                      </tr>
+                    ))
+                    : videoMatches.map((v) => {
+                      const sum = summaries.get(v.id);
+                      return (
+                        <tr key={v.id} tabIndex={0}
+                            onClick={() => { if (editingId !== v.id) open(v.id); }}
+                            onKeyDown={(e) => { if (e.key === 'Enter' && editingId !== v.id) open(v.id); }}>
+                          <td>
+                            <span className="uic-table-name">
+                              <MediaTile
+                                className="vd-row-tile"
+                                poster={sum?.poster || ''}
+                                state={sum?.running ? 'rendering' : 'ready'}
+                                duration=""
+                              />
+                              {editingId === v.id ? (
+                                <input className="input rename-input" value={editName} autoFocus
+                                       onClick={(e) => e.stopPropagation()}
+                                       onChange={(e) => setEditName(e.target.value)}
+                                       onBlur={() => commitRename(v)}
+                                       onKeyDown={(e) => {
+                                         e.stopPropagation();
+                                         if (e.key === 'Enter') commitRename(v);
+                                         if (e.key === 'Escape') setEditingId(null);
+                                       }} />
+                              ) : (
+                                <span className="vd-row-name">
+                                  <span title={v.name}>{v.name}</span>
+                                  {/* Only when the canvas actually says so. A video whose scene
+                                      has not loaded shows nothing here, not "0 shots". */}
+                                  {sum && <span className="vd-row-sub">{sum.shots} shot{sum.shots === 1 ? '' : 's'}</span>}
+                                </span>
+                              )}
+                            </span>
+                          </td>
+                          <td className="uic-table-quiet vd-col-len">
+                            {sum ? durationLabel(sum.seconds) : ''}
+                          </td>
+                          <td className="uic-table-quiet uic-col-last">
+                            {relativeTime(viewed[v.id]) || relativeTime(v.updated_at) || '—'}
+                          </td>
+                          <td className="uic-table-actions" onClick={(e) => e.stopPropagation()}>
+                            <button type="button" className="uic-iconbtn" aria-label={`Rename ${v.name}`}
+                                    onClick={() => { setEditingId(v.id); setEditName(v.name); }}>
+                              <Pencil size={13} />
+                            </button>
+                            <button type="button" className="uic-iconbtn is-danger" aria-label={`Delete ${v.name}`}
+                                    onClick={() => remove(v)}>
+                              <Trash2 size={13} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </main>
+
+      {preview && (
+        <Modal
+          open
+          onClose={() => setPreview(null)}
+          size="lg"
+          title={preview.name}
+          description={preview.description}
+          actions={(
+            <button type="button" className="btn primary" onClick={() => chooseTemplate(preview)}>
+              Use this template
+            </button>
+          )}
+        >
+          <div className="vd-preview">
+            <ol className="vd-preview-shots">
+              {templateShots(preview).map((s, i) => (
+                <li key={s.id || i}>
+                  <span className="vd-preview-n">{i + 1}</span>
+                  <span className="vd-preview-name">{s.name}</span>
+                  <span className="vd-preview-secs">{Number.isFinite(s.seconds) ? `${s.seconds}s` : '—'}</span>
+                  <span className="vd-preview-p">{s.prompt}</span>
+                </li>
+              ))}
+            </ol>
+            <p className="vd-preview-note">
+              {/* Both halves of the truth, in the order someone needs them: nothing here has been
+                  made, and the plan is a starting point rather than the film. */}
+              <strong>Nothing here has been rendered.</strong> This is the shot list the agent starts
+              from — it rewrites every shot in your subject, shows you the plan, and waits for your
+              yes before it renders anything.
+              {previewCaption ? ` ${previewCaption}` : ''}
+            </p>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+/** One video's canvas, reduced to the three things the list shows. Everything in it is measured:
+ *  a film with a shot still rendering has no length, and gets a dash. */
+function summarise(rawScene, addr) {
+  const { scene } = parseScene(rawScene);
+  if (!scene) return null;
+  const clips = mediaElements(scene.elements);
+  const timeline = parseTimeline(scene);
+  const view = timelineView(timeline, scene.elements);
+  const first = view.find((r) => r.clip?.posterMediaId) || null;
+  return {
+    shots: view.length || clips.filter((c) => c.kind === 'video' || c.kind === 'image').length,
+    seconds: totalSeconds(view),
+    running: clips.some((c) => c.status === 'running'),
+    poster: first ? posterUrl(addr, first.clip) : '',
+  };
+}

@@ -15,6 +15,7 @@
   "kits": [
     { "name": "slides", "include": true },
     { "name": "sheets", "include": true },
-    { "name": "dashboard", "include": true }
+    { "name": "dashboard", "include": true },
+    { "name": "video", "include": true }
   ]
 }

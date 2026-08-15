@@ -1,0 +1,307 @@
+/* Videos — what this app composes for itself.
+ *
+ * Everything structural is somebody else's. The shell, the hero, the prompt box, the carousel, the
+ * cards, the table, the conversation column and the dialogs come from reifyui and are styled by
+ * library.css / chat.css / dialog.css. The board — dragging, resizing, drawing, selection, zoom and
+ * the whole toolbar — is Excalidraw's, and this file does not restyle it: a canvas that half looks
+ * like Excalidraw and half looks like us is a canvas whose controls nobody recognises.
+ *
+ * What is here is only the part that is about VIDEO: what sits inside a clip, the cut along the
+ * bottom, the template shape, and how the page bar sheds its contents as it narrows.
+ */
+
+/* ── The page ──────────────────────────────────────────────────────────── */
+.vd-root { height: 100vh; display: flex; overflow: hidden; background: var(--bg); }
+.vd-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+/* The canvas is the only thing that grows. The bar, the banners and the cut are all their own
+   height, and min-height:0 is what stops the flex child from refusing to shrink and pushing the
+   timeline off the bottom of the window. */
+.vd-body { flex: 1; min-height: 0; display: flex; }
+.vd-canvas { flex: 1; min-width: 0; min-height: 0; position: relative; }
+.vd-canvas .excalidraw { height: 100%; }
+
+/* The document's name doubles as its rename control. It is a button because it does something; it
+   is styled as text because a button-looking title in a bar of buttons reads as an action the page
+   is urging on you. */
+.vd-title {
+  border: none; background: none; font: inherit; font-weight: 600; color: var(--ink);
+  padding: 3px 6px; border-radius: 6px; cursor: pointer; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 32ch;
+}
+.vd-title:hover { background: var(--line-soft); }
+.vd-save { font-size: 12px; color: var(--mute); white-space: nowrap; }
+
+/* What this video has cost. Rendered only when a job actually reported a figure — see
+   lib/jobs.totalSpend, which answers null rather than zero when nothing was measured. */
+.vd-spend {
+  font-size: 12px; font-weight: 600; color: var(--ink-2); white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  padding: 3px 8px; border-radius: var(--r-pill); background: var(--surface-2); border: 1px solid var(--line);
+}
+
+/* Which model a clip would render on. Quiet, but never absent: four video models are listed
+   upstream and which one is running is a live fact, not a property of the product. */
+.vd-cap {
+  display: inline-flex; align-items: center; gap: 6px; min-width: 0;
+  padding: 4px 9px; border-radius: var(--r-pill); font-size: 12px;
+  background: var(--brand-50); color: var(--brand-ink); border: 1px solid var(--brand-soft);
+}
+.vd-cap.is-none { background: var(--hot-soft); color: #B91C1C; border-color: #FCA5A5; }
+.vd-cap-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 26ch; }
+
+.vd-note {
+  margin: 0; padding: 10px 16px; font-size: 12.5px; color: var(--ink-2);
+  background: var(--brand-50); border-bottom: 1px solid var(--line);
+}
+.vd-note.is-err { background: var(--hot-soft); color: #B91C1C; }
+.vd-lock {
+  padding: 8px 16px; font-size: 12.5px; color: #92400E;
+  background: var(--warm-soft); border-bottom: 1px solid var(--line);
+}
+
+.vd-empty {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; padding: 40px; text-align: center; color: var(--mute); font-size: 13px;
+}
+.vd-empty .big { font-size: 15px; font-weight: 600; color: var(--ink); }
+.vd-empty .pulse-dot {
+  width: 9px; height: 9px; border-radius: 999px; background: var(--brand);
+  animation: vd-pulse 1.4s ease-in-out infinite;
+}
+@keyframes vd-pulse { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+.vd-empty-detail {
+  max-width: 560px; margin: 6px 0 0; padding: 10px 12px; text-align: left;
+  font-family: var(--mono); font-size: 12px; line-height: 1.55; color: var(--ink-2);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 9px;
+  white-space: pre-wrap; overflow-wrap: anywhere; max-height: 200px; overflow: auto;
+}
+
+.vd-chat-mark { display: inline-flex; color: var(--brand); }
+
+/* ── What sits inside a clip ───────────────────────────────────────────── */
+/* Excalidraw renders these in place of the iframe it would otherwise put in an embeddable, sized
+   and positioned to the element and panning with the scene. They fill the box exactly — an inset
+   would show as a border the person did not draw. */
+.vd-clip, .vd-clip-video {
+  width: 100%; height: 100%; display: flex; border-radius: 6px; overflow: hidden;
+  background: #10101a;
+}
+.vd-clip-video { object-fit: contain; display: block; }
+.vd-clip { align-items: center; justify-content: center; position: relative; }
+
+.vd-clip-mid {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 12px; text-align: center; min-width: 0;
+}
+.vd-clip-label {
+  font-size: 12.5px; font-weight: 600; color: #F4F3FF;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vd-clip-sub { font-size: 11.5px; color: #A8A4C4; }
+.vd-clip-err {
+  font-size: 11.5px; color: #FCA5A5; max-width: 34ch; line-height: 1.45;
+  overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+}
+
+/* A shot being rendered has no picture, so it does not pretend to have one. The sweep says the
+   thing is alive; it does not say how far along it is, because nothing here knows that. */
+.vd-clip.is-running { background: #14141c; }
+.vd-clip-shimmer {
+  position: absolute; inset: 0;
+  background: linear-gradient(100deg, transparent 20%, rgba(110, 85, 255, .22) 50%, transparent 80%);
+  background-size: 220% 100%;
+  animation: vd-sweep 1.8s ease-in-out infinite;
+}
+@keyframes vd-sweep { from { background-position: 140% 0; } to { background-position: -40% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .vd-clip-shimmer { animation: none; background: rgba(110, 85, 255, .12); }
+  .vd-empty .pulse-dot { animation: none; }
+}
+
+.vd-clip.is-failed { background: #1B1116; border: 1px solid #7F1D1D; }
+.vd-clip.is-failed .btn { background: #2A1A20; border-color: #7F1D1D; color: #FCA5A5; }
+
+.vd-clip.is-audio { flex-direction: column; gap: 8px; padding: 12px; background: #17161f; }
+.vd-clip.is-audio audio { width: 100%; }
+
+/* ── The tile (a poster, a length, a state) ────────────────────────────── */
+.vd-tile {
+  position: relative; display: flex; align-items: center; justify-content: center;
+  width: 100%; aspect-ratio: 16 / 9; border-radius: 7px; overflow: hidden;
+  background: var(--surface-2); border: 1px solid var(--line);
+  padding: 0; cursor: inherit; flex-shrink: 0;
+}
+button.vd-tile { cursor: pointer; }
+.vd-tile-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vd-tile-blank { color: var(--mute-2); display: inline-flex; }
+.vd-tile.is-failed { border-color: #FCA5A5; background: var(--hot-soft); }
+.vd-tile.is-failed .vd-tile-blank { color: #B91C1C; }
+.vd-tile-shimmer {
+  position: absolute; inset: 0;
+  background: linear-gradient(100deg, transparent 20%, var(--brand-50) 50%, transparent 80%);
+  background-size: 220% 100%; animation: vd-sweep 1.8s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) { .vd-tile-shimmer { animation: none; } }
+.vd-tile-dur {
+  position: absolute; right: 4px; bottom: 4px;
+  padding: 1px 5px; border-radius: 4px; font-size: 10.5px; font-variant-numeric: tabular-nums;
+  background: rgba(16, 16, 26, .78); color: #fff;
+}
+
+/* ── The cut ───────────────────────────────────────────────────────────── */
+.vd-tl {
+  flex-shrink: 0; border-top: 1px solid var(--line); background: var(--surface);
+  display: flex; flex-direction: column; max-height: 46vh;
+}
+.vd-tl-head {
+  display: flex; align-items: center; gap: 10px; padding: 8px 14px; min-height: 46px;
+  container-type: inline-size;
+}
+.vd-tl-toggle {
+  display: inline-flex; align-items: center; gap: 7px; border: none; background: none;
+  font: inherit; font-size: 13px; font-weight: 600; color: var(--ink); cursor: pointer;
+  padding: 4px 6px; border-radius: 6px;
+}
+.vd-tl-toggle:hover { background: var(--line-soft); }
+.vd-tl-count { font-size: 12px; color: var(--mute); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.vd-tl-spacer { flex: 1; min-width: 0; }
+.vd-tl-field { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--mute); }
+.vd-tl-field .input { width: auto; }
+
+.vd-tl-note {
+  margin: 0; padding: 6px 14px; font-size: 12px; color: #92400E; background: var(--warm-soft);
+  border-top: 1px solid var(--line-soft);
+}
+.vd-tl-note.is-err { color: #B91C1C; background: var(--hot-soft); }
+
+.vd-tl-rail {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 10px 14px 14px; overflow-x: auto; overflow-y: hidden;
+}
+.vd-tl-empty { margin: 0; padding: 4px 0 10px; font-size: 12.5px; color: var(--mute); }
+
+.vd-shot { width: 132px; flex-shrink: 0; position: relative; }
+.vd-shot-meta { display: flex; align-items: baseline; gap: 6px; margin-top: 5px; min-width: 0; }
+.vd-shot-n {
+  font-size: 10.5px; font-weight: 700; color: var(--brand-ink);
+  background: var(--brand-50); border-radius: 4px; padding: 0 4px; flex-shrink: 0;
+}
+.vd-shot-name {
+  font-size: 11.5px; color: var(--ink-2); min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vd-shot-tools { position: absolute; top: 4px; left: 4px; display: flex; gap: 3px; opacity: 0; }
+.vd-shot:hover .vd-shot-tools, .vd-shot:focus-within .vd-shot-tools { opacity: 1; }
+.vd-shot-tools .uic-iconbtn { background: var(--surface); border: 1px solid var(--line); }
+/* A shot pointing at a clip that is gone is kept and marked. Dropping it would renumber every shot
+   after it and make the mistake invisible. */
+.vd-shot.is-missing .vd-tile { border-color: #FCA5A5; }
+
+.vd-shot-add {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  width: 132px; aspect-ratio: 16 / 9; border-radius: 7px; cursor: pointer;
+  background: var(--surface-2); border: 1px dashed var(--line-strong, #CBD0DA);
+  color: var(--mute); font: inherit; font-size: 11.5px;
+}
+.vd-shot-add:hover { border-color: var(--brand); color: var(--brand-ink); }
+.vd-pop-meta { margin-left: auto; color: var(--mute); font-variant-numeric: tabular-nums; }
+
+/* ── Landing: the template shape ───────────────────────────────────────── */
+/* One bar per shot, as wide as the shot is long. No frames in it: a poster that looked like real
+   footage would sell the template on a picture no model has been asked to make yet. */
+.vd-tpl-art { width: 100%; height: 100%; padding: 12px; display: flex; gap: 3px; align-items: stretch; }
+.vd-tpl-art.is-blank { align-items: center; justify-content: center; color: var(--mute-2); }
+/* The bar's own colour is the template's tone, set inline. This is the colour it has WITHOUT one:
+   the brand tint, which reads on the card's white. It was --surface-2, which is two per cent off
+   white — six invisible bars on an empty-looking card, which is how a template with no tones ships
+   looking broken. */
+.vd-tpl-cell { border-radius: 4px; min-width: 4px; background: var(--brand-soft); }
+/* The preview control floats over the art, so it needs its own surface to stay legible. */
+.vd-eye { background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-1); }
+
+.vd-preview { display: flex; flex-direction: column; min-width: 0; width: 100%; }
+.vd-preview-shots {
+  list-style: none; margin: 0; padding: 0 4px; max-height: min(52vh, 440px); overflow: auto;
+}
+.vd-preview-shots li {
+  display: grid; grid-template-columns: 22px minmax(0, 8em) 3em minmax(0, 1fr);
+  gap: 10px; align-items: baseline; padding: 8px 10px; border-bottom: 1px solid var(--line-soft);
+  font-size: 12.5px;
+}
+.vd-preview-shots li:last-child { border-bottom: none; }
+.vd-preview-n { font-weight: 700; color: var(--brand-ink); }
+.vd-preview-name { font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vd-preview-secs { color: var(--mute); font-variant-numeric: tabular-nums; }
+.vd-preview-p { color: var(--ink-2); line-height: 1.5; min-width: 0; }
+.vd-preview-note {
+  margin: 0; padding: 12px 18px 4px; font-size: 12.5px; color: var(--mute); line-height: 1.55;
+  border-top: 1px solid var(--line);
+}
+.vd-preview-note strong { color: var(--ink-2); font-weight: 600; }
+
+/* ── My videos ─────────────────────────────────────────────────────────── */
+.vd-row-tile { width: 56px; }
+.vd-row-name { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.vd-row-name > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vd-row-sub { font-size: 11px; color: var(--mute); font-weight: 400; }
+.vd-col-len { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rename-input { font-size: 13px; font-weight: 600; padding: 3px 8px; }
+.vd-skel { display: block; height: 12px; }
+.vd-skel-row { cursor: default; }
+.vd-skel-row:hover { background: transparent; }
+
+/* ── Account menu (the body of a package Popover) ──────────────────────── */
+.vd-who { padding: 6px 10px 4px; font-size: 13px; font-weight: 600; color: var(--ink); }
+a.uic-pop-item { text-decoration: none; }
+.vd-danger { color: #B91C1C; }
+.vd-danger:hover { background: var(--hot-soft); color: #B91C1C; }
+
+/* ── Narrow widths ─────────────────────────────────────────────────────────
+   STANDING RULE: every surface must degrade cleanly — verify 1440 / 1024 / 768 / 390.
+
+   The conversation column already becomes a drawer at 900px (chat.css) and the landing already
+   sheds table columns and carousel buttons (library.css). What is left is this app's own two bars,
+   and neither can use a viewport query for its contents: on the editor their width depends on the
+   resizable conversation column, not on the viewport. Hence container queries on both.
+
+   Keep-priority in the app bar as space runs out: the video's name > the save state > the brand
+   text > the spend figure > the capability chip's text > the chip. */
+.uic-topbar { container-type: inline-size; }
+@container (max-width: 860px) { .uic-topbar .vd-cap-t { max-width: 14ch; } }
+@container (max-width: 700px) {
+  .uic-topbar .wm-text { display: none; }
+  .uic-topbar .btn .lbl { display: none; }
+  .uic-topbar .btn { padding: 0 9px; }
+}
+@container (max-width: 560px) { .uic-topbar .vd-spend { display: none; } }
+@container (max-width: 480px) {
+  /* The chip goes last, and only after its text has already been cut: WHICH model is a fact the
+     page should keep as long as it can. */
+  .uic-topbar .vd-cap { display: none; }
+  .vd-title { max-width: 30vw; }
+}
+
+/* The cut's bar sheds the same way. Export is the last thing to go, because it is the only control
+   on it that produces the thing the person came for. */
+@container (max-width: 620px) { .vd-tl-head .vd-tl-field { display: none; } }
+@container (max-width: 420px) { .vd-tl-head .vd-tl-count { display: none; } }
+
+/* Below this the cut is a strip: it keeps its bar, its warnings and one row of thumbnails, and the
+   canvas keeps the rest of the screen. Collapsed, it is only its bar. */
+@media (max-width: 1200px) {
+  .vd-tl { max-height: 34vh; }
+  .vd-shot, .vd-shot-add { width: 108px; }
+}
+@media (max-width: 900px) {
+  .vd-tl { max-height: 30vh; }
+  .vd-tl-rail { padding: 8px 12px 12px; }
+}
+@media (max-width: 640px) {
+  .uic-topbar { padding: 0 10px; gap: 6px; }
+  .vd-tl-head { padding: 6px 10px; gap: 8px; }
+  .vd-shot, .vd-shot-add { width: 92px; }
+  .vd-preview-shots li { grid-template-columns: 20px minmax(0, 1fr) 3em; }
+  /* The prompt wraps onto its own row rather than being crushed into a third of the width. */
+  .vd-preview-p { grid-column: 1 / -1; }
+}
+.vd-tl.is-closed { max-height: none; }

@@ -1,0 +1,140 @@
+/* Videos design tokens — the same token contract the other kits use, re-keyed to this kit's
+   accent (kit.json: #6E55FF). Flat colours, no gradients.
+
+   Nothing here colours a clip. What is on the canvas is footage and the frame around it is
+   Excalidraw's; a palette applied over the top would be this app having an opinion about a
+   picture somebody generated. The tokens dress the chrome and stop at the canvas edge. */
+:root {
+  --brand: #6E55FF;
+  --brand-ink: #5A42E8;
+  --brand-soft: #CFC6FF;
+  --brand-50: #F3F0FF;
+
+  --hot-soft: #FEE4E4;
+  --warm: #F59E0B;
+  --warm-soft: #FEF1D6;
+  --ok: #10B981;
+  --ok-soft: #DFF6EC;
+
+  --bg: #F7F8FB;
+  --surface: #FFFFFF;
+  --surface-2: #FAFBFD;
+
+  --ink: #111827;
+  --ink-2: #374151;
+  --mute: #6B7280;
+  --mute-2: #9CA3AF;
+  --line: #E5E7EB;
+  --line-soft: #EFF1F4;
+
+  --r-card: 12px;
+  --r-input: 8px;
+  --r-pill: 999px;
+
+  --shadow-1: 0 1px 2px rgba(17,24,39,.04), 0 1px 1px rgba(17,24,39,.03);
+  --shadow-2: 0 8px 24px -12px rgba(17,24,39,.12), 0 2px 6px -2px rgba(17,24,39,.06);
+
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+/* The shared components (the grid, the chat surface, the dialogs, the library page) read --uic-*
+   tokens. Mapping them here is the single place this app's palette meets the library's: set a
+   token once and the grid, the conversation, the dialogs and the landing all follow.
+
+   The whole contract is mapped, not the half the chat surface happened to need — an unmapped
+   token silently falls through to the package's own default, and a default that is merely a
+   near-miss for this kit's blue is harder to notice, and therefore likelier to ship, than the
+   obvious wrong colour would be. */
+:root {
+  --uic-bg: var(--bg);
+  --uic-surface: var(--surface);
+  --uic-surface-2: var(--surface-2);
+  --uic-line: var(--line);
+  --uic-line-soft: var(--line-soft);
+  --uic-line-strong: #CBD0DA;
+  --uic-ink: var(--ink);
+  --uic-ink-2: var(--ink-2);
+  --uic-mute: var(--mute);
+  --uic-mute-2: var(--mute-2);
+  --uic-brand: var(--brand);
+  --uic-brand-ink: var(--brand-ink);
+  --uic-brand-soft: var(--brand-soft);
+  --uic-brand-faint: var(--brand-50);
+  --uic-on-brand: #FFFFFF;
+  --uic-ok: var(--ok);
+  --uic-warn: var(--warm);
+  --uic-warn-bg: var(--warm-soft);
+  --uic-fail-ink: #B91C1C;
+  --uic-fail-line: #FCA5A5;
+  --uic-fail-bg: var(--hot-soft);
+  --uic-mono: var(--mono);
+  /* The conversation becomes a drawer below 900px; it must start under the app bar,
+     or the bar’s own controls hit-test to the conversation instead. */
+  --uic-chat-drawer-top: 56px;
+  --uic-shadow-1: var(--shadow-1);
+  --uic-shadow-2: var(--shadow-2);
+  --uic-shadow-3: -16px 0 40px rgba(15, 23, 42, .22);
+  --uic-focus-ring: color-mix(in srgb, var(--brand) 14%, transparent);
+  --uic-hover-wash: rgba(0, 0, 0, .05);
+  --uic-status-pulse: color-mix(in srgb, var(--brand) 45%, transparent);
+  --uic-skel: var(--line);
+  --uic-r-card: var(--r-card);
+  --uic-r-input: var(--r-input);
+  --uic-r-pill: var(--r-pill);
+  --uic-scrim: rgba(17, 24, 39, .42);
+  --uic-z-overlay: 9000;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { font-family: var(--font); color: var(--ink); background: var(--bg); -webkit-font-smoothing: antialiased; }
+
+/* ── The primitives this app actually renders ──────────────────────────────
+   A button, a text field, an avatar, a scrollbar. Everything else a page needs — cards, chips,
+   pills, tabs, search fields, tables, popovers, modals — comes from reifyui, so a second
+   vocabulary for the same things is not kept here waiting to disagree with it. */
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 32px; padding: 0 12px; border-radius: var(--r-input);
+  font-size: 13px; font-weight: 500; color: var(--ink-2);
+  background: #fff; border: 1px solid var(--line); cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.btn:hover { border-color: #CBD0DA; }
+.btn.primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+.btn.primary:hover { background: var(--brand-ink); }
+/* Disabled state: drop opacity, swap cursor, and neutralize hover styles. */
+.btn:disabled,
+.btn[disabled] { opacity: .5; cursor: not-allowed; pointer-events: none; }
+.btn:disabled:hover,
+.btn[disabled]:hover { border-color: var(--line); }
+.btn.primary:disabled,
+.btn.primary[disabled] { background: var(--brand); border-color: var(--brand); }
+
+.input {
+  width: 100%; font-family: inherit; font-size: 13px; color: var(--ink);
+  background: #fff; border: 1px solid var(--line); border-radius: var(--r-input);
+  padding: 8px 10px;
+}
+.input:focus {
+  outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--uic-focus-ring);
+}
+.input.sm { padding: 6px 8px; font-size: 12px; }
+
+/* Avatar circle (the account button) */
+.av {
+  width: 32px; height: 32px; border-radius: 999px;
+  background: var(--brand);
+  color: #fff; font-size: 12px; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  border: none; cursor: pointer; font-family: inherit;
+}
+
+/* Scrollbars */
+.scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+.scroll::-webkit-scrollbar-thumb { background: #D7DBE3; border-radius: 999px; }
+.scroll::-webkit-scrollbar-track { background: transparent; }

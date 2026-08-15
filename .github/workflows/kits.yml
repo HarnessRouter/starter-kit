@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        kit: [slides, sheets, dashboard]
+        kit: [slides, sheets, dashboard, video]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -32,3 +32,14 @@ jobs:
         working-directory: kits/${{ matrix.kit }}/app
       - name: dist exists
         run: test -d kits/${{ matrix.kit }}/app/dist
+
+  # A template is a document the agent copies from, so a template that has drifted out of the
+  # contract teaches the drift to every video made from it. The validator is the same one the agent
+  # is told to run; running it here means a template can never ship in a state the agent would be
+  # told to fix.
+  templates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 kits/video/skills/video-storyboard/validate_scene.py
+             --templates kits/video/templates/templates.json
