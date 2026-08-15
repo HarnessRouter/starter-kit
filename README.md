@@ -4,7 +4,7 @@ Starter demos and production-ready kits for [HarnessRouter](https://harnessroute
 
 An LLM returns tokens. A harness gives it a sandbox, tools, and a loop, so it returns the actual file. HarnessRouter lets your app send a task through one API and get back finished work.
 
-This repository contains two MIT-licensed reference demos and separately licensed production kits. The **Cursor-style coding app is the primary demo**; **LumaCare is a second reference demo** showing how the same HarnessRouter patterns transfer to a different domain. The **Slides Kit** is a heavier product foundation with its own license terms.
+This repository contains two MIT-licensed reference demos and a set of separately licensed production kits. The **Cursor-style coding app is the primary demo**; **LumaCare is a second reference demo** showing how the same HarnessRouter patterns transfer to a different domain. The production kits live under `kits/`, each a heavier product foundation with its own license terms.
 
 ## Get your API key
 
@@ -48,13 +48,11 @@ Run one demo at a time because both use port `3000` by default.
 
 ## Production kits
 
-### Slides
+Production kits live under `kits/`. Each one is a production-ready application foundation with its own guide (see the kit's own `README.md`) and its own license terms. Launch any kit from **Starter Kits** in the HarnessRouter console, which provisions the Harness and serves the app from the HarnessRouter image.
 
-Slides is a production-ready presentation application foundation with an editable canvas, a conversational copilot, 46 templates, a slide-design Skill, and deck validation.
+For example, the Slides kit provides a presentation application foundation with an editable canvas, a conversational copilot, templates, a slide-design Skill, and deck validation: [open the Slides kit guide](./kits/slides/README.md).
 
-[Open the Slides Kit guide](./kits/slides/README.md)
-
-Launch it from **Starter Kits** in the HarnessRouter console. The console provisions the Harness and serves the app from the HarnessRouter image.
+New kits are added under `kits/` over time and are covered by the same licensing described below without any change to this repository's terms.
 
 ## Repository structure
 
@@ -63,8 +61,7 @@ Launch it from **Starter Kits** in the HarnessRouter console. The console provis
 ├── demos/
 │   ├── 01-cursor-coding-app/  # Primary demo
 │   └── 02-lumacare/           # Secondary reference demo
-├── kits/
-│   └── slides/                # Separately licensed production kit
+├── kits/                      # Separately licensed production kits (see kits/LICENSE.md)
 ├── .env.example               # Shared local configuration template
 ├── package.json               # npm workspace commands
 └── README.md                  # Repository and demo index
@@ -94,7 +91,7 @@ Credentials belong in an ignored `.env` file and never in source control. See ea
 This is a mixed-license repository:
 
 - Files without a more specific directory license, including the reference demos, are available under the [repository MIT License](./LICENSE).
-- `kits/` is governed by the [HarnessRouter Starter Kit License Agreement](./kits/LICENSE.md), not MIT. This covers every kit — slides, sheets, and any added later.
+- `kits/` is governed by the [HarnessRouter Starter Kit License Agreement](./kits/LICENSE.md), not MIT. This covers every kit in `kits/`, including any added later.
 - Individual local use is free, including learning, evaluation, personal projects, and the individual's own business operations.
 - Organizations using HarnessRouter Cloud for Internal Use do not pay a separate Kit license fee or have a Direct User limit; Cloud plan and usage charges still apply.
 - Non-Cloud Internal Use is free for up to three Direct Users. A paid entitlement is required before a fourth Direct User begins use or for separately metered automation.
