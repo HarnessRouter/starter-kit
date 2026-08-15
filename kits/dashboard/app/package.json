@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "node --test src/lib/dashboard.test.mjs src/lib/refresh.test.mjs src/lib/templates.test.mjs"
+    "test": "node --test src/lib/dashboard.test.mjs src/lib/query.test.mjs src/lib/refresh.test.mjs src/lib/templates.test.mjs"
   },
   "dependencies": {
     "echarts": "^5.5.1",

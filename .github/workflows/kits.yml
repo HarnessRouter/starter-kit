@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        kit: [slides, sheets]
+        kit: [slides, sheets, dashboard]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

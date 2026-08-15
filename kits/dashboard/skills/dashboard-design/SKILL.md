@@ -139,7 +139,9 @@ two capabilities:
   `{ columns, rows, row_count, truncated, limit_applied }`.
 
 If neither is in your tool list, stop and say so: this dashboard has no database
-connected yet, and SQL you cannot run is SQL you cannot promise.
+connected, or the one it had is switched off, and SQL you cannot run is SQL you
+cannot promise. Neither is yours to fix from here — name the tools you are
+missing and let the person put them back.
 
 **Sample rows are the person's choice.** When they set the dashboard up they
 decided whether the agent may see real rows alongside the column names;

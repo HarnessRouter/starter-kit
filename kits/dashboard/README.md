@@ -50,10 +50,14 @@ is in it.
   ours anywhere — yours is the only one involved.
 - **The app is served by the HarnessRouter image** at `/kits/dashboard`, same-origin with the
   console, which is why it needs no API key and no login of its own.
+- **The database is one of the Harness's tools.** You give it a connection when you create the
+  dashboard; after that it sits beside every other tool in the console, where you can rename it,
+  switch it off or remove it. Pointing it at a different database is the same act as setting it
+  up, so it is done the same way.
 - **Your connection string is resolved in one place**, inside the gateway, at the moment a query
   runs. The agent never receives it, the browser never receives it, and `dashboard.json` holds a
-  reference to the connection rather than the connection itself — the same shape the console
-  already uses for MCP bearer tokens.
+  reference to the connection rather than the connection itself. What the agent is handed for a
+  turn is permission to ask this one database questions, not a password it could take elsewhere.
 - **Opening a dashboard costs no agent turn.** The page asks the gateway to run the queries
   directly. A turn per panel per page-load would be slow and billed; this is neither.
 - **Every number is live.** There is nowhere in `dashboard.json` to write a figure. A chart's data
