@@ -19,7 +19,7 @@ import { TimelineTracks } from './TimelineTracks';
 
 export function TimelineStrip({
   timeline, elements, addr, editable, open, onToggle, onChange,
-  exportState, onExport, exportUnavailable, filmUrl, height,
+  exportState, onExport, exportUnavailable, filmUrl, height, currentTime, onSeek,
 }) {
   const view = timelineView(timeline, elements);
   const { ready, warnings, total } = readiness(timeline, view);
@@ -96,8 +96,8 @@ export function TimelineStrip({
             // The ruler is drawn over MEASURED time only. `total` is null the moment one shot is
             // still rendering, so this sums what is known rather than passing that null through
             // and losing the ruler entirely while a single clip is in flight.
-            measuredTotal={view.reduce(
-              (n, r) => n + (Number.isFinite(r.seconds) ? r.seconds : 0), 0)}
+            currentTime={currentTime}
+            onSeek={onSeek}
           />
 
           {/* Only when there is something to add. A control that opens an empty list is a

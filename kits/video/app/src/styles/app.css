@@ -363,59 +363,23 @@ a.uic-pop-item { text-decoration: none; }
 .vd-prev:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px; }
 
 /* ── the layers ───────────────────────────────────────────────────────────────────────────────
-   One lane per layer, scrolling together, with time running left to right. */
-.vd-tk { padding: 4px 0 10px; overflow-x: auto; overflow-y: hidden; }
-.vd-tk-ruler {
-  position: relative; height: 16px; margin-left: 62px; min-width: 100%;
-  font-variant-numeric: tabular-nums;
-}
-.vd-tk-tick {
-  position: absolute; top: 0; font-size: 10px; color: var(--mute-2); padding-left: 3px;
-  white-space: nowrap;
-}
-.vd-tk-tick i { position: absolute; left: 0; top: 12px; width: 1px; height: 5px; background: var(--line); }
-.vd-tk-row { display: flex; align-items: stretch; gap: 8px; padding: 3px 10px 3px 0; }
-.vd-tk-label {
-  flex: 0 0 54px; display: inline-flex; align-items: center; gap: 5px; padding-left: 10px;
-  font-size: 11px; color: var(--mute); text-transform: uppercase; letter-spacing: .03em;
-}
-.vd-tk-lane { display: flex; align-items: center; gap: 3px; min-height: 46px; }
-.vd-tk-empty { margin: 0; font-size: 12px; color: var(--mute); }
-
-.vd-tk-clip {
-  position: relative; height: 46px; flex-shrink: 0; border-radius: 6px; overflow: hidden;
-  border: 1px solid var(--line); background: var(--surface-2); isolation: isolate;
-}
-.vd-tk-clip.is-ready { border-color: var(--brand-soft); }
-.vd-tk-clip.is-failed { border-color: var(--hot-soft); background: var(--hot-soft); }
-.vd-tk-poster { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.vd-tk-blank { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--mute-2); }
-/* Still rendering: hatched, so "no picture yet" is legible without a colour being the only cue. */
-.vd-tk-clip.is-unmeasured {
-  background-image: repeating-linear-gradient(45deg, var(--line-soft) 0 5px, transparent 5px 10px);
-}
-.vd-tk-n {
-  position: absolute; top: 2px; left: 3px; z-index: 1; font-size: 10px; font-weight: 600;
-  color: #fff; background: rgba(17,24,39,.6); border-radius: 4px; padding: 0 4px;
-}
-.vd-tk-dur {
-  position: absolute; bottom: 2px; right: 3px; z-index: 1; font-size: 10px; color: #fff;
-  background: rgba(17,24,39,.6); border-radius: 4px; padding: 0 4px;
-  font-variant-numeric: tabular-nums;
-}
-.vd-tk-tools {
-  position: absolute; top: 2px; right: 2px; z-index: 2; display: none; gap: 2px;
-  background: rgba(255,255,255,.9); border-radius: 5px; padding: 1px;
-}
-.vd-tk-clip:hover .vd-tk-tools, .vd-tk-clip:focus-within .vd-tk-tools { display: flex; }
-.vd-tk-clip.is-audio { background: var(--brand-50); border-color: var(--brand-soft); }
-.vd-tk-wave { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--brand-ink); }
+   The drawing is reifyui's Timeline (styles/timeline.css). What is left here is the one control
+   this kit adds to a lane and the tokens the library reads. */
 .vd-tk-add {
-  flex-shrink: 0; width: 34px; height: 46px; border: 1px dashed var(--line);
-  border-radius: 6px; background: none; color: var(--mute); cursor: pointer;
+  flex-shrink: 0; width: 34px; height: 40px; border: 1px dashed var(--line);
+  border-radius: 6px; background: var(--surface); color: var(--mute); cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
 }
 .vd-tk-add:hover { border-color: var(--brand-soft); color: var(--brand-ink); background: var(--brand-50); }
+
+/* The library themes off --uic-*; this kit's palette is --brand/--line/--ink. One mapping, here,
+   rather than a second palette inside the timeline. */
+.vd-tl {
+  --uic-brand: var(--brand); --uic-line: var(--line); --uic-line-soft: var(--line-soft);
+  --uic-surface: var(--surface); --uic-surface-2: var(--surface-2);
+  --uic-ink-2: var(--ink-2); --uic-mute: var(--mute); --uic-mute-2: var(--mute-2);
+  --uic-danger-soft: var(--hot-soft);
+}
 
 /* ── the canvas is ours, not a tour of somebody else's product ────────────────────────────────
    Excalidraw's own menu carries links to its GitHub, X and Discord, plus a canvas reset that

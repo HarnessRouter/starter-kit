@@ -64,6 +64,9 @@ export function VideoPage({ id: routeId, seed }) {
   const [chatOpen, setChatOpen] = useState(true);
   const [tlOpen, setTlOpen] = useState(true);
   const [exporting, setExporting] = useState('');
+  // Where the preview is, shared so the timeline's playhead and the counter read one number.
+  const [playAt, setPlayAt] = useState(0);
+  const [seekTo, setSeekTo] = useState(null);
 
   const dialog = useDialog();
   // The film column. Its own stored width, so moving the conversation does not move it.
@@ -498,6 +501,8 @@ export function VideoPage({ id: routeId, seed }) {
                     // made yet" apart from "made, but not in the cut" — two different situations
                     // with two different things for a person to do next.
                     canvasClips={(scene.elements || []).filter((e) => e.media?.mediaId).length}
+                    onTime={setPlayAt}
+                    seekTo={seekTo}
                   />
                 </div>
 
@@ -505,6 +510,8 @@ export function VideoPage({ id: routeId, seed }) {
 
                 <TimelineStrip
                   height={tlOpen ? tlPane.height : undefined}
+                  currentTime={playAt}
+                  onSeek={(t) => setSeekTo({ t, nonce: Date.now() })}
                   timeline={timeline}
                   elements={scene.elements}
                   addr={addr}

@@ -12,6 +12,7 @@ import 'reifyui/styles/file.css';
 import 'reifyui/styles/library.css';
 import 'reifyui/styles/chip.css';
 import 'reifyui/styles/preview.css';
+import 'reifyui/styles/timeline.css';
 import './styles/tokens.css';
 import './styles/app.css';
 

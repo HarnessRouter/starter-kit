@@ -19,7 +19,8 @@ import { Pause, Play, SkipBack } from 'lucide-react';
 import { durationLabel } from '../lib/timeline';
 import { mediaUrl, posterUrl } from '../lib/media';
 
-export function PreviewPlayer({ view, addr, filmUrl, total, canvasClips = 0 }) {
+export function PreviewPlayer({ view, addr, filmUrl, total, canvasClips = 0,
+                               onTime, seekTo }) {
   const ref = useRef(null);
   const [i, setI] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -68,6 +69,25 @@ export function PreviewPlayer({ view, addr, filmUrl, total, canvasClips = 0 }) {
     if (el) { el.currentTime = 0; if (playing) el.play().catch(() => {}); }
   }, [playing]);
 
+  // A seek from the timeline: find the shot that second falls in and jump inside it. The cut is
+  // a sequence of separate files, so a time is a (shot, offset) pair rather than one position.
+  useEffect(() => {
+    if (!seekTo || !seekTo.nonce) return;
+    const t = Math.max(0, seekTo.t || 0);
+    if (isFilm) { if (ref.current) ref.current.currentTime = t; return; }
+    let acc = 0;
+    for (let n = 0; n < playable.length; n += 1) {
+      const d = Number.isFinite(playable[n].seconds) ? playable[n].seconds : 0;
+      if (t < acc + d || n === playable.length - 1) {
+        setI(n);
+        const el = ref.current;
+        if (el) el.currentTime = Math.max(0, Math.min(d || 0, t - acc));
+        return;
+      }
+      acc += d;
+    }
+  }, [seekTo, isFilm, playable]);
+
   // Space is play/pause everywhere video is played. Bound on the section, not the window, so it
   // does not fight the canvas or the composer for the same key.
   const onKeyDown = useCallback((e) => {
@@ -75,6 +95,7 @@ export function PreviewPlayer({ view, addr, filmUrl, total, canvasClips = 0 }) {
   }, [toggle]);
 
   const at = before + elapsed;
+  useEffect(() => { onTime?.(at); }, [at, onTime]);
   const totalLabel = Number.isFinite(total) ? durationLabel(total) : '—';
 
   const hasClips = canvasClips > 0;
