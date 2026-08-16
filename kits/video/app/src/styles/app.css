@@ -444,9 +444,12 @@ a.uic-pop-item { text-decoration: none; }
    floating controls sit. */
 .vd-canvas .App-bottom-bar .Island,
 .vd-canvas .layer-ui__wrapper__footer-left {
-  width: fit-content; max-width: fit-content; flex: 0 0 auto;
+  /* !important because this is overriding the library's own stylesheet, the same way the rules
+     above hide its menu. Without it the island keeps the width its container hands out. */
+  width: fit-content !important; max-width: fit-content !important; flex: 0 0 auto !important;
+  align-self: flex-start;
 }
-.vd-canvas .App-bottom-bar { pointer-events: none; }
+.vd-canvas .App-bottom-bar { pointer-events: none; justify-content: flex-start; }
 .vd-canvas .App-bottom-bar .Island { pointer-events: auto; }
 
 /* The canvas already says what it is. Excalidraw's running commentary — "To move canvas, hold
