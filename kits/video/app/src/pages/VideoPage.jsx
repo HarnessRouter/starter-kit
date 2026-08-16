@@ -19,8 +19,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PaneResizer, useDialog, useResizablePane } from 'reifyui';
 import { lastAssistantText } from 'reifyui/harness';
 import {
-  getScene, isPending, listJobs, markViewed, mediaAddr, mediaCapabilities, putScene, renameVideo,
-  sessionTurns, startExport, videoHarness, videoStatus,
+  getScene, importMedia, isPending, listJobs, markViewed, mediaAddr, mediaCapabilities, putScene,
+  renameVideo, sessionTurns, startExport, takeReference, videoHarness, videoStatus,
 } from '../lib/video';
 import {
   documentDiffers, mediaChange, mergeScene, parseScene, runningJobIds, stripLinks, toFile,
@@ -77,6 +77,22 @@ export function VideoPage({ id: routeId, seed }) {
   const stagePane = useResizablePane({
     initial: 420, min: 300, maxFraction: 0.55, fromRight: true, storageKey: 'video.stage.w',
   });
+  // A template's reference frame, once it is media in this session: {mediaId, alt}. It waits
+  // here until the scene has loaded, because the element cannot be written into a document that
+  // has not arrived yet.
+  const [refToPlace, setRefToPlace] = useState(null);
+
+  const importReference = useCallback(async (sid, ref) => {
+    try {
+      const hid = hidRef.current || (await videoHarness())?.id || '';
+      if (!hid) return;
+      const res = await fetch(ref.src);
+      if (!res.ok) return;
+      const rec = await importMedia(hid, sid, await res.blob(), ref.alt || 'Reference');
+      if (rec?.media_id) setRefToPlace({ mediaId: rec.media_id, alt: ref.alt || 'Reference' });
+    } catch { /* the film starts without it — a reference is a help, not a precondition */ }
+  }, []);
+
   // Whether what is selected on the board is one of our clips, which decides whether the shape
   // inspector is shown — see the rule in app.css.
   const [clipPicked, setClipPicked] = useState(false);
@@ -334,6 +350,31 @@ export function VideoPage({ id: routeId, seed }) {
     commit(toFile(rawRef.current, { elements: stripLinks(elements), appState }));
   }, [commit]);
 
+  // The reference, onto the board, once there IS a board. One write, then it is forgotten: the
+  // element is an ordinary media element from that moment on and nothing here owns it.
+  useEffect(() => {
+    if (!refToPlace || !rawRef.current || !scene) return;
+    const already = (scene.elements || []).some(
+      (el) => el?.customData?.media?.mediaId === refToPlace.mediaId);
+    if (already) { setRefToPlace(null); return; }
+    const now = Date.now();
+    const el = {
+      id: `el_ref_${refToPlace.mediaId}`,
+      type: 'image', x: 0, y: 0, width: 480, height: 270, angle: 0,
+      strokeColor: '#1e1e1e', backgroundColor: 'transparent', fillStyle: 'solid',
+      strokeWidth: 1, strokeStyle: 'solid', roughness: 0, opacity: 100,
+      groupIds: [], frameId: null, roundness: null, seed: 1, version: 1, versionNonce: 1,
+      isDeleted: false, boundElements: null, updated: now, link: null, locked: false,
+      status: 'saved', fileId: refToPlace.mediaId, scale: [1, 1],
+      customData: { media: {
+        v: 1, kind: 'image', status: 'ready', mediaId: refToPlace.mediaId,
+        label: refToPlace.alt, cap: 'import', model: '',
+      } },
+    };
+    commit(toFile(rawRef.current, { elements: [...(scene.elements || []), el] }));
+    setRefToPlace(null);
+  }, [refToPlace, scene, commit]);
+
   const onTimelineChange = useCallback((next) => {
     if (!rawRef.current) return;
     commit(toFile(rawRef.current, { timeline: toTimelineFile(next) }));
@@ -566,14 +607,20 @@ export function VideoPage({ id: routeId, seed }) {
 
       <ChatColumn
         videoId={id}
-        harnessId={harness?.id || ''}
         seed={seed}
         title={scene?.title}
         agentBusy={agentBusy}
         onSceneMaybeChanged={() => { reconcile(); pollJobs(); }}
         onSessionStarted={(sid) => {
+          // A TEMPLATE'S REFERENCE FRAME GOES IN THE MOMENT THE VIDEO EXISTS. It cannot go in
+          // earlier: until the first turn there is no session to put it in, and the import
+          // answered 404 against the pending id. It is put ON THE CANVAS rather than announced
+          // in the message, because describe_canvas is where the agent looks anyway and a media
+          // id in prose is a thing to be mistyped.
+          const ref = takeReference(idRef.current);
           setId(sid);
           idRef.current = sid;
+          if (ref?.src) importReference(sid, ref);
           window.history.replaceState(null, '', `${window.location.pathname}#/v/${encodeURIComponent(sid)}`);
         }}
         width={chatPane.width}

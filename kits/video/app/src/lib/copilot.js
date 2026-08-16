@@ -67,6 +67,18 @@ export function templateInstructions(tpl) {
   }
   if (tpl.adapt) lines.push('', tpl.adapt);
 
+  // The reference frame is put on the canvas as this video is created, so it is describe_canvas
+  // that carries the media id rather than this text — an id in prose is an id to be mistyped,
+  // and it does not exist yet at the moment these instructions are written.
+  if (tpl.reference?.src) {
+    lines.push('',
+      'A REFERENCE FRAME for this look is placed on the canvas as this video starts — it is the '
+      + 'picture on the template card, and it is the look being aimed at rather than a shot of '
+      + "the person's own subject. Read the canvas before you plan. Unless they ask for "
+      + 'something else, render the opening shot FROM it with from_image so the film starts on '
+      + 'that look, and say that is what you did.');
+  }
+
   if (shots.length) {
     lines.push('', 'The shape to start from, before adapting it to what they asked for:');
     for (const [i, s] of shots.entries()) {

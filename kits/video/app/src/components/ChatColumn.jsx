@@ -14,9 +14,7 @@ import remarkGfm from 'remark-gfm';
 import { Clapperboard } from 'lucide-react';
 import { ChatPanel, createDictation } from 'reifyui';
 import { fileToInputBlock, sessionTurns, turnsToMessages } from 'reifyui/harness';
-import {
-  importMedia, isPending, takeAttachments, takeReference, videoHarness,
-} from '../lib/video';
+import { isPending, takeAttachments } from '../lib/video';
 import { runCopilotTurn } from '../lib/copilot';
 
 /** Drop ?seed= from the hash in place so refresh/back/bookmark never resend it. */
@@ -31,43 +29,19 @@ function stripSeedFromHash() {
     + path + (rest ? `?${rest}` : ''));
 }
 
-export function ChatColumn({ videoId, harnessId, seed, title, agentBusy, onSceneMaybeChanged,
+export function ChatColumn({ videoId, seed, title, agentBusy, onSceneMaybeChanged,
                              onSessionStarted, width, collapsed, onToggle }) {
   // Built once: a fresh recogniser object every render would stop dictation on every keystroke.
   // It is null where the browser has none, and then the panel renders no microphone at all.
   const [dictation] = useState(() => createDictation());
 
-  const runTurn = useCallback(async ({ sessionId, text, attachments, handlers }) => {
+  const runTurn = useCallback(({ sessionId, text, attachments, handlers }) => {
     // A file picked on the landing page belongs to this video's FIRST message: the panel sends the
     // landing prompt as a seed, which carries no attachments of its own.
     const files = [...takeAttachments(sessionId), ...attachments.map((f) => f.payload)];
 
-    // A TEMPLATE'S REFERENCE FRAME IS A REAL PICTURE AND IT GOES IN THE SESSION, not on the card
-    // only. It is imported here, on the first turn, because that is the moment the session first
-    // exists — and the agent is told its media id, which is all it needs to place it and to
-    // render the opening shot FROM it. If the import fails the film still starts; the reference
-    // is a help, not a precondition, and a broken one must not block anybody's first message.
-    let message = text;
-    const ref = takeReference(sessionId);
-    if (ref?.src) {
-      try {
-        // The harness id is resolved HERE rather than taken from a prop. The first turn fires
-        // while the page is still fetching it, so the prop was empty exactly when this runs —
-        // the import was skipped and the reference consumed, every single time.
-        const hid = harnessId || (await videoHarness())?.id || '';
-        const res = hid ? await fetch(ref.src) : null;
-        const rec = res?.ok ? await importMedia(hid, sessionId, await res.blob(),
-                                                ref.alt || 'Reference') : null;
-        if (rec?.media_id) {
-          message += `\n\n(Reference frame for this look is already in this video as `
-            + `${rec.media_id} — ${ref.alt || 'the template reference'}. Place it on the canvas `
-            + `so I can see it, and use it as from_image for the opening shot so the film starts `
-            + `on that look rather than a fresh guess at it.)`;
-        }
-      } catch { /* the film starts without it */ }
-    }
-    return runCopilotTurn(sessionId, message, handlers, files);
-  }, [harnessId]);
+    return runCopilotTurn(sessionId, text, handlers, files);
+  }, []);
 
   const loadHistory = useCallback((sessionId) => (
     isPending(sessionId) ? Promise.resolve([]) : sessionTurns(sessionId).then(turnsToMessages)
