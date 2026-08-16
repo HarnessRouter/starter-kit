@@ -77,10 +77,9 @@ export function VideoPage({ id: routeId, seed }) {
   const stagePane = useResizablePane({
     initial: 420, min: 300, maxFraction: 0.55, fromRight: true, storageKey: 'video.stage.w',
   });
-  // A template's reference frame, once it is media in this session: {mediaId, alt}. It waits
-  // here until the scene has loaded, because the element cannot be written into a document that
-  // has not arrived yet.
-  const [refToPlace, setRefToPlace] = useState(null);
+  // Set below, once `load` exists: the import is fired from an event handler and only needs to
+  // refresh the board afterwards, so a ref keeps the two out of each other's dependency lists.
+  const loadRef = useRef(null);
 
   const importReference = useCallback(async (sid, ref) => {
     try {
@@ -88,8 +87,10 @@ export function VideoPage({ id: routeId, seed }) {
       if (!hid) return;
       const res = await fetch(ref.src);
       if (!res.ok) return;
-      const rec = await importMedia(hid, sid, await res.blob(), ref.alt || 'Reference');
-      if (rec?.media_id) setRefToPlace({ mediaId: rec.media_id, alt: ref.alt || 'Reference' });
+      // The server places it on the canvas in the same call — the browser cannot win the race
+      // against the agent reading the board, and it should not have to try.
+      await importMedia(hid, sid, await res.blob(), ref.alt || 'Reference');
+      loadRef.current?.();      // pull the board the server just wrote
     } catch { /* the film starts without it — a reference is a help, not a precondition */ }
   }, []);
 
@@ -325,6 +326,8 @@ export function VideoPage({ id: routeId, seed }) {
     setJobs(indexJobs(res.jobs.map(normalizeJob)));
   }, []);
 
+  useEffect(() => { loadRef.current = load; }, [load]);
+
   useEffect(() => { pollJobs(); }, [id, harness, pollJobs]);
 
   // Keep looking while anything is in flight: the document is changed by the SERVER when a render
@@ -349,31 +352,6 @@ export function VideoPage({ id: routeId, seed }) {
     // reach the file, where a deployment's address would rot into it.
     commit(toFile(rawRef.current, { elements: stripLinks(elements), appState }));
   }, [commit]);
-
-  // The reference, onto the board, once there IS a board. One write, then it is forgotten: the
-  // element is an ordinary media element from that moment on and nothing here owns it.
-  useEffect(() => {
-    if (!refToPlace || !rawRef.current || !scene) return;
-    const already = (scene.elements || []).some(
-      (el) => el?.customData?.media?.mediaId === refToPlace.mediaId);
-    if (already) { setRefToPlace(null); return; }
-    const now = Date.now();
-    const el = {
-      id: `el_ref_${refToPlace.mediaId}`,
-      type: 'image', x: 0, y: 0, width: 480, height: 270, angle: 0,
-      strokeColor: '#1e1e1e', backgroundColor: 'transparent', fillStyle: 'solid',
-      strokeWidth: 1, strokeStyle: 'solid', roughness: 0, opacity: 100,
-      groupIds: [], frameId: null, roundness: null, seed: 1, version: 1, versionNonce: 1,
-      isDeleted: false, boundElements: null, updated: now, link: null, locked: false,
-      status: 'saved', fileId: refToPlace.mediaId, scale: [1, 1],
-      customData: { media: {
-        v: 1, kind: 'image', status: 'ready', mediaId: refToPlace.mediaId,
-        label: refToPlace.alt, cap: 'import', model: '',
-      } },
-    };
-    commit(toFile(rawRef.current, { elements: [...(scene.elements || []), el] }));
-    setRefToPlace(null);
-  }, [refToPlace, scene, commit]);
 
   const onTimelineChange = useCallback((next) => {
     if (!rawRef.current) return;
