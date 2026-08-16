@@ -12,10 +12,11 @@ import { AlertTriangle, Music, Plus, Video } from 'lucide-react';
 import { Timeline } from 'reifyui';
 import { durationLabel } from '../lib/timeline';
 import { mediaUrl, posterUrl } from '../lib/media';
+import { CLIP_DRAG_TYPE } from './MediaCanvas';
 
 export function TimelineTracks({
   view, audio, elements, addr, editable, onMove, onRemove, onAdd, canAdd, addRef,
-  currentTime = 0, onSeek, onTrim, onSplit, selectedId, onSelect,
+  currentTime = 0, onSeek, onTrim, onSplit, selectedId, onSelect, onDrop,
 }) {
   const shots = (view || []).map((row, i) => ({
     id: `${row.elementId}-${i}`,
@@ -25,18 +26,25 @@ export function TimelineTracks({
     label: row.label,
     title: `${row.label}${Number.isFinite(row.seconds)
       ? ` · ${durationLabel(row.seconds)}` : ' · still rendering'}`,
-    poster: row.clip ? posterUrl(addr, row.clip) : '',
-    // No poster on most renders. The clip's own file then shows its first frame — a real
-    // frame of the real shot, which is the only preview worth putting on the block.
-    video: row.clip?.mediaId && row.status === 'ready'
+    // AN IMAGE IS ITS OWN PICTURE. Handing a png to a <video> is what drew a black rectangle
+    // where the ginkgo still should have been: the element loaded nothing and painted its
+    // background. A still shows as a poster; only a VIDEO gets the first-frame treatment.
+    poster: row.clip?.kind === 'image' && row.clip?.mediaId
+      ? mediaUrl({ ...addr, mediaId: row.clip.mediaId })
+      : (row.clip ? posterUrl(addr, row.clip) : ''),
+    video: row.clip?.kind === 'video' && row.clip?.mediaId && row.status === 'ready'
       ? mediaUrl({ ...addr, mediaId: row.clip.mediaId }) : '',
     badge: i + 1,
     // What is left of the source outside this shot's window, so a trim can pull an edge back out
     // instead of only ever eating into the clip.
-    headroom: row.clip && Number.isFinite(row.clip.seconds) ? {
-      start: Math.max(0, row.inS ?? 0),
-      end: Math.max(0, row.clip.seconds - (row.outS ?? row.clip.seconds)),
-    } : undefined,
+    // How far each edge can go back OUT. A still has no source to run out of, so its end is
+    // open — you can hold it as long as you like — while a video is bounded by its own file.
+    headroom: row.clip?.kind === 'image'
+      ? { start: 0, end: 3600 }
+      : (row.clip && Number.isFinite(row.clip.seconds) ? {
+          start: Math.max(0, row.inS ?? 0),
+          end: Math.max(0, row.clip.seconds - (row.outS ?? row.clip.seconds)),
+        } : undefined),
     state: row.missing || row.status === 'failed' ? 'failed'
       : row.status === 'ready' ? 'ready' : 'rendering',
     glyph: row.missing || row.status === 'failed' ? <AlertTriangle size={13} /> : null,
@@ -91,6 +99,12 @@ export function TimelineTracks({
       onDeleteClip={editable ? ((clip) => {
         if (clip.index !== undefined) onRemove(clip.index);
       }) : undefined}
+      // Dropping a card from the canvas. The payload is an element id — a reference, never a copy
+      // — and which lane it lands on decides what it becomes: a shot in the cut, or a bed under it.
+      readDrop={editable ? ((dt) => (dt.types.includes(CLIP_DRAG_TYPE)
+        ? dt.getData(CLIP_DRAG_TYPE) || true : null)) : undefined}
+      onDropClip={editable ? ((payload, at) => onDrop?.(String(payload), at)) : undefined}
+      newLaneLabel={editable ? 'Drop a sound here to add an audio layer' : undefined}
       snapStorageKey="video.timeline.snap"
       zoomStorageKey="video.timeline.pps"
       laneAppend={editable && canAdd

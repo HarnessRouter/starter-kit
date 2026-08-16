@@ -13,7 +13,7 @@ import { Popover } from 'reifyui';
 import { useRef, useState } from 'react';
 import {
   FPS_CHOICES, RESOLUTIONS, appendShot, durationLabel, moveShot, readiness, removeShot, setFps,
-  setResolution, splitShot, timelineView, trimShot, unusedClips,
+  addAudio, insertShot, setResolution, splitShot, timelineView, trimShot, unusedClips,
 } from '../lib/timeline';
 import { TimelineTracks } from './TimelineTracks';
 
@@ -103,6 +103,23 @@ export function TimelineStrip({
             onSelect={onSelect}
             onTrim={(i, edge, seconds) => edit(trimShot(timeline, i, edge, seconds, elements))}
             onSplit={(i, atS) => edit(splitShot(timeline, i, atS, elements))}
+            onDrop={(elementId, at) => {
+              const clip = (elements || []).find((e) => e.id === elementId);
+              const kind = clip?.customData?.media?.kind;
+              // WHERE IT LANDED DECIDES WHAT IT BECOMES. A sound on the new-lane strip starts the
+              // audio layer; anything else joins the cut at the slot it was dropped into. Dropping
+              // a sound into the picture lane is refused rather than quietly reinterpreted — a
+              // drop that does something other than what it looked like is worse than one that
+              // does nothing.
+              if (at.trackId === null) {
+                if (kind !== 'audio') return;
+                edit(addAudio(timeline, elementId, at.seconds, elements));
+                return;
+              }
+              if (at.trackId === 'audio') { edit(addAudio(timeline, elementId, at.seconds, elements)); return; }
+              if (kind === 'audio') return;
+              edit(insertShot(timeline, elementId, at.index, elements));
+            }}
           />
 
           {/* Only when there is something to add. A control that opens an empty list is a

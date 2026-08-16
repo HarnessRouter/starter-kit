@@ -28,9 +28,15 @@ export function PreviewPlayer({ view, addr, filmUrl, total, canvasClips = 0,
 
   // Only shots we can actually play. A rendering or failed shot is not silently skipped in the
   // strip below — it is visible there — but it cannot be a source here.
+  // What can actually be PLAYED. A still is not playable — handing its url to a <video> loads
+  // nothing, fires neither `ended` nor `error` in any useful order, and leaves the transport
+  // showing 'Pause' forever over a black frame. It is shown for its hold instead, on a timer.
   const playable = useMemo(
-    () => (view || []).filter((r) => r.clip && !r.missing && r.status === 'ready'),
+    () => (view || []).filter((r) => r.clip && !r.missing && r.status === 'ready'
+                                     && r.clip.kind !== 'image'),
     [view]);
+  const stills = useMemo(
+    () => (view || []).filter((r) => r.clip?.kind === 'image').length, [view]);
 
   const isFilm = Boolean(filmUrl);
   const src = isFilm ? filmUrl
@@ -155,6 +161,9 @@ export function PreviewPlayer({ view, addr, filmUrl, total, canvasClips = 0,
       {!isFilm && (
         <p className="vd-prev-note">
           Shots played back to back. Music and transitions are added when you export.
+          {stills > 0 && ` ${stills} still${stills === 1 ? '' : 's'} in the cut ${
+            stills === 1 ? 'is' : 'are'} not previewed here; ${
+            stills === 1 ? 'it appears' : 'they appear'} in the exported film.`}
         </p>
       )}
     </section>

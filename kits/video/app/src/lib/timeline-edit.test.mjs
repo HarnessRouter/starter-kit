@@ -2,7 +2,7 @@
 // than eyeballed through the UI: an off-by-one here silently shortens somebody's film.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { shotSeconds, splitShot, trimShot } from './timeline.js';
+import { STILL_HOLD_S, appendShot, shotSeconds, splitShot, trimShot } from './timeline.js';
 
 // The real element shape: media hangs off customData, which is where mediaOf reads it. A fixture
 // that invents a shape tests nothing — this one was wrong at first and every assertion still
@@ -59,4 +59,36 @@ test('an unmeasured clip refuses both, rather than inventing a length', () => {
   const before = tl([{ elementId: 'e2', inS: null, outS: null }]);
   assert.equal(trimShot(before, 0, 'end', 2, els), before);
   assert.equal(splitShot(before, 0, 1, els), before);
+});
+
+/* ── stills ───────────────────────────────────────────────────────────────────────────────────
+   A still has no length of its own, so the CUT gives it one. These pin that down because the
+   alternative — the app defaulting one way and the exporter another — makes the film you download
+   a different film from the one the timeline drew, with nothing to say so. */
+
+const still = (id) => ({ id, customData: { media: {
+  kind: 'image', status: 'ready', mediaId: 'i-' + id } } });
+
+test('a still added to the cut carries its hold, rather than leaving it to be guessed', () => {
+  const els = [still('img1')];
+  const t = appendShot(tl([]), 'img1', els);
+  assert.equal(t.shots[0].outS, STILL_HOLD_S, 'the hold was not written on the shot');
+  assert.equal(shotSeconds(t.shots[0], { kind: 'image' }), STILL_HOLD_S);
+});
+
+test('a still has a length even though its file does not', () => {
+  assert.equal(shotSeconds({ elementId: 'img1', inS: null, outS: null }, { kind: 'image' }),
+               STILL_HOLD_S, 'an unmeasured still must still be drawable');
+});
+
+test('a still can be held for longer than any file length, because there is no file length', () => {
+  const els = [still('img1')];
+  const t = trimShot(tl([{ elementId: 'img1', inS: 0, outS: 3 }]), 0, 'end', 12, els);
+  assert.equal(shotSeconds(t.shots[0], { kind: 'image' }), 12);
+});
+
+test('a still cannot be trimmed to nothing', () => {
+  const els = [still('img1')];
+  const t = trimShot(tl([{ elementId: 'img1', inS: 0, outS: 3 }]), 0, 'end', 0, els);
+  assert.ok(shotSeconds(t.shots[0], { kind: 'image' }) >= 0.1);
 });

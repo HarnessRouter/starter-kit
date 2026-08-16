@@ -72,7 +72,19 @@ export function toTimelineFile(timeline) {
  *  offer a drag the document will refuse. */
 export const MIN_SHOT_S = 0.1;
 
+/** How long a still is held when the cut has not said. Matches the gateway's STILL_HOLD_S:
+ *  two defaults that disagree would make the preview and the exported film different films. */
+export const STILL_HOLD_S = 3;
+
 export function shotSeconds(shot, clip) {
+  // A STILL HAS NO LENGTH OF ITS OWN. How long it is held is a property of the cut, so it reads
+  // from the shot — and a still that has not been given one is held for STILL_HOLD_S, which is a
+  // stated default rather than a measurement dressed up as one.
+  if (clip && clip.kind === 'image') {
+    const from = Math.max(0, shot.inS ?? 0);
+    const to = shot.outS === null || shot.outS === undefined ? STILL_HOLD_S : shot.outS;
+    return Math.max(0, to - from);
+  }
   const len = clip?.seconds;
   if (!Number.isFinite(len)) return null;
   const from = Math.max(0, shot.inS ?? 0);
@@ -186,7 +198,14 @@ export function removeShot(timeline, index) {
 export function appendShot(timeline, elementId, elements) {
   if (!mediaById(elements).has(elementId)) return timeline;
   if (timeline.shots.length >= MAX_SHOTS) return timeline;
-  return { ...timeline, shots: [...timeline.shots, { elementId, inS: null, outS: null }] };
+  // The hold is written on the shot AT THE MOMENT IT JOINS THE CUT. Leaving it null puts the
+  // decision in two places — this app's default and the server's — and the day they drift the
+  // film is not the one the timeline drew.
+  const clip = mediaById(elements).get(elementId);
+  const still = clip?.kind === 'image';
+  return { ...timeline,
+           shots: [...timeline.shots,
+                   { elementId, inS: null, outS: still ? STILL_HOLD_S : null }] };
 }
 
 export function setFps(timeline, fps) {
@@ -229,6 +248,12 @@ export function trimShot(timeline, index, edge, seconds, elements) {
   const shot = timeline.shots[index];
   if (!shot) return timeline;
   const clip = mediaById(elements).get(shot.elementId);
+  if (clip?.kind === 'image') {
+    // No source to run out of: a still can be held for as long as the cut likes.
+    const want = Math.max(MIN_SHOT_S, seconds);
+    return { ...timeline,
+             shots: timeline.shots.map((x, i) => (i === index ? { ...x, inS: 0, outS: want } : x)) };
+  }
   const { from, to, len } = window_(shot, clip);
   if (!Number.isFinite(len) || to === null) return timeline;
   const want = Math.max(MIN_SHOT_S, Math.min(seconds, len));
@@ -255,4 +280,30 @@ export function splitShot(timeline, index, atS, elements) {
   const shots = [...timeline.shots];
   shots.splice(index, 1, a, b);
   return { ...timeline, shots };
+}
+
+/** Put a clip into the cut at a given slot. `appendShot` is this with the slot at the end. */
+export function insertShot(timeline, elementId, index, elements) {
+  const clip = mediaById(elements).get(elementId);
+  if (!clip || clip.kind === 'audio') return timeline;
+  if (timeline.shots.length >= MAX_SHOTS) return timeline;
+  const shot = { elementId, inS: null, outS: clip.kind === 'image' ? STILL_HOLD_S : null };
+  const shots = [...timeline.shots];
+  shots.splice(Math.max(0, Math.min(index, shots.length)), 0, shot);
+  return { ...timeline, shots };
+}
+
+/** Lay a sound under the film, starting where it was dropped.
+ *
+ *  The audio layer is a set of PLACED items rather than a sequence: a bed starts at a moment you
+ *  choose, and two of them may overlap. That is why it has `startS` and the shots do not. */
+export function addAudio(timeline, elementId, startS, elements) {
+  const clip = mediaById(elements).get(elementId);
+  if (!clip || clip.kind !== 'audio') return timeline;
+  const at = Math.max(0, Number(startS) || 0);
+  if ((timeline.audio || []).some((a) => a.elementId === elementId
+                                         && Math.abs((a.startS || 0) - at) < 0.05)) {
+    return timeline;                     // already there, at that moment
+  }
+  return { ...timeline, audio: [...(timeline.audio || []), { elementId, startS: at, gainDb: 0 }] };
 }

@@ -398,3 +398,7 @@ a.uic-pop-item { text-decoration: none; }
   .vd-stage { width: auto !important; border-left: none; border-top: 1px solid var(--line); max-height: 52vh; }
   .vd-work .uic-pane-resizer { display: none; }
 }
+
+/* A still on the board is a picture, not a <video> that will not play. */
+.vd-clip.is-still { width: 100%; height: 100%; background: var(--surface-2); }
+.vd-clip-img { width: 100%; height: 100%; object-fit: contain; display: block; }

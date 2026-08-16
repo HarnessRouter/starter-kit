@@ -112,6 +112,7 @@ export function MediaCanvas({ scene, rev, addr, editable, jobs, onChange, onRetr
     return (
       <ClipBody
         clip={clip}
+        elementId={element.id}
         addr={addr}
         job={jobs.get(clip.jobId) || null}
         onRetry={onRetry}
@@ -139,7 +140,12 @@ export function MediaCanvas({ scene, rev, addr, editable, jobs, onChange, onRetr
 }
 
 /** What sits inside a clip's box: the player, or the honest state of what is not one yet. */
-function ClipBody({ clip, addr, job, onRetry }) {
+/** What a card carries when it is dragged. One custom type, so a drop target can tell OUR drag
+ *  from a file being dragged in off the desktop and refuse the latter instead of half-handling
+ *  it. The element id is the whole payload: the timeline stores a reference, never a copy. */
+export const CLIP_DRAG_TYPE = 'application/x-harness-clip';
+
+function ClipBody({ clip, elementId, addr, job, onRetry }) {
   if (clip.status === 'running') {
     const progress = progressLabel(job);
     return (
@@ -178,11 +184,33 @@ function ClipBody({ clip, addr, job, onRetry }) {
   const src = mediaUrl({ ...addr, mediaId: clip.mediaId });
   if (!src) return <div className="vd-clip is-running"><span className="vd-clip-shimmer" aria-hidden="true" /></div>;
 
+  // Drag a FINISHED card into the timeline. A rendering one is deliberately not draggable: it has
+  // no length yet, and a shot with no length is exactly what put a black rectangle in the cut.
+  const drag = {
+    draggable: true,
+    onDragStart: (e) => {
+      e.stopPropagation();
+      e.dataTransfer.effectAllowed = 'copy';
+      e.dataTransfer.setData(CLIP_DRAG_TYPE, elementId);
+      // A plain-text fallback, so dragging into anything else at least produces the label rather
+      // than an opaque failure.
+      e.dataTransfer.setData('text/plain', clip.label || clip.kind);
+    },
+  };
+
   if (clip.kind === 'audio') {
     return (
-      <div className="vd-clip is-audio">
+      <div className="vd-clip is-audio" {...drag}>
         <div className="vd-clip-label">{clip.label || 'Narration'}</div>
         <audio src={src} controls preload="metadata" />
+      </div>
+    );
+  }
+
+  if (clip.kind === 'image') {
+    return (
+      <div className="vd-clip is-still" {...drag}>
+        <img className="vd-clip-img" src={src} alt={clip.label || ''} draggable={false} />
       </div>
     );
   }
@@ -190,6 +218,7 @@ function ClipBody({ clip, addr, job, onRetry }) {
   return (
     <video
       className="vd-clip-video"
+      {...drag}
       src={src}
       poster={posterUrl(addr, clip) || undefined}
       controls
