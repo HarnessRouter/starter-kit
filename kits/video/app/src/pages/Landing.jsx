@@ -24,7 +24,7 @@ import { canMakeVideo, parseCapabilities, videoUnavailableReason } from '../lib/
 import { listTemplates, templatePreview, templateShots } from '../lib/templates';
 import { mediaElements, parseScene } from '../lib/scene';
 import { durationLabel, parseTimeline, timelineView, totalSeconds } from '../lib/timeline';
-import { posterUrl } from '../lib/media';
+import { mediaUrl, posterUrl } from '../lib/media';
 import { MediaTile } from '../components/MediaTile';
 import { Topbar } from '../components/Topbar';
 
@@ -421,6 +421,7 @@ export function LandingPage() {
                               <MediaTile
                                 className="vd-row-tile"
                                 poster={sum?.poster || ''}
+                                video={sum?.video || ''}
                                 state={sum?.running ? 'rendering' : 'ready'}
                                 duration=""
                               />
@@ -517,11 +518,21 @@ function summarise(rawScene, addr) {
   const clips = mediaElements(scene.elements);
   const timeline = parseTimeline(scene);
   const view = timelineView(timeline, scene.elements);
-  const first = view.find((r) => r.clip?.posterMediaId) || null;
+  // WHAT THE FILM OPENS ON. A rendered poster if one exists, then a still (which IS its own
+  // picture), and otherwise the first shot itself — a <video> paints frame one on its own. The
+  // exported film is preferred over all of them: it is the artifact, and its first frame is the
+  // one the audience sees.
+  const film = clips.find((c) => c.kind === 'film' && c.mediaId) || null;
+  const posted = view.find((r) => r.clip?.posterMediaId) || null;
+  const still = view.find((r) => r.clip?.kind === 'image' && r.clip?.mediaId) || null;
+  const shot = view.find((r) => r.clip?.mediaId && r.status === 'ready') || null;
   return {
     shots: view.length || clips.filter((c) => c.kind === 'video' || c.kind === 'image').length,
     seconds: totalSeconds(view),
     running: clips.some((c) => c.status === 'running'),
-    poster: first ? posterUrl(addr, first.clip) : '',
+    poster: posted ? posterUrl(addr, posted.clip)
+      : (still ? mediaUrl({ ...addr, mediaId: still.clip.mediaId }) : ''),
+    video: film ? mediaUrl({ ...addr, mediaId: film.mediaId })
+      : (shot && shot.clip.kind === 'video' ? mediaUrl({ ...addr, mediaId: shot.clip.mediaId }) : ''),
   };
 }

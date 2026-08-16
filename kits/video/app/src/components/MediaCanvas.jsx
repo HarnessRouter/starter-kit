@@ -24,13 +24,14 @@
 //      mouse move during a pan is a several-hundred-KB write.
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { CaptureUpdateAction, Excalidraw } from '@excalidraw/excalidraw';
+import { Plus } from 'lucide-react';
 import { AlertTriangle, RotateCcw } from 'lucide-react';
 import { changeKey, contentKey, filesForScene, hydrateLinks, mediaOf, sanitizeAppState } from '../lib/scene';
 import { embedLink, mediaUrl, posterUrl } from '../lib/media';
 import { failureText, progressLabel } from '../lib/jobs';
 
 export function MediaCanvas({ scene, rev, addr, editable, jobs, onChange, onRetry,
-                             onSelection }) {
+                             onSelection, onAddToCut }) {
   const apiRef = useRef(null);
   // The key of whatever is currently in the canvas. Set both when WE push and when the person
   // edits, so a push never comes back out as a change of theirs.
@@ -129,9 +130,10 @@ export function MediaCanvas({ scene, rev, addr, editable, jobs, onChange, onRetr
         addr={addr}
         job={jobs.get(clip.jobId) || null}
         onRetry={onRetry}
+        onAdd={onAddToCut}
       />
     );
-  }, [addr, jobs, onRetry]);
+  }, [addr, jobs, onRetry, onAddToCut]);
 
   return (
     <Excalidraw
@@ -158,7 +160,7 @@ export function MediaCanvas({ scene, rev, addr, editable, jobs, onChange, onRetr
  *  it. The element id is the whole payload: the timeline stores a reference, never a copy. */
 export const CLIP_DRAG_TYPE = 'application/x-harness-clip';
 
-function ClipBody({ clip, elementId, addr, job, onRetry }) {
+function ClipBody({ clip, elementId, addr, job, onRetry, onAdd }) {
   if (clip.status === 'running') {
     const progress = progressLabel(job);
     return (
@@ -197,6 +199,19 @@ function ClipBody({ clip, elementId, addr, job, onRetry }) {
   const src = mediaUrl({ ...addr, mediaId: clip.mediaId });
   if (!src) return <div className="vd-clip is-running"><span className="vd-clip-shimmer" aria-hidden="true" /></div>;
 
+  // DRAGGING IS NOT DISCOVERABLE. Nothing on a card said it could go into the cut, so the only
+  // way to find out was to try it. The button appears on hover and on keyboard focus, does the
+  // same thing the drag does, and is the non-drag path every drag interaction is supposed to
+  // have. It is not shown while a clip is still rendering: there is nothing to put in a cut yet.
+  const addBtn = onAdd ? (
+    <button type="button" className="vd-clip-add" title="Add to the cut"
+            aria-label={`Add ${clip.label || 'this clip'} to the cut`}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => { e.stopPropagation(); e.preventDefault(); onAdd(elementId); }}>
+      <Plus size={13} /><span>Add</span>
+    </button>
+  ) : null;
+
   // Drag a FINISHED card into the timeline. A rendering one is deliberately not draggable: it has
   // no length yet, and a shot with no length is exactly what put a black rectangle in the cut.
   const drag = {
@@ -216,6 +231,7 @@ function ClipBody({ clip, elementId, addr, job, onRetry }) {
       <div className="vd-clip is-audio" {...drag}>
         <div className="vd-clip-label">{clip.label || 'Narration'}</div>
         <audio src={src} controls preload="metadata" />
+        {addBtn}
       </div>
     );
   }
@@ -224,11 +240,14 @@ function ClipBody({ clip, elementId, addr, job, onRetry }) {
     return (
       <div className="vd-clip is-still" {...drag}>
         <img className="vd-clip-img" src={src} alt={clip.label || ''} draggable={false} />
+        {addBtn}
       </div>
     );
   }
 
   return (
+    <div className="vd-clip-wrap">
+    {addBtn}
     <video
       className="vd-clip-video"
       {...drag}
@@ -240,5 +259,6 @@ function ClipBody({ clip, elementId, addr, job, onRetry }) {
       preload="metadata"
       playsInline
     />
+    </div>
   );
 }

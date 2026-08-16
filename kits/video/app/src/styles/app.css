@@ -417,3 +417,39 @@ a.uic-pop-item { text-decoration: none; }
 /* A still on the board is a picture, not a <video> that will not play. */
 .vd-clip.is-still { width: 100%; height: 100%; background: var(--surface-2); }
 .vd-clip-img { width: 100%; height: 100%; object-fit: contain; display: block; }
+
+/* The button that says a card can go into the cut. Dragging works and always did, but nothing
+   said so — the only way to discover it was to guess. Shown on hover and on keyboard focus, so
+   it is reachable without a pointer, and it never covers the play controls of a video card. */
+.vd-clip-wrap { position: relative; width: 100%; height: 100%; }
+.vd-clip-add {
+  position: absolute; top: 6px; right: 6px; z-index: 2;
+  display: inline-flex; align-items: center; gap: 4px;
+  height: 26px; padding: 0 9px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  font: inherit; font-size: 11px; line-height: 1;
+  opacity: 0; transition: opacity .12s ease, transform .12s ease; transform: translateY(-2px);
+  box-shadow: var(--shadow-1);
+}
+.vd-clip:hover .vd-clip-add,
+.vd-clip-wrap:hover .vd-clip-add,
+.vd-clip-add:focus-visible { opacity: 1; transform: none; }
+.vd-clip-add:hover { background: var(--brand); border-color: var(--brand); color: #fff; }
+.vd-clip-add:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; }
+@media (prefers-reduced-motion: reduce) { .vd-clip-add { transition: none; } }
+
+/* Excalidraw's bottom bar stretches its island to the full width of the canvas and then puts two
+   32px buttons in the left corner of it, so undo/redo read as a long empty shelf. The island is
+   the right idea; the width is not. Shrink it to what it holds and let it sit where the other
+   floating controls sit. */
+.vd-canvas .App-bottom-bar .Island,
+.vd-canvas .layer-ui__wrapper__footer-left {
+  width: fit-content; max-width: fit-content; flex: 0 0 auto;
+}
+.vd-canvas .App-bottom-bar { pointer-events: none; }
+.vd-canvas .App-bottom-bar .Island { pointer-events: auto; }
+
+/* The canvas already says what it is. Excalidraw's running commentary — "To move canvas, hold
+   mouse wheel or spacebar while dragging" — is a sentence about ITS input model, sitting under
+   our toolbar on every single frame, teaching nothing after the first ten seconds. */
+.vd-canvas .HintViewer { display: none !important; }

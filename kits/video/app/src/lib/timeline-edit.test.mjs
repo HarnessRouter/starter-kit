@@ -171,3 +171,19 @@ test('a layer alone is still a document worth writing', () => {
   const only = addOverlay(tl([]), 'e1', 0, 1, elements);
   assert.ok(toTimelineFile(only), 'a timeline holding only a layer was written as null');
 });
+
+test('a still can be split — the Split button used to be enabled and do nothing', () => {
+  // Shot 1 of a real film was a 3-second still. Split lit up, the click did nothing, and there
+  // was no way to tell the difference between "refused" and "broken".
+  const t = tl([{ elementId: 'p1', inS: null, outS: STILL_HOLD_S }]);
+  const els = [img('p1')];
+  const after = splitShot(t, 0, 1.2, els);
+  assert.equal(after.shots.length, 2, 'the still was not split');
+  assert.deepEqual(after.shots[0], { elementId: 'p1', inS: 0, outS: 1.2 });
+  assert.deepEqual(after.shots[1], { elementId: 'p1', inS: 1.2, outS: STILL_HOLD_S });
+  // The two halves together hold exactly as long as the one did — a split adds a cut point.
+  const held = (s) => shotSeconds(s, { kind: 'image' });
+  assert.equal(held(after.shots[0]) + held(after.shots[1]), STILL_HOLD_S);
+  // And a cut too near an edge is still refused rather than making a sliver.
+  assert.equal(splitShot(t, 0, 0.02, els), t);
+});

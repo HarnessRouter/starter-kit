@@ -16,7 +16,8 @@ import { AlertTriangle, Film } from 'lucide-react';
 
 const STATES = new Set(['rendering', 'ready', 'failed']);
 
-export function MediaTile({ poster, duration, state = 'ready', label, onClick, className = '' }) {
+export function MediaTile({ poster, video, duration, state = 'ready', label, onClick,
+                            className = '' }) {
   const s = STATES.has(state) ? state : 'ready';
   const Tag = onClick ? 'button' : 'div';
   return (
@@ -26,8 +27,15 @@ export function MediaTile({ poster, duration, state = 'ready', label, onClick, c
       onClick={onClick}
       aria-label={onClick ? label : undefined}
     >
-      {s === 'ready' && poster
-        ? <img className="vd-tile-img" src={poster} alt="" loading="lazy" />
+      {/* THE FIRST FRAME IS A PICTURE OF THE FILM, and a <video> paints its own without anyone
+          rendering a poster: metadata only, so this costs a range request rather than the clip.
+          It is used when no separate poster exists, which is every clip these models return —
+          which is why a list of finished films was a column of identical grey icons. */}
+      {s === 'ready' && (poster || video)
+        ? (poster
+          ? <img className="vd-tile-img" src={poster} alt="" loading="lazy" />
+          : <video className="vd-tile-img" src={video} preload="metadata" muted playsInline
+                   tabIndex={-1} aria-hidden="true" />)
         : (
           <span className="vd-tile-blank" aria-hidden="true">
             {s === 'failed' ? <AlertTriangle size={15} /> : <Film size={15} />}

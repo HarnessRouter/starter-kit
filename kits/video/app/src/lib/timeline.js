@@ -170,14 +170,13 @@ export function readiness(timeline, view) {
     }
     if (row.status === 'running') { warnings.push(`${row.label} is still rendering — export will refuse until it lands.`); continue; }
     if (row.status === 'failed') { warnings.push(`${row.label} failed to render, so it has nothing to export.`); continue; }
-    // Framing is only worth mentioning for a shot that will actually be in the film. Telling
-    // someone a failed shot would have been letterboxed is a second sentence about a shot that
-    // does not exist, and it buries the one that matters.
-    const { width, height } = row.clip;
-    if (Number.isFinite(width) && Number.isFinite(height) && (width !== W || height !== H)) {
-      const fit = width / height > W / H ? 'letterboxed' : 'pillarboxed';
-      warnings.push(`${row.label} is ${width}×${height} and will be ${fit} into ${timeline.resolution}.`);
-    }
+    // FRAMING IS NOT A WARNING. Every clip these models return is 1280x720 or 854x480 against a
+    // 1920x1080 timeline, so this fired for practically every shot in every film — two amber
+    // banners over the timeline saying, in effect, "video will be scaled to fit", which is what
+    // letterboxing IS and what the exporter has always done correctly. A banner that is always
+    // there is furniture, and it was pushing the warnings that MATTER (a clip still rendering, a
+    // clip that has gone) off the top of the list. The letterboxing itself is unchanged; only
+    // the running commentary about it is gone.
   }
 
   const total = totalSeconds(view);
@@ -289,8 +288,18 @@ export function splitShot(timeline, index, atS, elements) {
   if (!shot) return timeline;
   if (timeline.shots.length >= MAX_SHOTS) return timeline;
   const clip = mediaById(elements).get(shot.elementId);
-  const { from, to, len } = window_(shot, clip);
-  if (!Number.isFinite(len) || to === null) return timeline;
+  // A STILL HAS NO FILE LENGTH AND DOES NOT NEED ONE. Its window is the hold the cut gave it, so
+  // splitting it into two holds is as meaningful as splitting a video — it is how you get
+  // something in between them. Demanding a measured length here made the Split button do
+  // NOTHING on a still: enabled, clicked, and silently no cut, which is the worst of the three.
+  const still = clip?.kind === 'image';
+  const w = still
+    ? { from: Math.max(0, shot.inS ?? 0),
+        to: shot.outS === null || shot.outS === undefined ? STILL_HOLD_S : shot.outS }
+    : window_(shot, clip);
+  const { from, to } = w;
+  // A video needs a measured length to be cut against; a still is bounded by its hold instead.
+  if (to === null || (!still && !Number.isFinite(w.len))) return timeline;
   const cut = from + atS;
   if (cut <= from + MIN_SHOT_S || cut >= to - MIN_SHOT_S) return timeline;
   const a = { ...shot, inS: from, outS: cut };

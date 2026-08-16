@@ -25,7 +25,9 @@ import {
 import {
   documentDiffers, mediaChange, mergeScene, parseScene, runningJobIds, stripLinks, toFile,
 } from '../lib/scene';
-import { overlayView, parseTimeline, readiness, timelineView, toTimelineFile } from '../lib/timeline';
+import {
+  appendShot, overlayView, parseTimeline, readiness, timelineView, toTimelineFile,
+} from '../lib/timeline';
 import { exportAvailability, parseCapabilities } from '../lib/capabilities';
 import { indexJobs, normalizeJob, spendLabel, totalSpend } from '../lib/jobs';
 import { downloadName, mediaUrl } from '../lib/media';
@@ -500,6 +502,11 @@ export function VideoPage({ id: routeId, seed }) {
                   onChange={onCanvasChange}
                   onRetry={onRetry}
                   onSelection={setClipPicked}
+                  // The same edit the drag makes, from a button on the card — see MediaCanvas.
+                  onAddToCut={(elementId) => {
+                    setTlOpen(true);
+                    onTimelineChange(appendShot(timeline, elementId, scene?.elements || []));
+                  }}
                 />
               </div>
 
