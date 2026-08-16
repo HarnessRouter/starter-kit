@@ -31,6 +31,12 @@ export function TimelineTracks({
     video: row.clip?.mediaId && row.status === 'ready'
       ? mediaUrl({ ...addr, mediaId: row.clip.mediaId }) : '',
     badge: i + 1,
+    // What is left of the source outside this shot's window, so a trim can pull an edge back out
+    // instead of only ever eating into the clip.
+    headroom: row.clip && Number.isFinite(row.clip.seconds) ? {
+      start: Math.max(0, row.inS ?? 0),
+      end: Math.max(0, row.clip.seconds - (row.outS ?? row.clip.seconds)),
+    } : undefined,
     state: row.missing || row.status === 'failed' ? 'failed'
       : row.status === 'ready' ? 'ready' : 'rendering',
     glyph: row.missing || row.status === 'failed' ? <AlertTriangle size={13} /> : null,
