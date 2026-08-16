@@ -17,8 +17,23 @@
 // templateShots and validateTemplate — is what the tests exercise, and they run in node, where
 // there is no bundler to substitute a base URL.
 function templatesUrl() {
+  return `${kitBase()}templates.json`;
+}
+
+function kitBase() {
   const env = import.meta.env;
-  return `${env ? env.BASE_URL : '/'}templates.json`;
+  return env ? env.BASE_URL : '/';
+}
+
+/** A template's reference frame, addressed from the KIT'S base rather than the current page.
+ *
+ *  `templates/x.jpg` sitting in an <img> on /kits/video resolves to /kits/templates/x.jpg, which
+ *  is nothing — the picture was in the DOM and blank, which looks exactly like a broken card. */
+export function templateReference(template) {
+  const ref = template?.reference;
+  if (!ref?.src) return null;
+  const src = /^(https?:|data:|\/)/.test(ref.src) ? ref.src : `${kitBase()}${ref.src}`;
+  return { ...ref, src };
 }
 
 let cache = null;
