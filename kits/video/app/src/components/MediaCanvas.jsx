@@ -29,7 +29,8 @@ import { changeKey, contentKey, filesForScene, hydrateLinks, mediaOf, sanitizeAp
 import { embedLink, mediaUrl, posterUrl } from '../lib/media';
 import { failureText, progressLabel } from '../lib/jobs';
 
-export function MediaCanvas({ scene, rev, addr, editable, jobs, onChange, onRetry }) {
+export function MediaCanvas({ scene, rev, addr, editable, jobs, onChange, onRetry,
+                             onSelection }) {
   const apiRef = useRef(null);
   // The key of whatever is currently in the canvas. Set both when WE push and when the person
   // edits, so a push never comes back out as a change of theirs.
@@ -90,6 +91,18 @@ export function MediaCanvas({ scene, rev, addr, editable, jobs, onChange, onRetr
   //   simply OPENING a video write to it — a new revision, racing the agent, for a change of
   //   nothing. So once the counter moves, what actually gets compared is the content.
   const handleChange = useCallback((elements, appState, files) => {
+    // A CLIP IS NOT A SHAPE. Selecting one opens the shape inspector — stroke, background,
+    // sloppiness, edges — none of which describes a video or does anything to one. Whether the
+    // selection is ours is reported up so the page can put that panel away; a rectangle someone
+    // actually drew still gets it. Reported before the early returns below, which exist to skip
+    // SAVES: a selection changes no element, so they would swallow this every time.
+    const picked = Object.keys(appState?.selectedElementIds || {})
+      .filter((k) => appState.selectedElementIds[k]);
+    if (onSelection) {
+      const byId = new Map((elements || []).map((e) => [e.id, e]));
+      onSelection(picked.length > 0
+                  && picked.every((k) => (byId.get(k)?.customData || {}).media));
+    }
     const next = changeKey(elements, files);
     if (next === keyRef.current) return;
     keyRef.current = next;
@@ -97,7 +110,7 @@ export function MediaCanvas({ scene, rev, addr, editable, jobs, onChange, onRetr
     if (content === contentRef.current) return;
     contentRef.current = content;
     onChange({ elements, appState });
-  }, [onChange]);
+  }, [onChange, onSelection]);
 
   // Never off-origin. Our own player is rendered instead of the iframe, so nothing here is ever
   // actually loaded in a frame — but a scene is a file people can hand each other, and an

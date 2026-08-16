@@ -400,6 +400,12 @@ a.uic-pop-item { text-decoration: none; }
 .vd-canvas .sidebar-trigger,
 .vd-canvas .help-icon { display: none !important; }
 
+/* A CLIP IS NOT A SHAPE. Selecting one opened a panel offering stroke, background, fill,
+   sloppiness and edges — five things that do not describe a video and would not change one if
+   they did. What a clip's appearance actually is was decided by the model that rendered it, and
+   where it appears is decided in the timeline. A rectangle someone drew still gets the panel. */
+.vd-canvas.is-clip-selected .App-menu__left { display: none !important; }
+
 /* Narrow: the film column stops being a column. Below this the canvas cannot hold a board AND a
    player side by side, so the player goes under it rather than both being unusable. */
 @media (max-width: 1100px) {

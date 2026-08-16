@@ -75,6 +75,10 @@ export function VideoPage({ id: routeId, seed }) {
   const stagePane = useResizablePane({
     initial: 420, min: 300, maxFraction: 0.55, fromRight: true, storageKey: 'video.stage.w',
   });
+  // Whether what is selected on the board is one of our clips, which decides whether the shape
+  // inspector is shown — see the rule in app.css.
+  const [clipPicked, setClipPicked] = useState(false);
+
   // The timeline's height. Its top border is the handle; see HeightResizer.
   const tlPane = useHeightPane({ initial: 210, min: 96, storageKey: 'video.timeline.h' });
   const chatPane = useResizablePane({
@@ -486,7 +490,7 @@ export function VideoPage({ id: routeId, seed }) {
                second one a permanent home is what lets the timeline show tracks instead of a
                single row squeezed under a full-width canvas. */
             <div className="vd-work">
-              <div className="vd-canvas">
+              <div className={'vd-canvas' + (clipPicked ? ' is-clip-selected' : '')}>
                 <MediaCanvas
                   scene={scene}
                   rev={rev}
@@ -495,6 +499,7 @@ export function VideoPage({ id: routeId, seed }) {
                   jobs={jobs}
                   onChange={onCanvasChange}
                   onRetry={onRetry}
+                  onSelection={setClipPicked}
                 />
               </div>
 
