@@ -19,7 +19,7 @@ import { TimelineTracks } from './TimelineTracks';
 
 export function TimelineStrip({
   timeline, elements, addr, editable, open, onToggle, onChange,
-  exportState, onExport, exportUnavailable, filmUrl,
+  exportState, onExport, exportUnavailable, filmUrl, height,
 }) {
   const view = timelineView(timeline, elements);
   const { ready, warnings, total } = readiness(timeline, view);
@@ -30,7 +30,9 @@ export function TimelineStrip({
   const edit = (next) => { if (next !== timeline) onChange(next); };
 
   return (
-    <section className={'vd-tl' + (open ? '' : ' is-closed')} aria-label="Timeline">
+    // Closed, it is just its own header, so the height is only applied when it is open.
+    <section className={'vd-tl' + (open ? '' : ' is-closed')} aria-label="Timeline"
+             style={open && height ? { height } : undefined}>
       <header className="vd-tl-head">
         <button type="button" className="vd-tl-toggle" onClick={onToggle}
                 aria-expanded={open} aria-label={open ? 'Hide the timeline' : 'Show the timeline'}>

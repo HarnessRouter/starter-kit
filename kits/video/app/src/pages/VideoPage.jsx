@@ -32,6 +32,7 @@ import { downloadName, mediaUrl } from '../lib/media';
 import { MediaCanvas } from '../components/MediaCanvas';
 import { TimelineStrip } from '../components/TimelineStrip';
 import { PreviewPlayer } from '../components/PreviewPlayer';
+import { HeightResizer, useHeightPane } from '../components/HeightResizer';
 import { ChatColumn } from '../components/ChatColumn';
 import { Topbar } from '../components/Topbar';
 
@@ -69,6 +70,8 @@ export function VideoPage({ id: routeId, seed }) {
   const stagePane = useResizablePane({
     initial: 420, min: 300, maxFraction: 0.55, fromRight: true, storageKey: 'video.stage.w',
   });
+  // The timeline's height. Its top border is the handle; see HeightResizer.
+  const tlPane = useHeightPane({ initial: 210, min: 96, storageKey: 'video.timeline.h' });
   const chatPane = useResizablePane({
     initial: 380, min: 300, maxFraction: 0.6, fromRight: true, storageKey: 'videos.chat.w',
   });
@@ -484,13 +487,20 @@ export function VideoPage({ id: routeId, seed }) {
               <PaneResizer pane={stagePane} />
 
               <aside className="vd-stage" style={{ width: stagePane.width }} aria-label="Film">
-                <PreviewPlayer
-                  view={timelineView(timeline, scene.elements)}
-                  addr={addr}
-                  filmUrl={filmUrl}
-                  total={readiness(timeline, timelineView(timeline, scene.elements)).total}
-                />
+                {/* The player sits in the middle of whatever room the timeline leaves it. */}
+                <div className="vd-stage-view">
+                  <PreviewPlayer
+                    view={timelineView(timeline, scene.elements)}
+                    addr={addr}
+                    filmUrl={filmUrl}
+                    total={readiness(timeline, timelineView(timeline, scene.elements)).total}
+                  />
+                </div>
+
+                <HeightResizer pane={tlPane} />
+
                 <TimelineStrip
+                  height={tlOpen ? tlPane.height : undefined}
                   timeline={timeline}
                   elements={scene.elements}
                   addr={addr}
