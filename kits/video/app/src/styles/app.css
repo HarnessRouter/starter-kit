@@ -455,6 +455,12 @@ a.uic-pop-item { text-decoration: none; }
   pointer-events: none; align-items: flex-start !important; justify-content: flex-start;
 }
 .vd-canvas .App-bottom-bar .Island { pointer-events: auto; }
+/* And the island was only as wide as the toolbar INSIDE it, which is the thing that stretches.
+   Measured, after three rules that changed nothing: the island already shrink-wrapped its
+   child; the child was the full width of the canvas. */
+.vd-canvas .App-bottom-bar .App-toolbar {
+  width: fit-content !important; flex: 0 0 auto !important;
+}
 
 /* The canvas already says what it is. Excalidraw's running commentary — "To move canvas, hold
    mouse wheel or spacebar while dragging" — is a sentence about ITS input model, sitting under
