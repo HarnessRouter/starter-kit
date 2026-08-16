@@ -14,7 +14,9 @@ import remarkGfm from 'remark-gfm';
 import { Clapperboard } from 'lucide-react';
 import { ChatPanel, createDictation } from 'reifyui';
 import { fileToInputBlock, sessionTurns, turnsToMessages } from 'reifyui/harness';
-import { importMedia, isPending, takeAttachments, takeReference } from '../lib/video';
+import {
+  importMedia, isPending, takeAttachments, takeReference, videoHarness,
+} from '../lib/video';
 import { runCopilotTurn } from '../lib/copilot';
 
 /** Drop ?seed= from the hash in place so refresh/back/bookmark never resend it. */
@@ -47,11 +49,15 @@ export function ChatColumn({ videoId, harnessId, seed, title, agentBusy, onScene
     // is a help, not a precondition, and a broken one must not block anybody's first message.
     let message = text;
     const ref = takeReference(sessionId);
-    if (ref?.src && harnessId) {
+    if (ref?.src) {
       try {
-        const res = await fetch(ref.src);
-        const rec = res.ok ? await importMedia(harnessId, sessionId, await res.blob(),
-                                               ref.alt || 'Reference') : null;
+        // The harness id is resolved HERE rather than taken from a prop. The first turn fires
+        // while the page is still fetching it, so the prop was empty exactly when this runs —
+        // the import was skipped and the reference consumed, every single time.
+        const hid = harnessId || (await videoHarness())?.id || '';
+        const res = hid ? await fetch(ref.src) : null;
+        const rec = res?.ok ? await importMedia(hid, sessionId, await res.blob(),
+                                                ref.alt || 'Reference') : null;
         if (rec?.media_id) {
           message += `\n\n(Reference frame for this look is already in this video as `
             + `${rec.media_id} — ${ref.alt || 'the template reference'}. Place it on the canvas `
