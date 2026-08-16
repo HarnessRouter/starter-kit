@@ -446,8 +446,11 @@ a.uic-pop-item { text-decoration: none; }
 .vd-canvas .layer-ui__wrapper__footer-left {
   /* !important because this is overriding the library's own stylesheet, the same way the rules
      above hide its menu. Without it the island keeps the width its container hands out. */
-  width: fit-content !important; max-width: fit-content !important; flex: 0 0 auto !important;
-  align-self: flex-start !important;
+  /* The library sets width, max-width AND MIN-WIDTH to 100% on this island. Overriding the
+     first two changed nothing at all, because min-width won — which is why three earlier rules
+     appeared to do nothing and the measurement was the only way to see it. */
+  width: fit-content !important; max-width: fit-content !important; min-width: 0 !important;
+  flex: 0 0 auto !important; align-self: flex-start !important;
 }
 .vd-canvas .App-bottom-bar {
   /* The bar is a COLUMN flex, so its child stretched across the cross axis — the width was never
