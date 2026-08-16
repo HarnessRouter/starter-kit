@@ -39,6 +39,9 @@ export function normalizeJob(raw) {
   const status = STATUSES.has(raw?.status) ? raw.status : UNKNOWN;
   return {
     jobId: raw?.job_id || '',
+    // When it was submitted, so several jobs of the same kind can be told apart by age. A page
+    // that cannot do that follows whichever one the server happened to list first.
+    createdAt: Number.isFinite(raw?.created_at) ? raw.created_at : 0,
     status,
     capability: raw?.capability || '',
     model: raw?.model || '',

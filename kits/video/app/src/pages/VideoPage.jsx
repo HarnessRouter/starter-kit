@@ -345,9 +345,18 @@ export function VideoPage({ id: routeId, seed }) {
 
   // ── export ────────────────────────────────────────────────────────────────
   const exportInfo = exportAvailability(caps);
-  const exportJob = useMemo(() => [...jobs.values()].find((j) => j.capability === 'export') || null, [jobs]);
-  const filmUrl = exportJob?.status === 'succeeded' && exportJob.mediaId
-    ? mediaUrl({ ...addr, mediaId: exportJob.mediaId }) : '';
+  // THE LATEST EXPORT, not the first one the server listed. A session accumulates them — every
+  // re-cut is another — and following the oldest meant the button sat on 'Starting…' through a
+  // whole render and the player went on offering a film from two edits ago.
+  const exports = useMemo(
+    () => [...jobs.values()].filter((j) => j.capability === 'export')
+      .sort((a, b) => a.createdAt - b.createdAt),
+    [jobs]);
+  const exportJob = exports.length ? exports[exports.length - 1] : null;
+  const film = useMemo(
+    () => [...exports].reverse().find((j) => j.status === 'succeeded' && j.mediaId) || null,
+    [exports]);
+  const filmUrl = film ? mediaUrl({ ...addr, mediaId: film.mediaId }) : '';
 
   useEffect(() => {
     // The button's label follows the real job, so a reopened tab shows an export that is still
