@@ -34,6 +34,15 @@ export function useHeightPane({ initial = 210, min = 96, storageKey = null } = {
     }
   }, [storageKey]);
 
+  // Grow to fit something that has just appeared — never shrink, and never overwrite what the
+  // person last dragged to: this is "reveal the result of an edit", not a second opinion about
+  // how tall they want their timeline. Not persisted, so a reload returns to their own size and
+  // the measurement runs again from there.
+  const ensure = useCallback((h) => {
+    const want = clamp(h);
+    setHeight((cur) => (want > cur ? want : cur));
+  }, [clamp]);
+
   const onMouseDown = useCallback((e) => {
     e.preventDefault();
     drag.current = { y: e.clientY, h: height };
@@ -75,7 +84,7 @@ export function useHeightPane({ initial = 210, min = 96, storageKey = null } = {
     return () => window.removeEventListener('resize', onResize);
   }, [clamp]);
 
-  return { height, onMouseDown, onKeyDown, reset };
+  return { height, onMouseDown, onKeyDown, reset, ensure };
 }
 
 export function HeightResizer({ pane, label = 'Drag to resize the timeline' }) {

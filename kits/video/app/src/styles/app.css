@@ -181,6 +181,7 @@ button.vd-tile { cursor: pointer; }
 .vd-tl-field { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--mute); }
 .vd-tl-field .input { width: auto; }
 
+.vd-tl-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .vd-tl-note {
   margin: 0; padding: 6px 14px; font-size: 12px; color: #92400E; background: var(--warm-soft);
   border-top: 1px solid var(--line-soft);

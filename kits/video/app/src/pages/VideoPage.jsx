@@ -522,6 +522,7 @@ export function VideoPage({ id: routeId, seed }) {
 
                 <TimelineStrip
                   height={tlOpen ? tlPane.height : undefined}
+                  onNeedHeight={tlPane.ensure}
                   currentTime={playAt}
                   onSeek={(t) => setSeekTo({ t, nonce: Date.now() })}
                   selectedId={selShot}

@@ -10,7 +10,7 @@
 // to break is exactly the place someone reads a duration and plans around it.
 import { ChevronDown, ChevronUp, Download, Film } from 'lucide-react';
 import { Popover } from 'reifyui';
-import { useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   FPS_CHOICES, OVERLAY_POSITIONS, RESOLUTIONS, addOverlay, appendShot, durationLabel, layerCount,
   moveOverlay, moveShot, overlayView, readiness, removeOverlay, removeShot, setFps,
@@ -21,7 +21,7 @@ import { TimelineTracks } from './TimelineTracks';
 
 export function TimelineStrip({
   timeline, elements, addr, editable, open, onToggle, onChange,
-  exportState, onExport, exportUnavailable, filmUrl, height, currentTime, onSeek,
+  exportState, onExport, exportUnavailable, filmUrl, height, onNeedHeight, currentTime, onSeek,
   selectedId, onSelect,
 }) {
   const view = timelineView(timeline, elements);
@@ -35,6 +35,20 @@ export function TimelineStrip({
   const addRef = useRef(null);
 
   const edit = (next) => { if (next !== timeline) onChange(next); };
+
+  // A LANE YOU CANNOT SEE IS A LANE YOU DID NOT ADD, as far as the person who just dropped
+  // something is concerned. When the lanes no longer fit, ask for exactly the shortfall —
+  // measured off the DOM, not computed from a lane height this file would have to keep in step
+  // with the library's.
+  const bodyRef = useRef(null);
+  const laneCount = 1 + new Set(layers.map((l) => l.layer)).size + (timeline.audio?.length ? 1 : 0);
+  useLayoutEffect(() => {
+    if (!open || !onNeedHeight) return;
+    const el = bodyRef.current?.querySelector('.rui-tl-scroll');
+    if (!el) return;
+    const short = el.scrollHeight - el.clientHeight;
+    if (short > 2) onNeedHeight((height || 0) + short);
+  }, [laneCount, open, height, onNeedHeight]);
 
   return (
     // Closed, it is just its own header, so the height is only applied when it is open.
@@ -101,6 +115,7 @@ export function TimelineStrip({
           {exportUnavailable && <p className="vd-tl-note is-err">{exportUnavailable}</p>}
           {warnings.map((w) => <p key={w} className="vd-tl-note">{w}</p>)}
 
+          <div ref={bodyRef} className="vd-tl-body">
           <TimelineTracks
             view={view}
             audio={timeline.audio}
@@ -150,6 +165,7 @@ export function TimelineStrip({
               edit(insertShot(timeline, elementId, at.index, elements));
             }}
           />
+          </div>
 
           {/* Only when there is something to add. A control that opens an empty list is a
               control that should not be there. */}
