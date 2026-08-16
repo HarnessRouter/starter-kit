@@ -347,10 +347,18 @@ a.uic-pop-item { text-decoration: none; }
 /* The frame grows into the space and the video letterboxes inside it, so nothing is cropped and
    nothing is stretched — `contain` is doing the work, not an assumed aspect ratio. */
 .vd-prev-stage {
+  position: relative;   /* the layers are drawn over the picture, inside this box */
   flex: 1; min-height: 120px; background: #0B0D12; display: flex; align-items: center;
   justify-content: center; overflow: hidden;
 }
 .vd-prev-video { width: 100%; height: 100%; object-fit: contain; background: #0B0D12; }
+/* A layer, over the picture. Positioned by the same five places the exporter composites into,
+   and `contain` inside its box for the same reason the stage uses it: the layer is letterboxed
+   into the space the cut gives it, never stretched to fill it. */
+.vd-prev-ov { position: absolute; display: flex; align-items: center; justify-content: center;
+  overflow: hidden; pointer-events: none; }
+.vd-prev-ov > * { width: 100%; height: 100%; object-fit: contain; }
+.vd-prev-ov:not([style*="inset: 0"]) { border-radius: 4px; box-shadow: var(--shadow-2); }
 .vd-prev.is-empty .vd-prev-blank {
   aspect-ratio: 16 / 9; display: flex; flex-direction: column; align-items: center;
   justify-content: center; gap: 4px; color: var(--mute); font-size: 12px; background: var(--surface-2);

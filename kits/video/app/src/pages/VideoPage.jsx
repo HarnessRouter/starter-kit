@@ -25,7 +25,7 @@ import {
 import {
   documentDiffers, mediaChange, mergeScene, parseScene, runningJobIds, stripLinks, toFile,
 } from '../lib/scene';
-import { parseTimeline, readiness, timelineView, toTimelineFile } from '../lib/timeline';
+import { overlayView, parseTimeline, readiness, timelineView, toTimelineFile } from '../lib/timeline';
 import { exportAvailability, parseCapabilities } from '../lib/capabilities';
 import { indexJobs, normalizeJob, spendLabel, totalSpend } from '../lib/jobs';
 import { downloadName, mediaUrl } from '../lib/media';
@@ -496,6 +496,7 @@ export function VideoPage({ id: routeId, seed }) {
                 <div className="vd-stage-view">
                   <PreviewPlayer
                     view={timelineView(timeline, scene.elements)}
+                    layers={overlayView(timeline, scene.elements)}
                     addr={addr}
                     filmUrl={filmUrl}
                     total={readiness(timeline, timelineView(timeline, scene.elements)).total}

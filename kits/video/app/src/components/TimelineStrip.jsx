@@ -12,8 +12,10 @@ import { ChevronDown, ChevronUp, Download, Film } from 'lucide-react';
 import { Popover } from 'reifyui';
 import { useRef, useState } from 'react';
 import {
-  FPS_CHOICES, RESOLUTIONS, appendShot, durationLabel, moveShot, readiness, removeShot, setFps,
-  addAudio, insertShot, setResolution, splitShot, timelineView, trimShot, unusedClips,
+  FPS_CHOICES, OVERLAY_POSITIONS, RESOLUTIONS, addOverlay, appendShot, durationLabel, layerCount,
+  moveOverlay, moveShot, overlayView, readiness, removeOverlay, removeShot, setFps,
+  setOverlayFraming, addAudio, insertShot, setResolution, splitShot, timelineView, trimOverlay,
+  trimShot, unusedClips,
 } from '../lib/timeline';
 import { TimelineTracks } from './TimelineTracks';
 
@@ -23,7 +25,11 @@ export function TimelineStrip({
   selectedId, onSelect,
 }) {
   const view = timelineView(timeline, elements);
+  const layers = overlayView(timeline, elements);
   const { ready, warnings, total } = readiness(timeline, view);
+  // The selected clip, when it is one of the layers — the framing control acts on that and on
+  // nothing else, so it is only rendered when there is something for it to act on.
+  const picked = layers.find((l) => `${l.elementId}-ov-${l.index}` === selectedId) || null;
   const spare = unusedClips(timeline, elements);
   const [addOpen, setAddOpen] = useState(false);
   const addRef = useRef(null);
@@ -55,6 +61,18 @@ export function TimelineStrip({
                 {RESOLUTIONS.map((r) => <option key={r} value={r}>{r.replace('x', '×')}</option>)}
               </select>
             </label>
+            {picked && (
+              <label className="vd-tl-field">
+                <span>Layer {picked.layer}</span>
+                <select className="input sm" value={picked.position} disabled={!editable}
+                        aria-label={`How ${picked.label} is framed`}
+                        onChange={(e) => edit(setOverlayFraming(timeline, picked.index, e.target.value))}>
+                  {OVERLAY_POSITIONS.map((p) => (
+                    <option key={p.id} value={p.id}>{p.label}</option>
+                  ))}
+                </select>
+              </label>
+            )}
             <label className="vd-tl-field">
               <span>fps</span>
               <select className="input sm" value={timeline.fps} disabled={!editable}
@@ -86,6 +104,7 @@ export function TimelineStrip({
           <TimelineTracks
             view={view}
             audio={timeline.audio}
+            layers={layers}
             elements={elements}
             addr={addr}
             editable={editable}
@@ -103,6 +122,9 @@ export function TimelineStrip({
             onSelect={onSelect}
             onTrim={(i, edge, seconds) => edit(trimShot(timeline, i, edge, seconds, elements))}
             onSplit={(i, atS) => edit(splitShot(timeline, i, atS, elements))}
+            onLayerTrim={(i, edge, seconds) => edit(trimOverlay(timeline, i, edge, seconds, elements))}
+            onLayerMove={(i, atS) => edit(moveOverlay(timeline, i, atS))}
+            onLayerRemove={(i) => edit(removeOverlay(timeline, i))}
             onDrop={(elementId, at) => {
               const clip = (elements || []).find((e) => e.id === elementId);
               const kind = clip?.customData?.media?.kind;
@@ -112,12 +134,19 @@ export function TimelineStrip({
               // drop that does something other than what it looked like is worse than one that
               // does nothing.
               if (at.trackId === null) {
-                if (kind !== 'audio') return;
-                edit(addAudio(timeline, elementId, at.seconds, elements));
+                // The new-lane strip: a sound starts the audio bed, a picture starts the next
+                // layer up. Both are "add a lane", and which lane depends on what was dropped.
+                if (kind === 'audio') edit(addAudio(timeline, elementId, at.seconds, elements));
+                else edit(addOverlay(timeline, elementId, at.seconds, layerCount(timeline) + 1, elements));
                 return;
               }
               if (at.trackId === 'audio') { edit(addAudio(timeline, elementId, at.seconds, elements)); return; }
               if (kind === 'audio') return;
+              if (String(at.trackId).startsWith('layer:')) {
+                edit(addOverlay(timeline, elementId, at.seconds,
+                                Number(String(at.trackId).slice(6)), elements));
+                return;
+              }
               edit(insertShot(timeline, elementId, at.index, elements));
             }}
           />

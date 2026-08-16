@@ -8,15 +8,19 @@
 // both — but only `shots` was ever drawn, so a music bed the agent added was in the film and
 // invisible in the app. The audio lane appears when the document has audio in it and not before:
 // an empty lane with a label on it is a promise, not a feature.
-import { AlertTriangle, Music, Plus, Video } from 'lucide-react';
+import { AlertTriangle, Layers, Music, Plus, Video } from 'lucide-react';
 import { Timeline } from 'reifyui';
 import { durationLabel } from '../lib/timeline';
 import { mediaUrl, posterUrl } from '../lib/media';
 import { CLIP_DRAG_TYPE } from './MediaCanvas';
 
+/** Whether a gesture happened on one of the layer lanes rather than on the cut itself. */
+const isLayer = (track) => String(track?.id || '').startsWith('layer:');
+
 export function TimelineTracks({
-  view, audio, elements, addr, editable, onMove, onRemove, onAdd, canAdd, addRef,
+  view, audio, layers, elements, addr, editable, onMove, onRemove, onAdd, canAdd, addRef,
   currentTime = 0, onSeek, onTrim, onSplit, selectedId, onSelect, onDrop,
+  onLayerTrim, onLayerMove, onLayerRemove,
 }) {
   const shots = (view || []).map((row, i) => ({
     id: `${row.elementId}-${i}`,
@@ -72,6 +76,48 @@ export function TimelineTracks({
     clips: shots,
     emptyLabel: 'Nothing in the cut yet. Ask for a shot, or add a clip from the canvas.',
   }];
+
+  // One lane per layer, in the order they are composited: each lane is drawn over the one above
+  // it, and the spine is above them all. Reading down the list is reading up through the film.
+  // A lane exists because the document has something on it — never as an empty invitation.
+  const byLayer = new Map();
+  for (const row of layers || []) {
+    if (!byLayer.has(row.layer)) byLayer.set(row.layer, []);
+    byLayer.get(row.layer).push(row);
+  }
+  for (const n of [...byLayer.keys()].sort((a, b) => a - b)) {
+    tracks.push({
+      id: `layer:${n}`,
+      label: `Layer ${n}`,
+      icon: <Layers size={12} />,
+      sequential: false,      // placed: a layer sits at a moment, it is not queued behind anything
+      title: n === 1 ? 'Drawn over the cut' : `Drawn over Layer ${n - 1}`,
+      clips: byLayer.get(n).map((row) => ({
+        id: `${row.elementId}-ov-${row.index}`,
+        start: row.startS,
+        duration: Number.isFinite(row.seconds) ? row.seconds : null,
+        label: row.label,
+        title: `${row.label} · ${row.position === 'full' ? 'fills the frame' : 'inset'}`
+             + `${Number.isFinite(row.seconds) ? ` · ${durationLabel(row.seconds)}` : ''}`,
+        poster: row.clip?.kind === 'image' && row.clip?.mediaId
+          ? mediaUrl({ ...addr, mediaId: row.clip.mediaId })
+          : (row.clip ? posterUrl(addr, row.clip) : ''),
+        video: row.clip?.kind === 'video' && row.clip?.mediaId && row.status === 'ready'
+          ? mediaUrl({ ...addr, mediaId: row.clip.mediaId }) : '',
+        headroom: row.clip?.kind === 'image'
+          ? { start: 0, end: 3600 }
+          : (row.clip && Number.isFinite(row.clip.seconds) ? {
+              start: Math.max(0, row.inS ?? 0),
+              end: Math.max(0, row.clip.seconds - (row.outS ?? row.clip.seconds)),
+            } : undefined),
+        state: row.missing || row.status === 'failed' ? 'failed'
+          : row.status === 'ready' ? 'ready' : 'rendering',
+        glyph: row.missing || row.status === 'failed' ? <AlertTriangle size={13} /> : null,
+        index: row.index,
+      })),
+    });
+  }
+
   // Placed, not sequential: an audio bed starts where the document says it starts.
   if (sound.length) {
     tracks.push({ id: 'audio', label: 'Audio', icon: <Music size={12} />, clips: sound,
@@ -87,24 +133,36 @@ export function TimelineTracks({
       onSelectClip={(clip) => onSelect?.(clip.id)}
       // The library speaks clips and seconds; the document speaks shot indexes and a window into
       // the source. This is the whole translation, and it lives here rather than in the library.
-      onTrim={editable ? ((clip, edge, seconds) => {
-        if (clip.index !== undefined) onTrim?.(clip.index, edge, seconds);
+      //
+      // WHICH LANE THE GESTURE HAPPENED ON DECIDES WHAT IT EDITS. The same drag means "reorder
+      // the cut" on the spine and "slide along the film" on a layer, because on a placed lane
+      // there is no order to change — and the library says which lane it was.
+      onTrim={editable ? ((clip, edge, seconds, track) => {
+        if (clip.index === undefined) return;
+        if (isLayer(track)) onLayerTrim?.(clip.index, edge, seconds);
+        else onTrim?.(clip.index, edge, seconds);
       }) : undefined}
-      onSplit={editable ? ((clip, atSeconds) => {
-        if (clip.index !== undefined) onSplit?.(clip.index, atSeconds);
+      onSplit={editable ? ((clip, atSeconds, track) => {
+        // Splitting a layer would need a second placed item at a computed offset — not wrong,
+        // just not built, and offering the gesture where it does nothing is worse than not.
+        if (clip.index !== undefined && !isLayer(track)) onSplit?.(clip.index, atSeconds);
       }) : undefined}
-      onMoveClip={editable ? ((clip, toIndex) => {
-        if (clip.index !== undefined && toIndex !== clip.index) onMove(clip.index, toIndex);
+      onMoveClip={editable ? ((clip, to, track) => {
+        if (clip.index === undefined) return;
+        if (isLayer(track)) onLayerMove?.(clip.index, to);
+        else if (to !== clip.index) onMove(clip.index, to);
       }) : undefined}
-      onDeleteClip={editable ? ((clip) => {
-        if (clip.index !== undefined) onRemove(clip.index);
+      onDeleteClip={editable ? ((clip, track) => {
+        if (clip.index === undefined) return;
+        if (isLayer(track)) onLayerRemove?.(clip.index);
+        else onRemove(clip.index);
       }) : undefined}
       // Dropping a card from the canvas. The payload is an element id — a reference, never a copy
       // — and which lane it lands on decides what it becomes: a shot in the cut, or a bed under it.
       readDrop={editable ? ((dt) => (dt.types.includes(CLIP_DRAG_TYPE)
         ? dt.getData(CLIP_DRAG_TYPE) || true : null)) : undefined}
       onDropClip={editable ? ((payload, at) => onDrop?.(String(payload), at)) : undefined}
-      newLaneLabel={editable ? 'Drop a sound here to add an audio layer' : undefined}
+      newLaneLabel={editable ? 'Drop a clip here to add a layer' : undefined}
       snapStorageKey="video.timeline.snap"
       zoomStorageKey="video.timeline.pps"
       laneAppend={editable && canAdd

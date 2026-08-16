@@ -37,19 +37,31 @@ export function parseTimeline(scene) {
   const audio = (Array.isArray(t.audio) ? t.audio : [])
     .filter((a) => a && typeof a.elementId === 'string' && a.elementId)
     .map((a) => ({ elementId: a.elementId, startS: num(a.startS) ?? 0, gainDb: num(a.gainDb) ?? 0 }));
+  const overlays = (Array.isArray(t.overlays) ? t.overlays : [])
+    .filter((o) => o && typeof o.elementId === 'string' && o.elementId)
+    .map((o) => ({
+      elementId: o.elementId,
+      layer: Math.max(1, Math.round(num(o.layer) ?? 1)),
+      startS: Math.max(0, num(o.startS) ?? 0),
+      inS: num(o.inS),
+      outS: num(o.outS),
+      position: OVERLAY_POSITIONS.some((p) => p.id === o.position) ? o.position : 'full',
+      scale: Math.min(1, Math.max(0.05, num(o.scale) ?? 1)),
+    }));
   return {
     v: TIMELINE_V,
     fps: FPS_CHOICES.includes(t.fps) ? t.fps : DEFAULT_FPS,
     resolution: RESOLUTIONS.includes(t.resolution) ? t.resolution : DEFAULT_RESOLUTION,
     shots,
     audio,
+    overlays,
     updatedAt: num(t.updatedAt) ?? 0,
   };
 }
 
 /** The timeline back in its on-disk shape, or null when there is nothing in it to write. */
 export function toTimelineFile(timeline) {
-  if (!timeline?.shots?.length && !timeline?.audio?.length) return null;
+  if (!timeline?.shots?.length && !timeline?.audio?.length && !timeline?.overlays?.length) return null;
   return {
     v: TIMELINE_V,
     fps: timeline.fps,
@@ -60,6 +72,12 @@ export function toTimelineFile(timeline) {
       ...(s.outS === null ? {} : { outS: s.outS }),
     })),
     audio: timeline.audio.map((a) => ({ elementId: a.elementId, startS: a.startS, gainDb: a.gainDb })),
+    overlays: (timeline.overlays || []).map((o) => ({
+      elementId: o.elementId, layer: o.layer, startS: o.startS,
+      ...(o.inS === null ? {} : { inS: o.inS }),
+      ...(o.outS === null ? {} : { outS: o.outS }),
+      position: o.position, scale: o.scale,
+    })),
     updatedAt: Date.now(),
   };
 }
@@ -291,6 +309,128 @@ export function insertShot(timeline, elementId, index, elements) {
   const shots = [...timeline.shots];
   shots.splice(Math.max(0, Math.min(index, shots.length)), 0, shot);
   return { ...timeline, shots };
+}
+
+/* ── layers above the cut ──────────────────────────────────────────────────────────────────────
+   A layer is PLACED: it names the second of the FILM where it appears, so adding one never moves
+   the shots underneath it. That is the whole difference between a layer and another shot, and it
+   is why an overlay carries `startS` and a shot does not — the same distinction the audio bed has
+   had since the beginning.
+
+   The film stays as long as its shots. A layer running past the end is trimmed at export, so the
+   app never shows a total that counts one. */
+
+/** Where a layer sits when it is not filling the frame. The same five the gateway composites and
+ *  the preview draws — a sixth here would be an option that does nothing to the film. */
+export const OVERLAY_POSITIONS = [
+  { id: 'full', label: 'Fill the frame' },
+  { id: 'tl', label: 'Top left' },
+  { id: 'tr', label: 'Top right' },
+  { id: 'bl', label: 'Bottom left' },
+  { id: 'br', label: 'Bottom right' },
+  { id: 'center', label: 'Centred' },
+];
+/** How big a layer is when it stops filling the frame. A corner inset of the frame's width. */
+export const OVERLAY_PIP_SCALE = 0.34;
+export const OVERLAY_INSET = 0.03;
+export const MAX_LAYERS = 8;
+
+/** How long one layer is on screen, from the clip's measured length and its own window. */
+export function overlaySeconds(ov, clip) {
+  return shotSeconds({ inS: ov.inS, outS: ov.outS }, clip);
+}
+
+/** The layers resolved against the canvas, in compositing order: layer 1 first, drawn over the
+ *  spine, and each one after it over that. Rows keep their index into `timeline.overlays` so an
+ *  edit names the same item the document does. */
+export function overlayView(timeline, elements) {
+  const clips = mediaById(elements);
+  return (timeline.overlays || [])
+    .map((ov, index) => {
+      const clip = clips.get(ov.elementId) || null;
+      return {
+        index,
+        elementId: ov.elementId,
+        layer: ov.layer,
+        startS: ov.startS,
+        inS: ov.inS,
+        outS: ov.outS,
+        position: ov.position,
+        scale: ov.scale,
+        clip,
+        missing: !clip,
+        label: clip?.label || `Layer ${ov.layer}`,
+        status: clip ? clip.status : 'missing',
+        seconds: clip ? overlaySeconds(ov, clip) : null,
+      };
+    })
+    .sort((a, b) => a.layer - b.layer || a.startS - b.startS);
+}
+
+/** How many layers the cut has. Zero means the lane is not drawn: an empty lane with a label on
+ *  it is a promise, not a feature. */
+export function layerCount(timeline) {
+  return (timeline.overlays || []).reduce((n, o) => Math.max(n, o.layer), 0);
+}
+
+/** Put a clip over the film, starting at the second it was dropped on. */
+export function addOverlay(timeline, elementId, startS, layer, elements) {
+  const clip = mediaById(elements).get(elementId);
+  if (!clip || clip.kind === 'audio') return timeline;
+  const lay = Math.max(1, Math.min(MAX_LAYERS, Math.round(layer || 1)));
+  if (lay > layerCount(timeline) + 1) return timeline;    // no gaps: layer 3 over nothing
+  const at = Math.max(0, Number(startS) || 0);
+  const overlays = [...(timeline.overlays || []), {
+    elementId, layer: lay, startS: at,
+    inS: null, outS: clip.kind === 'image' ? STILL_HOLD_S : null,
+    position: 'full', scale: 1,
+  }];
+  return { ...timeline, overlays };
+}
+
+/** Slide a layer along the film. Only when it moves — a click that lands where it started must
+ *  not enter the undo history as an edit. */
+export function moveOverlay(timeline, index, startS) {
+  const ov = (timeline.overlays || [])[index];
+  if (!ov) return timeline;
+  const at = Math.max(0, Number(startS) || 0);
+  if (Math.abs(at - ov.startS) < 1e-3) return timeline;
+  return { ...timeline,
+           overlays: timeline.overlays.map((o, i) => (i === index ? { ...o, startS: at } : o)) };
+}
+
+/** Trim a layer's own window. Dragging its LEFT edge moves where it starts on the film too:
+ *  the frame under the pointer is the frame that stays there, which is what dragging an edge
+ *  looks like it should do. */
+export function trimOverlay(timeline, index, edge, seconds, elements) {
+  const ov = (timeline.overlays || [])[index];
+  if (!ov) return timeline;
+  const clip = mediaById(elements).get(ov.elementId);
+  const was = overlaySeconds(ov, clip);
+  const shot = trimShot({ ...timeline, shots: [{ elementId: ov.elementId, inS: ov.inS, outS: ov.outS }] },
+                        0, edge, seconds, elements).shots[0];
+  if (!shot) return timeline;
+  const now = overlaySeconds(shot, clip);
+  const startS = edge === 'start' && Number.isFinite(was) && Number.isFinite(now)
+    ? Math.max(0, ov.startS + (was - now)) : ov.startS;
+  return { ...timeline,
+           overlays: timeline.overlays.map((o, i) => (
+             i === index ? { ...o, inS: shot.inS, outS: shot.outS, startS } : o)) };
+}
+
+export function removeOverlay(timeline, index) {
+  if (!(timeline.overlays || [])[index]) return timeline;
+  return { ...timeline, overlays: timeline.overlays.filter((_, i) => i !== index) };
+}
+
+/** How a layer is framed: filling the frame, or inset into one of the corners. */
+export function setOverlayFraming(timeline, index, position) {
+  const ov = (timeline.overlays || [])[index];
+  if (!ov || !OVERLAY_POSITIONS.some((p) => p.id === position)) return timeline;
+  const scale = position === 'full' ? 1 : OVERLAY_PIP_SCALE;
+  return { ...timeline,
+           overlays: timeline.overlays.map((o, i) => (
+             i === index ? { ...o, position, scale } : o)) };
 }
 
 /** Lay a sound under the film, starting where it was dropped.

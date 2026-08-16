@@ -2,7 +2,11 @@
 // than eyeballed through the UI: an off-by-one here silently shortens somebody's film.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { STILL_HOLD_S, appendShot, shotSeconds, splitShot, trimShot } from './timeline.js';
+import {
+  STILL_HOLD_S, addOverlay, appendShot, moveOverlay, overlaySeconds, parseTimeline,
+  setOverlayFraming, shotSeconds, splitShot, timelineView, toTimelineFile, totalSeconds,
+  trimOverlay, trimShot,
+} from './timeline.js';
 
 // The real element shape: media hangs off customData, which is where mediaOf reads it. A fixture
 // that invents a shape tests nothing — this one was wrong at first and every assertion still
@@ -91,4 +95,79 @@ test('a still cannot be trimmed to nothing', () => {
   const els = [still('img1')];
   const t = trimShot(tl([{ elementId: 'img1', inS: 0, outS: 3 }]), 0, 'end', 0, els);
   assert.ok(shotSeconds(t.shots[0], { kind: 'image' }) >= 0.1);
+});
+
+// ── layers above the cut ───────────────────────────────────────────────────────────────────────
+// A layer is placed, not queued. Every assertion below is about the one property that makes it a
+// layer rather than a shot: editing it must never move anything underneath it.
+const img = (id) => ({ id, customData: { media: {
+  kind: 'image', status: 'ready', mediaId: 'm-' + id } } });
+const withLayers = (shots, overlays) => ({ ...tl(shots), overlays });
+
+test('a layer is placed at the second it was dropped on and does not move the cut', () => {
+  const before = tl([{ elementId: 'e1', inS: null, outS: null }]);
+  const after = addOverlay(before, 'e1', 2.5, 1, elements);
+  assert.deepEqual(after.shots, before.shots, 'adding a layer re-cut the film');
+  assert.equal(after.overlays.length, 1);
+  assert.equal(after.overlays[0].startS, 2.5);
+  assert.equal(after.overlays[0].layer, 1);
+  assert.equal(after.overlays[0].position, 'full');
+  assert.equal(totalSeconds(timelineView(after, elements)), 6, 'a layer lengthened the film');
+});
+
+test('a still on a layer is given the hold that a still in the cut gets', () => {
+  const t = addOverlay(tl([]), 'p1', 0, 1, [...elements, img('p1')]);
+  assert.equal(t.overlays[0].outS, STILL_HOLD_S);
+  assert.equal(overlaySeconds(t.overlays[0], { kind: 'image' }), STILL_HOLD_S);
+});
+
+test('layers may not skip a level — layer 3 over nothing is not a cut', () => {
+  const t = addOverlay(tl([]), 'e1', 0, 3, elements);
+  assert.equal((t.overlays || []).length, 0);
+  const one = addOverlay(tl([]), 'e1', 0, 1, elements);
+  assert.equal(addOverlay(one, 'e1', 0, 2, elements).overlays.length, 2, 'the next layer up was refused');
+});
+
+test('trimming a layer from the left keeps the frame under the pointer where it is', () => {
+  // A 6s clip laid at 2s, trimmed from the left to 4s: it now starts at 4s on the film, and the
+  // frame that was at 4s before the drag is still at 4s after it.
+  const t = addOverlay(tl([]), 'e1', 2, 1, elements);
+  const after = trimOverlay(t, 0, 'start', 4, elements);
+  assert.equal(after.overlays[0].startS, 4);
+  assert.equal(overlaySeconds(after.overlays[0], clip), 4);
+  // Trimming the right edge leaves the start alone.
+  const right = trimOverlay(t, 0, 'end', 3, elements);
+  assert.equal(right.overlays[0].startS, 2);
+  assert.equal(overlaySeconds(right.overlays[0], clip), 3);
+});
+
+test('a layer slides along the film without changing what it shows', () => {
+  const t = addOverlay(tl([]), 'e1', 1, 1, elements);
+  const moved = moveOverlay(t, 0, 4.25);
+  assert.equal(moved.overlays[0].startS, 4.25);
+  assert.equal(moved.overlays[0].inS, t.overlays[0].inS);
+  assert.equal(moved.overlays[0].outS, t.overlays[0].outS);
+  assert.equal(moveOverlay(t, 0, 1), t, 'a move to where it already is counted as an edit');
+});
+
+test('framing a layer into a corner shrinks it; filling the frame restores it', () => {
+  const t = addOverlay(tl([]), 'e1', 0, 1, elements);
+  const pip = setOverlayFraming(t, 0, 'br');
+  assert.equal(pip.overlays[0].position, 'br');
+  assert.ok(pip.overlays[0].scale < 1 && pip.overlays[0].scale > 0);
+  assert.equal(setOverlayFraming(pip, 0, 'full').overlays[0].scale, 1);
+  assert.equal(setOverlayFraming(t, 0, 'nowhere'), t, 'an unknown place was accepted');
+});
+
+test('the layers survive a round trip through the file', () => {
+  const t = addOverlay(tl([{ elementId: 'e1', inS: null, outS: null }]), 'e1', 2, 1, elements);
+  const framed = setOverlayFraming(t, 0, 'tr');
+  const back = parseTimeline({ timeline: toTimelineFile(framed) });
+  assert.deepEqual(back.overlays, framed.overlays);
+});
+
+test('a layer alone is still a document worth writing', () => {
+  // The film is not exportable without shots, but the layer must not be silently dropped on save.
+  const only = addOverlay(tl([]), 'e1', 0, 1, elements);
+  assert.ok(toTimelineFile(only), 'a timeline holding only a layer was written as null');
 });
