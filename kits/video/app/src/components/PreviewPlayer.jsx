@@ -19,7 +19,7 @@ import { Pause, Play, SkipBack } from 'lucide-react';
 import { durationLabel } from '../lib/timeline';
 import { mediaUrl, posterUrl } from '../lib/media';
 
-export function PreviewPlayer({ view, addr, filmUrl, total }) {
+export function PreviewPlayer({ view, addr, filmUrl, total, canvasClips = 0 }) {
   const ref = useRef(null);
   const [i, setI] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -77,12 +77,23 @@ export function PreviewPlayer({ view, addr, filmUrl, total }) {
   const at = before + elapsed;
   const totalLabel = Number.isFinite(total) ? durationLabel(total) : '—';
 
+  const hasClips = canvasClips > 0;
+
   if (!src) {
     return (
       <section className="vd-prev is-empty" aria-label="Preview">
+        {/* What plays here is THE CUT, so this says that. It used to promise a shot would appear
+            "as soon as one has rendered", which is not true and is visibly not true in the one
+            situation it was written for: a clip finishes, sits on the canvas, and this panel goes
+            on saying nothing is here. The player is not lying about the cut being empty — the
+            sentence was describing a different thing. */}
         <div className="vd-prev-blank">
-          <span>Nothing to play yet.</span>
-          <span className="vd-prev-hint">A shot appears here as soon as one has rendered.</span>
+          <span>{hasClips ? 'Nothing in the cut yet.' : 'Nothing to play yet.'}</span>
+          <span className="vd-prev-hint">
+            {hasClips
+              ? 'There are clips on the canvas. Add one to the cut below and it plays here.'
+              : 'The film plays here once a shot is in the cut.'}
+          </span>
         </div>
       </section>
     );

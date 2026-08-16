@@ -494,6 +494,10 @@ export function VideoPage({ id: routeId, seed }) {
                     addr={addr}
                     filmUrl={filmUrl}
                     total={readiness(timeline, timelineView(timeline, scene.elements)).total}
+                    // How many playable clips exist at all, so the empty state can tell "nothing
+                    // made yet" apart from "made, but not in the cut" — two different situations
+                    // with two different things for a person to do next.
+                    canvasClips={(scene.elements || []).filter((e) => e.media?.mediaId).length}
                   />
                 </div>
 
