@@ -566,6 +566,7 @@ export function VideoPage({ id: routeId, seed }) {
 
       <ChatColumn
         videoId={id}
+        harnessId={harness?.id || ''}
         seed={seed}
         title={scene?.title}
         agentBusy={agentBusy}

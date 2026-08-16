@@ -150,6 +150,37 @@ export function listJobs(harnessId, sessionId, ids) {
   return hr(at(harnessId, sessionId, `/jobs${q}`));
 }
 
+/** Put a picture the person already has into this video, as media the agent can render FROM.
+ *
+ *  Everything else in a session arrived by being rendered, so a reference frame — the look a
+ *  template is aiming at — had nowhere to live and could only ever be decoration on a card. */
+export function importMedia(harnessId, sessionId, blob, label) {
+  return hr(at(harnessId, sessionId, '/media'), {
+    method: 'POST',
+    headers: {
+      'content-type': blob.type || 'application/octet-stream',
+      ...(label ? { 'x-media-label': label } : {}),
+    },
+    body: blob,
+  });
+}
+
+// ── a template's reference frame, waiting for its video to exist ────────────
+// Same shape as the staged attachments above and for the same reason: the picture belongs to a
+// session that has not been created yet, so it waits in memory under the pending id.
+let refHandoff = null;
+
+export function stageReference(id, reference) {
+  refHandoff = reference ? { id, reference } : null;
+}
+
+export function takeReference(id) {
+  if (!refHandoff || refHandoff.id !== id) return null;
+  const { reference } = refHandoff;
+  refHandoff = null;
+  return reference;
+}
+
 /** Start assembling the timeline into one file. Returns a job, like every other long thing here. */
 export function startExport(harnessId, sessionId, filename) {
   return hr(at(harnessId, sessionId, '/export'), {

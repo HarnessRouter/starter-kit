@@ -136,15 +136,16 @@ test('a failed shot blocks export and says it has nothing to contribute', () => 
   assert.match(r.warnings.join(' '), /Shot 2 failed to render/);
 });
 
-test('a shot at a different shape is warned about before export, not discovered after it', () => {
-  const r = ready([{ elementId: 'a' }], [clip('a', { width: 1366, height: 768 })]);
-  assert.equal(r.ready, true, 'it can still be assembled');
-  assert.match(r.warnings[0], /1366×768 and will be letterboxed into 1920x1080/);
-});
-
-test('a portrait clip in a landscape film is pillarboxed, and says so in those words', () => {
-  const r = ready([{ elementId: 'a' }], [clip('a', { width: 1080, height: 1920 })]);
-  assert.match(r.warnings[0], /pillarboxed/);
+test('framing is not a warning — every clip is a different shape and it is handled', () => {
+  // This used to say "1366x768 and will be letterboxed into 1920x1080" and it fired for
+  // practically every shot of every film, because that is what these models return. An amber
+  // banner announcing that video gets scaled to fit is furniture, and two of them pushed the
+  // warnings that MATTER off the top of the list. The letterboxing itself never changed.
+  const wide = ready([{ elementId: 'a' }], [clip('a', { width: 1366, height: 768 })]);
+  assert.equal(wide.ready, true);
+  assert.deepEqual(wide.warnings, [], 'framing was reported as a problem');
+  const tall = ready([{ elementId: 'a' }], [clip('a', { width: 1080, height: 1920 })]);
+  assert.deepEqual(tall.warnings, [], 'a portrait clip was reported as a problem');
 });
 
 test('an empty timeline is not ready — there is no film to make', () => {
