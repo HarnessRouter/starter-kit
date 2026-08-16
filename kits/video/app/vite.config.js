@@ -16,9 +16,17 @@ const stageTemplates = {
   buildStart() {
     mkdirSync('public', { recursive: true });
     const src = '../templates/templates.json';
-    if (existsSync(src)) { cpSync(src, 'public/templates.json'); return; }
-    this.warn(`${src} does not exist — building with an empty template library.`);
-    writeFileSync('public/templates.json', '{"templates":[]}\n');
+    if (existsSync(src)) { cpSync(src, 'public/templates.json'); } else {
+      this.warn(`${src} does not exist — building with an empty template library.`);
+      writeFileSync('public/templates.json', '{"templates":[]}\n');
+    }
+    // The reference frames travel with the library for the same reason it does: they are kit
+    // data, written by whoever owns the kit folder, and public/ is generated. A template that
+    // names a frame which is not staged renders a blank card, so a missing folder is said out
+    // loud rather than discovered as five empty rectangles.
+    const refs = '../templates/reference';
+    if (existsSync(refs)) cpSync(refs, 'public/templates', { recursive: true });
+    else this.warn(`${refs} does not exist — templates will show their shape instead of a frame.`);
   },
 };
 
