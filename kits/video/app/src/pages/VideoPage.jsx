@@ -31,6 +31,7 @@ import { indexJobs, normalizeJob, spendLabel, totalSpend } from '../lib/jobs';
 import { downloadName, mediaUrl } from '../lib/media';
 import { MediaCanvas } from '../components/MediaCanvas';
 import { TimelineStrip } from '../components/TimelineStrip';
+import { PreviewPlayer } from '../components/PreviewPlayer';
 import { ChatColumn } from '../components/ChatColumn';
 import { Topbar } from '../components/Topbar';
 
@@ -64,6 +65,10 @@ export function VideoPage({ id: routeId, seed }) {
   const [exporting, setExporting] = useState('');
 
   const dialog = useDialog();
+  // The film column. Its own stored width, so moving the conversation does not move it.
+  const stagePane = useResizablePane({
+    initial: 420, min: 300, maxFraction: 0.55, fromRight: true, storageKey: 'video.stage.w',
+  });
   const chatPane = useResizablePane({
     initial: 380, min: 300, maxFraction: 0.6, fromRight: true, storageKey: 'videos.chat.w',
   });
@@ -459,35 +464,49 @@ export function VideoPage({ id: routeId, seed }) {
               )}
             </div>
           ) : (
-            <div className="vd-canvas">
-              <MediaCanvas
-                scene={scene}
-                rev={rev}
-                addr={addr}
-                editable={!agentBusy}
-                jobs={jobs}
-                onChange={onCanvasChange}
-                onRetry={onRetry}
-              />
+            /* Canvas on the left, the film on the right, with a divider you can move. They are
+               two different jobs — arranging the board, and watching the cut — and giving the
+               second one a permanent home is what lets the timeline show tracks instead of a
+               single row squeezed under a full-width canvas. */
+            <div className="vd-work">
+              <div className="vd-canvas">
+                <MediaCanvas
+                  scene={scene}
+                  rev={rev}
+                  addr={addr}
+                  editable={!agentBusy}
+                  jobs={jobs}
+                  onChange={onCanvasChange}
+                  onRetry={onRetry}
+                />
+              </div>
+
+              <PaneResizer pane={stagePane} />
+
+              <aside className="vd-stage" style={{ width: stagePane.width }} aria-label="Film">
+                <PreviewPlayer
+                  view={timelineView(timeline, scene.elements)}
+                  addr={addr}
+                  filmUrl={filmUrl}
+                  total={readiness(timeline, timelineView(timeline, scene.elements)).total}
+                />
+                <TimelineStrip
+                  timeline={timeline}
+                  elements={scene.elements}
+                  addr={addr}
+                  editable={!agentBusy}
+                  open={tlOpen}
+                  onToggle={() => setTlOpen((v) => !v)}
+                  onChange={onTimelineChange}
+                  exportState={exporting}
+                  onExport={onExport}
+                  exportUnavailable={exportInfo.available === false ? exportInfo.reason : ''}
+                  filmUrl={filmUrl}
+                />
+              </aside>
             </div>
           )}
         </div>
-
-        {scene && (
-          <TimelineStrip
-            timeline={timeline}
-            elements={scene.elements}
-            addr={addr}
-            editable={!agentBusy}
-            open={tlOpen}
-            onToggle={() => setTlOpen((v) => !v)}
-            onChange={onTimelineChange}
-            exportState={exporting}
-            onExport={onExport}
-            exportUnavailable={exportInfo.available === false ? exportInfo.reason : ''}
-            filmUrl={filmUrl}
-          />
-        )}
       </div>
 
       {/* The grab handle between the canvas and the conversation. `useResizablePane` computes the
