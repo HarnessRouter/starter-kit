@@ -68,6 +68,10 @@ export function toTimelineFile(timeline) {
  *
  *  Null when the clip has not been measured — which is every clip that has not finished
  *  rendering. Null propagates; it does not become zero. */
+/** The shortest a shot may be trimmed to. Matches reifyui's TL_MIN_CLIP_S: the UI must not
+ *  offer a drag the document will refuse. */
+export const MIN_SHOT_S = 0.1;
+
 export function shotSeconds(shot, clip) {
   const len = clip?.seconds;
   if (!Number.isFinite(len)) return null;
@@ -199,4 +203,56 @@ export function unusedClips(timeline, elements) {
   const used = new Set(timeline.shots.map((s) => s.elementId));
   return [...mediaById(elements).values()]
     .filter((m) => (m.kind === 'video' || m.kind === 'image') && !used.has(m.id));
+}
+
+/* ── trimming and splitting ────────────────────────────────────────────────────────────────────
+   A shot is a WINDOW onto its clip — [inS, outS] in the clip's own seconds — so trimming moves an
+   edge of that window and splitting cuts it in two. Neither touches the clip: the same 6 second
+   render can appear twice in a cut at two different lengths, and nothing is re-rendered to make
+   that true. That is the whole reason the window lives on the shot rather than the media. */
+
+/** The window as concrete numbers, with the nulls that mean "the whole clip" resolved. */
+function window_(shot, clip) {
+  const len = clip?.seconds;
+  const from = Math.max(0, shot.inS ?? 0);
+  const to = shot.outS === null || shot.outS === undefined
+    ? (Number.isFinite(len) ? len : null) : shot.outS;
+  return { from, to, len };
+}
+
+/** Move one edge so the shot lasts `seconds`. The opposite edge does not move.
+ *
+ *  Refuses rather than guesses when the clip has not been measured: a window needs a length to be
+ *  clamped against, and inventing one here is how a cut comes to claim a duration the file cannot
+ *  provide. */
+export function trimShot(timeline, index, edge, seconds, elements) {
+  const shot = timeline.shots[index];
+  if (!shot) return timeline;
+  const clip = mediaById(elements).get(shot.elementId);
+  const { from, to, len } = window_(shot, clip);
+  if (!Number.isFinite(len) || to === null) return timeline;
+  const want = Math.max(MIN_SHOT_S, Math.min(seconds, len));
+  const next = edge === 'end'
+    ? { ...shot, inS: from, outS: Math.min(len, from + want) }
+    : { ...shot, inS: Math.max(0, to - want), outS: to };
+  if (next.inS === shot.inS && next.outS === shot.outS) return timeline;
+  return { ...timeline, shots: timeline.shots.map((s, i) => (i === index ? next : s)) };
+}
+
+/** Cut a shot in two at `atS` measured from the shot's own start. The two halves together occupy
+ *  exactly the window the one shot did — a split adds a cut point, it does not add or lose film. */
+export function splitShot(timeline, index, atS, elements) {
+  const shot = timeline.shots[index];
+  if (!shot) return timeline;
+  if (timeline.shots.length >= MAX_SHOTS) return timeline;
+  const clip = mediaById(elements).get(shot.elementId);
+  const { from, to, len } = window_(shot, clip);
+  if (!Number.isFinite(len) || to === null) return timeline;
+  const cut = from + atS;
+  if (cut <= from + MIN_SHOT_S || cut >= to - MIN_SHOT_S) return timeline;
+  const a = { ...shot, inS: from, outS: cut };
+  const b = { ...shot, inS: cut, outS: to };
+  const shots = [...timeline.shots];
+  shots.splice(index, 1, a, b);
+  return { ...timeline, shots };
 }

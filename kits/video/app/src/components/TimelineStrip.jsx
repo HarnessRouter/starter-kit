@@ -13,13 +13,14 @@ import { Popover } from 'reifyui';
 import { useRef, useState } from 'react';
 import {
   FPS_CHOICES, RESOLUTIONS, appendShot, durationLabel, moveShot, readiness, removeShot, setFps,
-  setResolution, timelineView, unusedClips,
+  setResolution, splitShot, timelineView, trimShot, unusedClips,
 } from '../lib/timeline';
 import { TimelineTracks } from './TimelineTracks';
 
 export function TimelineStrip({
   timeline, elements, addr, editable, open, onToggle, onChange,
   exportState, onExport, exportUnavailable, filmUrl, height, currentTime, onSeek,
+  selectedId, onSelect,
 }) {
   const view = timelineView(timeline, elements);
   const { ready, warnings, total } = readiness(timeline, view);
@@ -98,6 +99,10 @@ export function TimelineStrip({
             // and losing the ruler entirely while a single clip is in flight.
             currentTime={currentTime}
             onSeek={onSeek}
+            selectedId={selectedId}
+            onSelect={onSelect}
+            onTrim={(i, edge, seconds) => edit(trimShot(timeline, i, edge, seconds, elements))}
+            onSplit={(i, atS) => edit(splitShot(timeline, i, atS, elements))}
           />
 
           {/* Only when there is something to add. A control that opens an empty list is a

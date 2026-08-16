@@ -67,6 +67,8 @@ export function VideoPage({ id: routeId, seed }) {
   // Where the preview is, shared so the timeline's playhead and the counter read one number.
   const [playAt, setPlayAt] = useState(0);
   const [seekTo, setSeekTo] = useState(null);
+  // Which shot is selected, by index. Held here because Remove and the keyboard act on it.
+  const [selShot, setSelShot] = useState(null);
 
   const dialog = useDialog();
   // The film column. Its own stored width, so moving the conversation does not move it.
@@ -512,6 +514,8 @@ export function VideoPage({ id: routeId, seed }) {
                   height={tlOpen ? tlPane.height : undefined}
                   currentTime={playAt}
                   onSeek={(t) => setSeekTo({ t, nonce: Date.now() })}
+                  selectedId={selShot}
+                  onSelect={setSelShot}
                   timeline={timeline}
                   elements={scene.elements}
                   addr={addr}

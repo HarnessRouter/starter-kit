@@ -8,14 +8,14 @@
 // both — but only `shots` was ever drawn, so a music bed the agent added was in the film and
 // invisible in the app. The audio lane appears when the document has audio in it and not before:
 // an empty lane with a label on it is a promise, not a feature.
-import { AlertTriangle, GripVertical, Music, Plus, Video, X } from 'lucide-react';
+import { AlertTriangle, Music, Plus, Video } from 'lucide-react';
 import { Timeline } from 'reifyui';
 import { durationLabel } from '../lib/timeline';
 import { posterUrl } from '../lib/media';
 
 export function TimelineTracks({
   view, audio, elements, addr, editable, onMove, onRemove, onAdd, canAdd, addRef,
-  currentTime = 0, onSeek,
+  currentTime = 0, onSeek, onTrim, onSplit, selectedId, onSelect,
 }) {
   const shots = (view || []).map((row, i) => ({
     id: `${row.elementId}-${i}`,
@@ -65,21 +65,24 @@ export function TimelineTracks({
       tracks={tracks}
       currentTime={currentTime}
       onSeek={onSeek}
+      selectedClipId={selectedId}
+      onSelectClip={(clip) => onSelect?.(clip.id)}
+      // The library speaks clips and seconds; the document speaks shot indexes and a window into
+      // the source. This is the whole translation, and it lives here rather than in the library.
+      onTrim={editable ? ((clip, edge, seconds) => {
+        if (clip.index !== undefined) onTrim?.(clip.index, edge, seconds);
+      }) : undefined}
+      onSplit={editable ? ((clip, atSeconds) => {
+        if (clip.index !== undefined) onSplit?.(clip.index, atSeconds);
+      }) : undefined}
+      onMoveClip={editable ? ((clip, toIndex) => {
+        if (clip.index !== undefined && toIndex !== clip.index) onMove(clip.index, toIndex);
+      }) : undefined}
+      onDeleteClip={editable ? ((clip) => {
+        if (clip.index !== undefined) onRemove(clip.index);
+      }) : undefined}
+      snapStorageKey="video.timeline.snap"
       zoomStorageKey="video.timeline.pps"
-      clipActions={editable ? (clip) => (clip.index === undefined ? null : (
-        <>
-          <button type="button" className="uic-iconbtn" disabled={clip.index === 0}
-                  aria-label={`Move ${clip.label} earlier`}
-                  onClick={(e) => { e.stopPropagation(); onMove(clip.index, clip.index - 1); }}>
-            <GripVertical size={11} style={{ transform: 'rotate(90deg)' }} />
-          </button>
-          <button type="button" className="uic-iconbtn is-danger"
-                  aria-label={`Remove ${clip.label} from the cut`}
-                  onClick={(e) => { e.stopPropagation(); onRemove(clip.index); }}>
-            <X size={11} />
-          </button>
-        </>
-      )) : undefined}
       laneAppend={editable && canAdd
         ? (track) => (track.id === 'video' ? (
           <button ref={addRef} type="button" className="vd-tk-add" onClick={onAdd}
