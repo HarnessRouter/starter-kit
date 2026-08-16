@@ -88,10 +88,13 @@ export function TimelineTracks({
   for (const n of [...byLayer.keys()].sort((a, b) => a - b)) {
     tracks.push({
       id: `layer:${n}`,
-      label: `Layer ${n}`,
+      // "L1", not "Layer 1": the gutter is one column wide and the long form truncated to
+      // "LAYE…", which names nothing. The short form is what an editor calls a track anyway,
+      // and the full name is on the lane's tooltip and on the control that frames it.
+      label: `L${n}`,
       icon: <Layers size={12} />,
       sequential: false,      // placed: a layer sits at a moment, it is not queued behind anything
-      title: n === 1 ? 'Drawn over the cut' : `Drawn over Layer ${n - 1}`,
+      title: n === 1 ? `Layer ${n} · drawn over the cut` : `Layer ${n} · drawn over Layer ${n - 1}`,
       clips: byLayer.get(n).map((row) => ({
         id: `${row.elementId}-ov-${row.index}`,
         start: row.startS,
