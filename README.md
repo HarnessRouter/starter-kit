@@ -32,17 +32,6 @@ use today — Slides, Sheets, Dashboards and Videos — each a foundation to bui
 **Demos** (`demos/`) are small MIT-licensed apps that show the integration patterns in code you can
 read in an afternoon.
 
-## Get your API key
-
-1. [Create a HarnessRouter account](https://app.harnessrouter.ai/login?ref=github-starter). Signing up is free.
-2. Add a payment card to unlock the 500 free launch credits (limited-time offer).
-3. Follow the [quickstart](https://app.harnessrouter.ai/quickstart?ref=github-starter) to create an API key, and — for the coding demo — an agent whose ID you will reference below.
-
-**The kits need none of this.** They are launched from the console and served by it, so they have
-no API key to configure; you only need a key for the demos, which run as their own apps against
-the API. Credits are consumed when work actually runs, and everything here fits comfortably
-inside the free ones.
-
 ## The kits
 
 Four working products, each launched from **Starter Kits** in the HarnessRouter console. Launching
@@ -175,7 +164,7 @@ Each demo owns its frontend, server, tests, agent mapping, and documentation. Th
 ## Prerequisites
 
 - Node.js 22 or newer
-- A HarnessRouter API key (see [Get your API key](#get-your-api-key))
+- A HarnessRouter API key, from the [quickstart](https://app.harnessrouter.ai/quickstart?ref=github-starter) — the kits need none; only the demos do
 - A HarnessRouter coding-agent ID for the primary demo
 
 ## Commands

@@ -22,7 +22,7 @@ From the repository root:
    PORT=3000
    ```
 
-   No key yet? Follow [Get your API key](../../README.md#get-your-api-key) in the repository README. Starting the demo consumes no credits; credits are only used when tasks run.
+   No key yet? Create one from the [quickstart](https://app.harnessrouter.ai/quickstart?ref=github-starter). Starting the demo consumes no credits; credits are only used when tasks run.
 
 3. Start the primary demo.
 
