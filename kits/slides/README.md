@@ -6,6 +6,19 @@ a style system, then slide by slide — and everything it makes is yours to edit
 Launch it from **Starter Kits** in the HarnessRouter console. That provisions the Harness this app
 talks to; nothing else is deployed and nothing is configured.
 
+## The first screen
+
+Launch it and this is the first screen: one box, and a shelf of templates if you would rather
+start from a look than from a blank page. A template is a **style system** — type scale, palette,
+layout rules — not a fixed set of slides, so asking for eleven slides in a five-slide template
+gets you eleven slides that match.
+
+![The Slides kit's first screen: the prompt box, and the template shelf beneath it](../../.github/images/kits/first-slides.png)
+
+What comes back is a deck of real objects — text frames, shapes, images, tables — each one
+selectable, editable and restylable. The agent is a very good first draft, not a rendering
+service: nothing it makes is a flat picture you have to ask it to change.
+
 ## How it works
 
 - **One session is one deck.** The deck list is this Harness's session list, and a deck's content

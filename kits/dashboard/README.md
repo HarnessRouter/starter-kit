@@ -43,6 +43,18 @@ starts **on**. Sample rows make the agent much better at the things names do not
 holds ISO codes. Turn it off and the agent gets the shape of your database and not one row of what
 is in it.
 
+## The first screen
+
+Launch it and this is the first screen: say what you want to understand, or start from one of the
+templates.
+
+![The Dashboards kit's first screen: the prompt box and the templates beneath it](../../.github/images/kits/first-dashboard.png)
+
+There is no chart builder and no query editor, because you do not need one. The agent reads your
+schema, decides which questions answer yours, writes one SQL statement per panel and arranges
+them. Every panel keeps its SQL — open the dashboard tomorrow and each query runs again, so the
+numbers are tomorrow's.
+
 ## How it works
 
 - **One session is one dashboard.** The dashboard list is this Harness's session list, and a

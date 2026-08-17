@@ -7,6 +7,19 @@ with what that agent said and made.
 Launch it from **Starter Kits** in the HarnessRouter console. That provisions the Harness this app
 talks to; nothing else is deployed and nothing is configured.
 
+## The first screen
+
+Launch it and this is the first screen: describe the sheet you want, or start from one of the
+templates.
+
+![The Sheets kit's first screen: the prompt box and the templates beneath it](../../.github/images/kits/first-sheets.png)
+
+The idea worth understanding is the **agent column**. A normal column holds values. An agent
+column holds a *job*: for every row, it builds a prompt from the cells to its left, runs one of
+your other agents, and writes back what that agent said — plus any file it produced, attached to
+the cell. Add a row and the job runs for that row. It is a spreadsheet where fill-down is an
+agent doing real work, one row at a time, and you can watch each cell arrive.
+
 ## How it works
 
 - **One session is one sheet.** The sheet list is this Harness's session list, and a sheet's
