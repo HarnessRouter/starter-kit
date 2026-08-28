@@ -15,6 +15,10 @@
  *
  * Usage: node scripts/capture-template-thumbs.mjs [baseUrl]
  *   HR_USER / HR_PASS  log in first, for a console that gates the kit behind a session.
+ *
+ * Playwright is deliberately NOT a devDependency: this is a maintenance tool run by hand when a
+ * template changes, and adding it would make every install of the kit download browsers. Run it
+ * with `npx playwright@1.62 ...` available, or `npm i -D playwright` temporarily.
  */
 import { chromium } from 'playwright';
 import { mkdir, readFile } from 'node:fs/promises';
