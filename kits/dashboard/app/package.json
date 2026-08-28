@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "node --test src/lib/dashboard.test.mjs src/lib/query.test.mjs src/lib/refresh.test.mjs src/lib/templates.test.mjs"
+    "test": "node --test src/lib/dashboard.test.mjs src/lib/query.test.mjs src/lib/refresh.test.mjs src/lib/templates.test.mjs",
+    "capture:thumbs": "node scripts/capture-template-thumbs.mjs"
   },
   "dependencies": {
     "echarts": "^5.5.1",
@@ -20,7 +21,9 @@
     "remark-gfm": "^4.0.0"
   },
   "devDependencies": {
+    "@rollup/rollup-darwin-arm64": "^4.63.1",
     "@vitejs/plugin-react": "^4.3.4",
+    "playwright": "^1.62.1",
     "vite": "^6.0.7"
   }
 }
