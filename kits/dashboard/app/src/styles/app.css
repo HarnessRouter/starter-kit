@@ -131,6 +131,18 @@
 .db-tpl-cell.is-stat { background: var(--brand-50); border-color: var(--brand-soft); }
 .db-tpl-cell.is-chart { background: var(--surface-2); }
 .db-tpl-cell.is-table { background: var(--surface-2); border-style: dashed; }
+
+/* The card thumbnail is a captured picture of the board (see TemplateArt).
+ *
+ * object-fit: cover with a top anchor: the captures are wide boards (~1200x476) and the card art
+ * box is a different aspect, so anchoring the top keeps the headline stats — the row that actually
+ * distinguishes one template from another — rather than centring on empty chart whitespace. */
+.db-tpl-shot {
+  display: block; width: 100%; height: 100%;
+  object-fit: cover; object-position: top center;
+  background: var(--bg);
+  pointer-events: none;                       /* the CARD takes the click */
+}
 /* The preview control floats over the art, so it needs its own surface to stay legible. */
 .db-eye { background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-1); }
 

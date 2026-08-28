@@ -1,4 +1,4 @@
-import { copyFileSync, mkdirSync } from 'node:fs';
+import { copyFileSync, cpSync, existsSync, mkdirSync } from 'node:fs';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -10,6 +10,12 @@ const stageTemplates = {
   buildStart() {
     mkdirSync('public', { recursive: true });
     copyFileSync('../templates/templates.json', 'public/templates.json');
+    // The card thumbnails are kit data too — captured pictures of each template's board, staged
+    // the same way and for the same reason. Optional: a checkout without them still builds, and
+    // the card falls back to the layout shape rather than a broken image.
+    if (existsSync('../templates/thumbs')) {
+      cpSync('../templates/thumbs', 'public/templates', { recursive: true });
+    }
   },
 };
 
