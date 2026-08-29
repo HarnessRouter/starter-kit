@@ -22,6 +22,12 @@ TYPES = {"text", "number", "select", "tags", "checkbox", "date", "url", "harness
 STATUSES = {"queued", "running", "done", "failed", "skipped"}
 APP_OWNED = ("status", "run_id", "response_id", "session_id", "artifacts", "started_at", "ended_at")
 CHRN = re.compile(r"^chrn_[0-9a-f]{32}$")
+
+# The base agents, whose id IS the base name and is accepted as a harness id directly. Stable
+# across deployments, which is exactly why the builder may write one: it cannot see the person's
+# own agents, but it can always name a base. Which of these is actually installed varies, and the
+# app substitutes an available one, so naming a base is never the thing that breaks a sheet.
+BASES = {"codex", "claude-code", "hermes", "pi", "dsh", "opencode", "qwen"}
 REF = re.compile(r"\{\{\s*([^}]+?)\s*\}\}")
 
 errors: list[str] = []
@@ -98,11 +104,16 @@ def check_harness(columns: list, by_name: dict) -> None:
         if not is_agent:
             continue
 
-        hid = cfg.get("harness_id", "")
-        if hid != "" and not CHRN.match(str(hid)):
+        hid = str(cfg.get("harness_id", "") or "")
+        if hid == "":
+            warn(f"{at}.harness.harness_id", "is empty",
+                 'name a base agent so the sheet can be run the moment it exists — one of '
+                 + ", ".join(sorted(BASES)))
+        elif hid not in BASES and not CHRN.match(hid):
             err(f"{at}.harness.harness_id", f"is {json.dumps(hid)}",
-                'leave it "" unless you were given a real agent id — you cannot see the list, '
-                "and an invented id silently runs the wrong agent")
+                "use a base agent id (" + ", ".join(sorted(BASES)) + ") or a real chrn_ id you "
+                "were given — you cannot see the person's own agents, and an invented id "
+                "silently runs the wrong one")
 
         prompt = str(cfg.get("prompt") or "")
         if not prompt.strip():

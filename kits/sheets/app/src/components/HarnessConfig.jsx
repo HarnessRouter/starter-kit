@@ -35,6 +35,22 @@ export function HarnessConfig({ column, columns, applyPatch, close }) {
 
   const chosen = agents?.find((a) => a.id === harnessId) || null;
 
+  // The person's own agents and the base agents, in one list with a heading over each. The Select
+  // renders a flat list, so the headings are disabled entries — and they only appear when there is
+  // more than one group, because a lone heading is noise rather than orientation.
+  const options = useMemo(() => {
+    const own = (agents || []).filter((a) => a.kind !== 'base');
+    const bases = (agents || []).filter((a) => a.kind === 'base');
+    const label = (a) => `${a.name}${a.model ? ` · ${a.model}` : ''}${a.unusable ? ` — ${a.unusable}` : ''}`;
+    const out = [];
+    for (const [head, group] of [['Your agents', own], ['Base agents', bases]]) {
+      if (!group.length) continue;
+      if (own.length && bases.length) out.push({ value: `__head_${head}`, label: head, disabled: true });
+      out.push(...group.map((a) => ({ value: a.id, label: label(a), disabled: !!a.unusable })));
+    }
+    return out;
+  }, [agents]);
+
   // What this column will actually read, derived from the prompt and the attachments — the same
   // function the planner uses, so what is shown and what runs cannot drift apart.
   const reads = derivedDeps({ ...column, type: 'harness', harness: { prompt, attach: [...attach] } }, columns)
@@ -82,16 +98,12 @@ export function HarnessConfig({ column, columns, applyPatch, close }) {
         label="Agent"
         value={harnessId}
         onChange={(e) => setHarnessId(e.target.value)}
-        placeholder={agents === null ? 'Loading your agents…' : 'Choose an agent…'}
+        placeholder={agents === null ? 'Loading agents…' : 'Choose an agent…'}
         disabled={agents === null || agents.length === 0}
         hint={agents && agents.length === 0
-          ? (loadErr || 'You have no other agents yet. Create one, then choose it here.')
+          ? (loadErr || 'No agent on this deployment can run a column yet.')
           : undefined}
-        options={(agents || []).map((a) => ({
-          value: a.id,
-          label: `${a.name}${a.model ? ` · ${a.model}` : ''}${a.unusable ? ` — ${a.unusable}` : ''}`,
-          disabled: !!a.unusable,
-        }))}
+        options={options}
       />
 
 

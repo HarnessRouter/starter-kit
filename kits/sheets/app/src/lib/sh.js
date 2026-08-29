@@ -11,7 +11,7 @@
 // /kits/sheets, so it is same-origin with the console's API proxy: the browser sends the console
 // session it already has and the proxy attaches the internal key server-side.
 import {
-  configureKit, kitHarness, listHarnesses, listSessions, sessionDetail, patchSession,
+  configureKit, hr, kitHarness, listHarnesses, listSessions, sessionDetail, patchSession,
   deleteSession, readJsonFile, writeFile, sessionTurns, containerFileUrl,
 } from 'reifyui/harness';
 
@@ -24,21 +24,29 @@ export { containerFileUrl, sessionTurns };
 /** The Harness this kit launched, or null when it was never launched. */
 export const sheetsHarness = kitHarness;
 
-/** Every Harness an agent COLUMN may run.
+/** Every agent an agent COLUMN may run: the person's own agents, and the BASE agents.
+ *
+ *  A base is a first-class choice, not a fallback. Its id IS its base name ("codex", "opencode"),
+ *  which the server accepts as a harness id directly, so a column can run one without anybody
+ *  having configured a thing first. That is what lets a brand new sheet be runnable the moment it
+ *  is created — before, every agent column arrived blank and the person had to go and make an
+ *  agent before the Run button meant anything.
  *
  *  Deliberately excludes this kit's own Harness. A sheet whose column runs the sheet's own agent
  *  would have that agent editing sheet.json while the app is driving a run over it — recursion
  *  with a file-write race inside it. Excluded at the source of the list rather than validated at
- *  run time, so the choice is never offered in the first place.
+ *  run time, so the choice is never offered in the first place. The base it happens to sit on is
+ *  NOT excluded: that is a different agent with its own session and no interest in sheet.json.
  *
  *  Also excludes harnesses that require request headers: their turns are refused without those
  *  headers, and this app has nowhere to hold them. They are returned marked rather than dropped,
  *  so the picker can say why instead of silently having fewer entries than the console shows. */
 export async function runnableHarnesses() {
-  const [harnesses, mine] = await Promise.all([listHarnesses(), sheetsHarness()]);
-  return harnesses
+  const [harnesses, bases, mine] = await Promise.all([listHarnesses(), listBases(), sheetsHarness()]);
+  const own = harnesses
     .filter((h) => h.id !== mine?.id)
     .map((h) => ({
+      kind: 'agent',
       id: h.id,
       name: h.name,
       base: h.base,
@@ -47,6 +55,45 @@ export async function runnableHarnesses() {
         ? 'needs request headers this app can’t send'
         : '',
     }));
+  return [...own, ...bases];
+}
+
+/** The base agents this deployment can actually run.
+ *
+ *  Filtered on what the server reports, never on a list written down here: which bases are
+ *  installed differs per deployment, and offering one that is not would produce a sheet that looks
+ *  configured and fails on the first row. A base with no available model is dropped for the same
+ *  reason — the choice would dispatch and then fail. */
+async function listBases() {
+  let bases = [];
+  try {
+    ({ bases = [] } = await hr('/bases'));
+  } catch {
+    return [];                 // the person's own agents still list; bases just are not offered
+  }
+  return bases
+    .filter((b) => b.status === 'ready' && (b.models || []).some((m) => m.available))
+    .map((b) => ({
+      kind: 'base',
+      id: b.id,                // the base id IS the harness id the server accepts
+      name: b.label || b.id,
+      base: b.id,
+      model: b.defaultModel || '',
+      unusable: '',
+    }));
+}
+
+/** The agent an unbound column should get, or '' when this deployment can run none.
+ *
+ *  Prefers the base this kit's own Harness runs on. That one is installed and has working
+ *  credentials by construction — the sheet in front of you was written by it — so it is the
+ *  choice least likely to fail on the first row. */
+export function defaultAgentId(list, mine) {
+  const bases = (list || []).filter((a) => a.kind === 'base' && !a.unusable);
+  if (!bases.length) return '';
+  const ownBase = String(mine?.base || '').toLowerCase();
+  const alias = ownBase === 'claude' ? 'claude-code' : ownBase;
+  return (bases.find((b) => b.id === alias) || bases[0]).id;
 }
 
 // ── sheets (= sessions) ────────────────────────────────────────────────────

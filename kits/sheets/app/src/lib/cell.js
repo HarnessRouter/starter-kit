@@ -187,13 +187,16 @@ export function makeCellDispatcher({ sheetId, runId, sheetTitle, columns, onCell
 
         const base = { ...partial, ended_at: now(), session_id: res?.metadata?.session_id || sessionId };
 
-        if (st === 'completed') {
-          // "completed" means the agent exited cleanly, which is not the same as answering. A turn
-          // that produced neither text nor a file did not fill this cell, and saying it did would
-          // be a green tick over nothing.
-          if (!value && !artifacts.length) {
-            return { ...base, status: 'failed', error: 'The agent finished without answering.' };
-          }
+        // A Stop stays a Stop. The person asked for it, and partial output under a green tick
+        // would read as a success they did not get.
+        if (st === 'cancelled') return { ...base, status: 'failed', artifacts, error: 'Stopped.' };
+
+        // AN ANSWER IS AN ANSWER, whatever the turn was LABELLED. A terminal status that is not
+        // "completed" and yet carries text or a file is what a finished turn looks like when its
+        // record is read a moment before the label catches up. Throwing that content away is what
+        // wrote "the turn ended without an answer" into cells whose answer was sitting in the
+        // very record being read.
+        if (value || artifacts.length) {
           return {
             ...base,
             status: 'done',
@@ -203,13 +206,17 @@ export function makeCellDispatcher({ sheetId, runId, sheetTitle, columns, onCell
             error: null,
           };
         }
-        if (st === 'cancelled') return { ...base, status: 'failed', error: 'Stopped.' };
+
+        // Nothing to show. "completed" means the agent exited cleanly, which is not the same as
+        // answering, so it says that rather than borrowing a failure message.
         return {
           ...base,
           status: 'failed',
           artifacts,
-          error: res?.error?.message
-            || (st === 'incomplete' ? 'The turn ended without an answer.' : `The turn ${st}.`),
+          error: st === 'completed'
+            ? 'The agent finished without answering.'
+            : (res?.error?.message
+               || (st === 'incomplete' ? 'The turn ended without an answer.' : `The turn ${st}.`)),
         };
       }
     } finally {
