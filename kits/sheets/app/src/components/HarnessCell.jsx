@@ -69,7 +69,7 @@ export function HarnessCell({ cell, live, readOnly, onRun, onPreviewFile }) {
     return (
       <span className="hcell failed" title={cell.error || ''}>
         <span className="hcell-dot failed" />
-        <span className="hcell-txt">{cell.error || 'This cell failed.'}</span>
+        <span className="hcell-txt" data-shg-clamp-text>{cell.error || 'This cell failed.'}</span>
         {tools}
       </span>
     );
@@ -77,14 +77,14 @@ export function HarnessCell({ cell, live, readOnly, onRun, onPreviewFile }) {
   if (status === 'skipped') {
     return (
       <span className="hcell skipped" title={cell.error || ''}>
-        <span className="hcell-txt">{cell.error || 'Skipped.'}</span>
+        <span className="hcell-txt" data-shg-clamp-text>{cell.error || 'Skipped.'}</span>
         {tools}
       </span>
     );
   }
   return (
     <span className="hcell">
-      <span className="hcell-txt">{cell.value}</span>
+      <span className="hcell-txt" data-shg-clamp-text>{cell.value}</span>
       <Artifacts artifacts={cell.artifacts} onPreview={onPreviewFile} />
       {tools}
     </span>
