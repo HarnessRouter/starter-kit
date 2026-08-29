@@ -16,8 +16,8 @@ import { PaneResizer, useResizablePane, useDialog } from 'reifyui';
 import { SheetGrid, FilePreview, fitRowHeights } from 'reifyui';
 import { containerFileUrl, getResponse, lastAssistantText, sessionTurns } from 'reifyui/harness';
 import {
-  getSheet, isPending, markViewed, renameSheet, runnableHarnesses, saveSheet, sheetStatus,
-  sheetsHarness,
+  defaultAgentId, getSheet, isPending, markViewed, renameSheet, runnableHarnesses, saveSheet,
+  sheetStatus, sheetsHarness,
 } from '../lib/sh';
 import {
   GRID_TYPES, cellKey, derivedDeps, isHarnessColumn, validate,
@@ -220,11 +220,37 @@ export function SheetPage({ id: routeId, seed }) {
     Promise.all([runnableHarnesses(), sheetsHarness()])
       .then(([list, mine]) => {
         if (dead) return;
-        setEnv({ harnesses: new Map(list.map((h) => [h.id, h])), ownId: mine?.id || '' });
+        setEnv({ harnesses: new Map(list.map((h) => [h.id, h])),
+                 ownId: mine?.id || '',
+                 ownBase: mine?.base || '' });
       })
-      .catch(() => { if (!dead) setEnv({ harnesses: new Map(), ownId: '' }); });
+      .catch(() => { if (!dead) setEnv({ harnesses: new Map(), ownId: '', ownBase: '' }); });
     return () => { dead = true; };
   }, []);
+
+  // ── an agent column arrives pointing at nothing, so point it somewhere that works ──────────
+  // The builder cannot see the list of agents, and a template ships blank because which agents
+  // exist differs per deployment. Left alone that is a finished-looking sheet whose Run button
+  // refuses on every column until the person opens each menu in turn. So the app fills the blanks
+  // with an agent it has JUST confirmed this deployment can run.
+  //
+  // Blanks only. A column pointing at an agent that no longer exists keeps refusing, because
+  // quietly re-pointing it would run something other than what the sheet says it runs.
+  useEffect(() => {
+    if (!env || !sheet) return;
+    const cols = sheet.columns || [];
+    const blank = (c) => isHarnessColumn(c) && !String((c.harness || {}).harness_id || '').trim();
+    if (!cols.some(blank)) return;
+    const pick = defaultAgentId([...env.harnesses.values()], { base: env.ownBase });
+    if (!pick) return;                       // nothing runnable here: leave it honest and refusing
+    commit({
+      ...sheet,
+      columns: cols.map((c) => (blank(c)
+        ? { ...c, harness: { ...(c.harness || {}), harness_id: pick,
+                             harness_name: env.harnesses.get(pick)?.name || '' } }
+        : c)),
+    });
+  }, [env, sheet, commit]);
 
   const adoptSession = useCallback((sid) => {
     if (!sid || sid === idRef.current) return;

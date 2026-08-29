@@ -22,13 +22,13 @@ empty grid or a column with no editor. Match it exactly.
     { "id": "col_site",    "name": "Site",    "type": "url",  "width": 240 },
     { "id": "col_brief",   "name": "Brief",   "type": "harness", "width": 380,
       "harness": {
-        "harness_id": "",
+        "harness_id": "codex",
         "prompt": "Read {{Site}} and write three sentences on {{Company}}: what they sell, who to, and how they price. Put your full notes in notes.md.",
         "attach": []
       } },
     { "id": "col_fit", "name": "Overlap", "type": "harness", "width": 300,
       "harness": {
-        "harness_id": "",
+        "harness_id": "codex",
         "prompt": "Score 1-5 how directly this company competes with us, then one line of why.\n\n{{Brief}}",
         "attach": ["col_brief"]
       } }
@@ -53,9 +53,13 @@ Non-negotiable, because each of these breaks silently:
 - **`type` is one of** `text` `number` `select` `tags` `checkbox` `date` `url`
   `harness`. Anything else loses its editor.
 - **Only a `harness` column carries a `harness` object**, and only it can be run.
-- **`harness_id` is `""`** unless the person gave you a real one. You cannot see
-  the list of agents, and an invented id silently runs the wrong agent. Write
-  `""` and tell the person to pick it in the column menu.
+- **`harness_id` names a BASE agent**, so the sheet is runnable the moment it
+  exists. The base ids are stable and you may write them: `codex`,
+  `claude-code`, `hermes`, `pi`, `dsh`, `opencode`, `qwen`. Pick the one that
+  suits the work. If it is not installed on this deployment the app substitutes
+  one that is, so a reasonable guess always beats a blank. Never invent a
+  `chrn_` id: those are the person's own agents, you cannot see them, and an
+  invented one silently runs the wrong agent.
 - **Never write `status`, `run_id`, `response_id`, `session_id` or `artifacts`
   into a cell, and never invent a `run` block.** Those are results the app
   produced. Writing them makes the sheet claim a run that never happened; you
@@ -68,10 +72,13 @@ have edited the grid between your turns, and a partial write loses their work.
 
 ## What you do and do not run
 
-An agent column runs one of the person's OTHER agents, once per row. You create
-and configure such columns. **You never execute one.** The app runs them, from
-the browser, in dependency order — and it will not let a sheet run itself, so
-there is no id you could put there that would work.
+An agent column runs an agent once per row. You create and configure such
+columns. **You never execute one.** The app runs them, from the browser, in
+dependency order — and it will not let a sheet run itself, so there is no id
+you could put there that would point back here.
+
+Leave the sheet ready to go. A person who asked for a sheet with agent columns
+wants to press Run, not to open every column menu first.
 
 ## Designing the columns
 
