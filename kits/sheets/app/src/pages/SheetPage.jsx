@@ -8,7 +8,7 @@
 // The run happens in this tab. There is no workflow engine and no batch endpoint in this
 // deployment, so the browser is the orchestrator; the UI says that before you press Run and says
 // exactly what happened if you leave.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Download, HelpCircle, Home } from 'lucide-react';
@@ -35,6 +35,10 @@ const SAVE_DEBOUNCE_MS = 400;
 const STATUS_POLL_MS = 2000;      // while a turn is live: the grid fills in as it is written
 const STATUS_IDLE_MS = 10000;     // while nothing is: still notices a turn started elsewhere
 const RELOAD_POLL_MS = 4000;
+// The line height and vertical padding the grid lays a cell out with (reifyui's sheet.css sets
+// line-height: 18px). They turn a measured height into a number of lines for --shg-clamp.
+const CLAMP_LINE = 18;
+const CLAMP_PAD = 10;
 const now = () => Math.floor(Date.now() / 1000);
 
 const escapeRe = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -400,6 +404,53 @@ export function SheetPage({ id: routeId, seed }) {
       commit(done);
     }
   }, [env, concurrency, commit, dialog]);
+
+  // ── how many lines of text a cell has room for ────────────────────────────
+  // The grid derives --shg-clamp from a row's STORED height, falling back to 34px — one line —
+  // for any row never explicitly sized. But a row is usually tall because of ONE column: an agent
+  // cell keeping its files under its answer. Every other cell then showed a single ellipsised
+  // line above a block of empty row, and the taller the neighbour, the more space went to waste.
+  //
+  // Three things have to be true at once, and each is a trap on its own:
+  //
+  //   The basis cannot be the RENDERED height. More lines makes the row taller, which allows more
+  //   lines: measured live the rows climb 92 → 137 → 182 and never settle. So every clamp goes
+  //   back to one line before measuring, making the basis the height the row's OTHER content
+  //   needs — a quantity the clamp cannot influence.
+  //
+  //   The basis cannot be the <td>. A table cell is stretched to its row and reports the row
+  //   height for every column, which makes them all look equally full. The measurement is taken
+  //   on the text's own box, which sizes to its content.
+  //
+  //   The count cannot be shared by the row. A cell carrying files under its text has far less
+  //   room than one carrying nothing, and one number for both is the bug restated.
+  //
+  // Set on each <td>: a custom property resolves from the nearest ancestor, so this wins over the
+  // row-level value the grid sets, for both this kit's answer text and the grid's own value cell.
+  useLayoutEffect(() => {
+    const trs = gridRef.current?.querySelectorAll('tbody tr[data-row-id]');
+    if (!trs?.length) return;
+    const rows = [...trs];
+    for (const tr of rows) for (const td of tr.children) td.style.setProperty('--shg-clamp', '1');
+    const plan = rows.map((tr) => ({
+      base: tr.offsetHeight,                       // one reflow, every clamp at its floor
+      cells: [...tr.children].map((td) => {
+        const txt = td.querySelector('[data-shg-clamp-text]');
+        const box = txt?.parentElement;
+        return { td, extra: box ? Math.max(0, box.scrollHeight - txt.offsetHeight) : 0 };
+      }),
+    }));
+    for (const { base, cells } of plan) {
+      const floorLines = Math.max(1, Math.floor((base - CLAMP_PAD) / CLAMP_LINE));
+      // The height the row needs for the cell carrying the most beside its text to still get the
+      // row's baseline count. Every other cell then fills THAT, which is the whole point.
+      const need = Math.max(...cells.map((c) => c.extra)) + floorLines * CLAMP_LINE + CLAMP_PAD;
+      for (const { td, extra } of cells) {
+        td.style.setProperty('--shg-clamp', String(Math.max(floorLines,
+          Math.floor((need - extra - CLAMP_PAD) / CLAMP_LINE))));
+      }
+    }
+  });
 
   const stopRun = useCallback(() => { runnerRef.current?.stop(); }, []);
 
