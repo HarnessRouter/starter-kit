@@ -185,6 +185,12 @@ export function materialize(template, title) {
 }
 
 const CHRN = /^chrn_[0-9a-f]{32}$/;
+
+// The base agents, whose id IS the base name and which the server accepts as a harness id
+// directly. Stable across deployments, unlike a chrn_ id, which is why an agent column may name
+// one and why a sheet can arrive already runnable. The picker filters these against what THIS
+// deployment reports; validation only has to know the shape is legitimate.
+const BASES = new Set(['codex', 'claude-code', 'hermes', 'pi', 'dsh', 'opencode', 'qwen']);
 const APP_OWNED = ['status', 'run_id', 'response_id', 'session_id', 'artifacts', 'started_at', 'ended_at'];
 
 /** Every way a sheet can be wrong, with the fix for each.
@@ -238,10 +244,10 @@ export function validate(sheet) {
           'Either set "type": "harness" or delete the harness object.');
     }
     if (isHarnessColumn(c) && c.harness) {
-      const hid = c.harness.harness_id;
-      if (hid !== '' && hid !== undefined && !CHRN.test(String(hid))) {
-        err(`${at}.harness.harness_id`, `is ${JSON.stringify(hid)}`,
-            'Leave it "" unless you were given a real agent id — you cannot see the list of agents.');
+      const hid = String(c.harness.harness_id ?? '');
+      if (hid !== '' && !BASES.has(hid) && !CHRN.test(hid)) {
+        err(`${at}.harness.harness_id`, `is ${JSON.stringify(c.harness.harness_id)}`,
+            `Name a base agent (${[...BASES].join(', ')}) or use an agent id you were given.`);
       }
       const prompt = String(c.harness.prompt || '');
       if (!prompt.trim()) {
