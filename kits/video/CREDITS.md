@@ -4,7 +4,7 @@
 
 The five worked storyboards in `templates/templates.json` — their shot lists, their prompts and
 their arrangement — are original to this kit, and so is the guidance in
-`skills/video-storyboard/`. What is not original is the craft underneath: which shots a short film
+`plugin/skills/video-storyboard/`. What is not original is the craft underneath: which shots a short film
 needs, in what order, and why a face has to be established once rather than described repeatedly.
 These are the sources that settled those questions.
 
@@ -30,7 +30,7 @@ These are the sources that settled those questions.
 
 - Pat P. Miller, *Script Supervising and Film Continuity* (Focal Press) — continuity is somebody's
   explicit responsibility on a real set, tracked shot by shot, precisely because it cannot be held
-  in anyone's head. `skills/video-storyboard/references/continuity.md` is that idea applied to a
+  in anyone's head. `plugin/skills/video-storyboard/references/continuity.md` is that idea applied to a
   generative pipeline, where the failure mode is sharper: a described character is a distribution
   of faces, and re-describing draws a new one each time.
 
