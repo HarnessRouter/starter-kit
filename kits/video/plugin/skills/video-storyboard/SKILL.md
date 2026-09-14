@@ -324,16 +324,14 @@ about today, not a house style — the capabilities tool is what is true now.
 
 ## Review pass (mandatory)
 
-From your working directory, before you tell the person it is done:
+The validator ships beside this SKILL.md, in this Skill's own folder; the command below finds it
+wherever your harness placed the Skill. From your working directory, before you tell the person it
+is done:
 
 ```
-python3 "$(ls .claude/skills/video_storyboard/validate_scene.py \
-              .harness/skills/video_storyboard/validate_scene.py 2>/dev/null | head -1)" \
+python3 "$(find . -path '*/video-storyboard/validate_scene.py' -not -path '*/node_modules/*' 2>/dev/null | head -1)" \
         scene.excalidraw --expect-seconds <the total the storyboard promised>
 ```
-
-Both paths are real — which one exists depends on which backend you are running on. The
-directory is `video_storyboard`, with an underscore.
 
 It reads the projection of the canvas and prints anything that will render wrong or
 refuse to export: a shot still rendering, a shot that points at nothing, a trim past the
