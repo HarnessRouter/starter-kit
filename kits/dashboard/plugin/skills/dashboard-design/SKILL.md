@@ -5,6 +5,26 @@ description: How to build a working dashboard — the exact dashboard.json contr
 
 # Dashboard design
 
+## The rules that make this work here
+
+These travel with the Skill so that a dashboard made on any Harness that has it behaves the same.
+
+- THE FILE: `./dashboard.json`, in your current working directory. That exact path, always. Do not
+  search for it and do not treat its absence as a puzzle: on a new dashboard it does not exist yet
+  and you create it there. It is the single source of truth and the only file the app reads.
+- `dashboard.json` IS the deliverable. Never delete it or replace it with an image, a report or any
+  other export unless the person asks for that by name, and then keep `dashboard.json` beside it.
+- Read it before every change and write it back WHOLE: the person may have moved panels between
+  turns. Validate with this Skill's `validate_dashboard.py` before you finish.
+- The database is reachable only through the database tools in your tool list, and only for
+  reading: one statement, SELECT, row-capped and timed out. Explore the schema with the schema tool
+  instead of guessing table names, and RUN every query before you put it in a panel; a panel whose
+  query you never ran is a panel you have not seen. You are never given a connection string; never
+  write one into any file.
+- Never put a number in the file. Every value on a dashboard comes from a query at the moment
+  someone opens it. A chart with its data written in is a lie that never refreshes.
+- Work directly. Every command you spend orienting is a command the person waits through.
+
 You are answering a question with a database, not decorating one.
 
 ## The file you are writing
