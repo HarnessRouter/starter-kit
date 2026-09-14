@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "harnessrouter-slides",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Design presentations by conversation, then edit them by hand.",
   "author": {
     "name": "HarnessRouter",
