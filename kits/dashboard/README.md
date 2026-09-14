@@ -81,7 +81,7 @@ numbers are tomorrow's.
 | Path | What |
 |---|---|
 | `kit.json` | The Harness this kit needs, and where its app is served |
-| `skills/dashboard-design/` | The `dashboard.json` contract, how to explore a schema, which chart answers which question, and the validator — read before anything is written |
+| `plugin/skills/dashboard-design/` | The `dashboard.json` contract, how to explore a schema, which chart answers which question, and the validator — read before anything is written |
 | `templates/templates.json` | Five worked dashboards (revenue, pipeline, traffic, support, executive) as reference material |
 | `app/` | The UI |
 
@@ -90,12 +90,12 @@ numbers are tomorrow's.
 `dashboard.json` is the whole dashboard: `meta`, one `datasource`, a list of `queries` (id, name,
 SQL), and a list of `panels` (a title, the query it draws, its place on a 12-column grid, and
 either a single-number readout or an ECharts option). The contract is stated once, in
-`skills/dashboard-design/SKILL.md`, and enforced twice — by the app's reader and by
+`plugin/skills/dashboard-design/SKILL.md`, and enforced twice — by the app's reader and by
 `validate_dashboard.py`, which the agent runs before it finishes. If the two ever disagree, the
 app is right and the validator is the bug.
 
 ```
-python3 skills/dashboard-design/validate_dashboard.py path/to/dashboard.json
+python3 plugin/skills/dashboard-design/validate_dashboard.py path/to/dashboard.json
 ```
 
 It catches what cannot be seen from inside a turn: a statement the read-only check would refuse,

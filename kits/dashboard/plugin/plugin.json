@@ -1,0 +1,20 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "harnessrouter-dashboard",
+  "version": "1.0.0",
+  "description": "Say what you want to understand; your database answers it.",
+  "author": {
+    "name": "HarnessRouter",
+    "url": "https://harnessrouter.ai"
+  },
+  "homepage": "https://github.com/HarnessRouter/starter-kit/tree/main/kits/dashboard",
+  "repository": "https://github.com/HarnessRouter/starter-kit",
+  "license": "LicenseRef-HarnessRouter-Starter-Kit-1.0.0",
+  "keywords": [
+    "harnessrouter",
+    "starter-kit",
+    "dashboards",
+    "sql",
+    "charts"
+  ]
+}
