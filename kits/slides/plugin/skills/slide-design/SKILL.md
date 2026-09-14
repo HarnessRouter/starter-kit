@@ -162,10 +162,12 @@ Decide ONCE, before building — then every slide obeys it:
 
 ## 4. Review pass (mandatory)
 
-FIRST, check it renders at all. From your working directory:
+FIRST, check it renders at all. The validator ships beside this SKILL.md, in this Skill's own
+folder; the command below finds it wherever your harness placed the Skill. From your working
+directory:
 
 ```
-python3 ~/.harness/skills/slide_design/validate_deck.py deck.json
+python3 "$(find . -path '*/slide-design/validate_deck.py' -not -path '*/node_modules/*' 2>/dev/null | head -1)" deck.json
 ```
 
 It prints the exact path of anything the renderer will drop, and what to write

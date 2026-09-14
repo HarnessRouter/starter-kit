@@ -319,15 +319,12 @@ unchanged is a dashboard of error messages.
 
 ## Review pass (mandatory)
 
-From your working directory:
+The validator ships beside this SKILL.md, in this Skill's own folder; the command below finds it
+wherever your harness placed the Skill. From your working directory:
 
 ```
-python3 "$(ls .claude/skills/dashboard_design/validate_dashboard.py \
-              .harness/skills/dashboard_design/validate_dashboard.py 2>/dev/null | head -1)" dashboard.json
+python3 "$(find . -path '*/dashboard-design/validate_dashboard.py' -not -path '*/node_modules/*' 2>/dev/null | head -1)" dashboard.json
 ```
-
-Both paths are real — which one exists depends on which backend you are running
-on. The directory is `dashboard_design`, with an underscore.
 
 It prints the exact path of anything that will render wrong, and what to write
 instead. **Fix and re-run until it exits clean.** It catches a statement the

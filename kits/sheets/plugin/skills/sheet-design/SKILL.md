@@ -101,15 +101,12 @@ The columns are a pipeline, left to right: **identify → gather → judge.**
 
 ## Review pass (mandatory)
 
-From your working directory:
+The validator ships beside this SKILL.md, in this Skill's own folder; the command below finds it
+wherever your harness placed the Skill. From your working directory:
 
 ```
-python3 "$(ls .claude/skills/sheet_design/validate_sheet.py \
-              .harness/skills/sheet_design/validate_sheet.py 2>/dev/null | head -1)" sheet.json
+python3 "$(find . -path '*/sheet-design/validate_sheet.py' -not -path '*/node_modules/*' 2>/dev/null | head -1)" sheet.json
 ```
-
-Both paths are real — which one exists depends on which backend you are running
-on. The directory is `sheet_design` with an underscore.
 
 It prints the exact path of anything that will break, and what to write instead.
 **Fix and re-run until it exits clean.** A sheet that fails this shows the
