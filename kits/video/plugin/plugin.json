@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "harnessrouter-video",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Describe the film; watch the shots arrive on the canvas.",
   "author": {
     "name": "HarnessRouter",
