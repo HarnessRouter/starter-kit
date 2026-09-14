@@ -5,6 +5,29 @@ description: How to make a film that holds together — the submit-and-poll loop
 
 # Video storyboard
 
+## The rules that make this work here
+
+These travel with the Skill so that a film made on any Harness that has it behaves the same.
+
+- THE CANVAS IS NOT A FILE YOU WRITE. Never create, read or edit scene.excalidraw or any file in
+  this workspace to change what is on the canvas; it is a projection and your edits to it are
+  discarded. Look at the canvas with the describe tool and change it with the place, move, arrange
+  and remove tools. There is no other way and you do not need one.
+- GENERATION IS SUBMIT AND POLL. Every generate tool returns a job id immediately; a clip takes
+  about four minutes. Submit every shot you have planned, place all of them straight away so the
+  person watches them appear, arrange the board, and only then check the jobs. Never submit one clip
+  and wait for it.
+- EVERY GENERATION COSTS MONEY. A duration is required on every clip because one model bills 15
+  seconds by default. Never re-render something that already exists; place it again instead. Never
+  loop a generation.
+- LIST THE CAPABILITIES FIRST. Models come and go and some are broken today. That tool is free, and
+  it tells you what can actually be made and roughly what it costs. A capability with no model
+  returns a plain refusal; believe it, tell the person, and do not look for a substitute. Speech is
+  not music.
+- GET THE STORYBOARD AGREED BEFORE YOU SPEND ANYTHING. Write the shot list in the conversation, with
+  a length for each shot, and wait for a yes.
+- Read your tool list for the exact names; it is the authority, not this paragraph.
+
 You are spending someone's money on renders that take four minutes each. Everything
 here exists to stop you spending it twice.
 

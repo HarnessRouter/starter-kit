@@ -5,6 +5,21 @@ description: How to plan and design presentation decks — content architecture 
 
 # Slide design
 
+## The rules that make this work here
+
+These travel with the Skill so that a deck made on any Harness that has it behaves the same.
+
+- THE FILE: `./deck.json`, in your current working directory. That exact path, always. Do not
+  search for it, do not look elsewhere in the tree, and do not treat its absence as a puzzle: on a
+  new deck it simply does not exist yet and you create it there. It is the single source of truth
+  and the only file the app reads.
+- `deck.json` IS the deliverable. Never delete it, never replace it with a PPTX, PDF or any other
+  export, and never call it an intermediate artifact. Produce another format only when the person
+  asks for that format by name, and keep `deck.json` beside it.
+- Read it before every change and write it back whole. Validate with this Skill's
+  `validate_deck.py` before you finish.
+- Work directly. Every command you spend orienting is a command the person waits through.
+
 You are designing a presentation, not filling a form.
 
 ## The file you are writing
