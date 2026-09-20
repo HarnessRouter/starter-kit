@@ -62,7 +62,7 @@ STATE_JS = """(function(){
   }
   var u = window.unitsize || 4, T = 8 * u, p = player, sl = gamescreen.left, sr = gamescreen.right;
   function tiles(px){ return Math.round(px / T * 10) / 10; }
-  var enemies = [], behind = [], gaps = [], walls = [], blocks = [];
+  var enemies = [], behind = [], gaps = [], walls = [], blocks = [], overhead = [];
   // heights are measured from where Mario stands: his feet on the ground, and in the air the
   // level he last stood on, so a jump does not shrink the wall ahead and a stair step is one
   // tile tall from the step below it, not four from the floor
@@ -90,7 +90,10 @@ STATE_JS = """(function(){
     // forty steps of "no wall within 8 tiles" against a pipe). A wall stands on the ground: what
     // sits at or below the ground is floor, and what floats a tile or more above it (the block
     // rows) is run under, not jumped
-    if (s.right <= p.left || s.top >= ground - 2 || s.bottom < ground - T) return;
+    // behind him with a quarter tile of tolerance: pressed against a pipe's far side he overlaps
+    // it by a tenth of a tile, and counted as "0 tiles ahead" it made the run-up jump at once,
+    // 4.5 tiles early, into the side of the pipe that was actually ahead (measured)
+    if (s.right <= p.left + T / 4 || s.top >= ground - 2 || s.bottom < ground - T) return;
     var dx = Math.max(0, (s.left - p.right) / T);
     if (dx <= 8) walls.push({kind: s.title.toLowerCase(), dx: Math.round(dx * 10) / 10, height: tiles(ground - s.top)});
   });
@@ -98,10 +101,12 @@ STATE_JS = """(function(){
   (window.solids || []).forEach(function(s){
     // a question block still holding something, at the height a jump reaches (the head gets to
     // about 4.9 tiles); it pays when hit from below
-    if (!s.alive || s.title !== 'Block' || s.used || s.hidden) return;
-    if (enemies.length && enemies[0].dx <= 10) return;
+    if (!s.alive || (s.title !== 'Block' && s.title !== 'Brick') || s.hidden) return;
     var up = (ground - s.bottom) / T, dx = (s.left - p.right) / T;
     if (up < 3 || up > 4.5 || s.right <= p.left || dx > 8) return;
+    overhead.push({dx: Math.round(Math.max(-1, dx) * 10) / 10});
+    if (s.title !== 'Block' || s.used) return;
+    if (enemies.length && enemies[0].dx <= 10) return;
     blocks.push({dx: Math.round(Math.max(-1, dx) * 10) / 10, up: Math.round(up * 10) / 10});
   });
   enemies.sort(function(a, b){ return a.dx - b.dx; }); walls.sort(function(a, b){ return a.dx - b.dx; }); gaps.sort(function(a, b){ return a.dx - b.dx; }); blocks.sort(function(a, b){ return a.dx - b.dx; });
@@ -111,7 +116,7 @@ STATE_JS = """(function(){
   return {ready: true, x: tiles(p.left), y: tiles(ground - p.bottom), level_x: tiles(p.left + (window.__s1scroll || 0)),
           dying: !!p.dying,
           screen_tiles: tiles(sr - sl), xvel: Math.round((p.xvel || 0) * 10) / 10, on_ground: !!p.resting, dead: !!p.dead,
-          power: p.power || 1, enemies: enemies.slice(0, 3), behind: behind.slice(0, 2), gaps: gaps.slice(0, 2), walls: walls.slice(0, 2), blocks: blocks.slice(0, 2),
+          power: p.power || 1, enemies: enemies.slice(0, 3), behind: behind.slice(0, 2), gaps: gaps.slice(0, 2), walls: walls.slice(0, 2), blocks: blocks.slice(0, 2), overhead: overhead.slice(0, 4),
           lives: amt('lives'), time: amt('time'), score: amt('score'), coins: amt('coins'), world: amt('world'), paused: !!window.paused,
           ending: !!(window.map && map.ending)};
 })()"""
@@ -249,7 +254,7 @@ class Game:
                     await self._up(R, S)
                     self._stopped_short = {"kind": en["kind"] + " walking at him"}
                     break
-                if w and w["height"] >= TALL and w["dx"] <= 3.5:
+                if w and w["height"] >= TALL and w["dx"] <= 3.0:
                     # pressed against a tall pipe, a jump with the run key held rode up its side
                     # and left Mario embedded in it, "falling" in place (measured); the run stops
                     # where the jump's run-up starts
@@ -264,6 +269,7 @@ class Game:
             await self._up(L)
             await self._down(R, S)
             await self._land()
+            await self._peel()
             if await self._approach():          # the jump was taken inside (an enemy let under)
                 return
             await self._eval(f"keydown({U}); 'ok'")
@@ -288,11 +294,48 @@ class Game:
 
     async def _land(self) -> None:
         """A jump key pressed in the air does nothing in this game, so a jump asked for mid-flight
-        is taken on landing: the action means what it says instead of being spent."""
-        for _ in range(30):
+        is taken on landing: the action means what it says instead of being spent. Mario held
+        against a pipe's side mid-air, "falling" in place at terminal speed (measured: yvel 7, no
+        movement, for seven decisions), is freed by letting go of the run key and stepping left."""
+        for i in range(30):
             if await self._eval("!!player.resting || !!player.dead || !!player.dying"):
                 return
+            if i == 12:
+                await self._unstick()
             await asyncio.sleep(0.03)
+
+    async def _unstick(self) -> None:
+        """Held into a pipe's side in the air, Mario "falls" in place at terminal speed for as long
+        as a key is held (measured: yvel 7, no movement, a whole life against the fourth pipe).
+        Letting go of every key drops him to the ground within a second (measured); the run key
+        comes back once he is down."""
+        if not await self._eval("!player.resting && !player.dead && !player.dying && player.yvel >= 6.9"):
+            return
+        y0 = await self._eval("player.bottom")
+        await asyncio.sleep(0.12)
+        if await self._eval("player.bottom") != y0:
+            return
+        held = set(self._held)
+        await self._up(*held)
+        for _ in range(40):
+            await asyncio.sleep(0.03)
+            if await self._eval("!!player.resting || !!player.dead || !!player.dying"):
+                break
+        if KEY["right"] in held:
+            await self._down(KEY["right"], KEY["sprint"])
+
+    async def _peel(self) -> None:
+        """Overlapping a wall's edge (he stops a tenth of a tile inside it), a jump with the run key
+        held rides up its side and embeds him. A short step back first, and the jump is a jump."""
+        st = await self._eval(STATE_JS)
+        w = ((st or {}).get("walls") or [None])[0] if isinstance(st, dict) else None
+        if w and w["dx"] <= 0.05 and st.get("on_ground"):
+            await self._up(KEY["right"], KEY["sprint"])
+            await self._down(KEY["left"])
+            await asyncio.sleep(0.12)
+            await self._up(KEY["left"])
+            await asyncio.sleep(0.1)
+            await self._down(KEY["right"], KEY["sprint"])
 
     def _needed_hold(self) -> str | None:
         """The hold the nearest gap or wall within a step needs. A short hop into a gap and a
@@ -309,14 +352,14 @@ class Game:
             return hold_for(walls[0]["height"])
         return None
 
-    async def _let_pass(self) -> bool:
+    async def _let_pass(self, seconds: float = 3.5) -> bool:
         """An enemy walking toward Mario is let under a standing jump: stop, wait until it is a
         tile away, jump straight up, land, run on. Measured six times out of six between 0.8 and
         1.2 tiles with a medium hold; a running jump over the first Goomba hit the block row above
         it and dropped Mario onto it, every life. Returns whether the jump was taken here."""
         R, S, U = KEY["right"], KEY["sprint"], KEY["jump"]
         await self._up(R, S)
-        for _ in range(450):                    # up to 9 s of waiting: a Goomba twelve tiles off takes that long
+        for _ in range(int(seconds / 0.02)):
             await asyncio.sleep(0.02)
             st = await self._eval(STATE_JS)
             if not isinstance(st, dict) or not st.get("ready") or st.get("dying") or st.get("dead"):
@@ -328,10 +371,20 @@ class Game:
             if en["dy"] < -1:
                 continue                         # below him (he stands on something): it cannot reach him; let it pass or turn
             if st.get("on_ground") and (en["dx"] <= 0.6 or (en["dx"] <= 1.0 and abs(st.get("xvel") or 0) < 0.6)):
+                w = (st.get("walls") or [None])[0]
+                if w and w["dx"] <= 0.05:
+                    # against a pipe, a jump here followed by the run key mid-air rode up its side
+                    # and embedded him (measured: every life at the fourth pipe); a step back first
+                    await self._down(KEY["left"])
+                    await asyncio.sleep(0.12)
+                    await self._up(KEY["left"])
                 await self._eval(f"keydown({U}); 'ok'")
                 await asyncio.sleep(HOLDS["medium"])
                 await self._eval(f"keyup({U}); 'ok'")
-                await asyncio.sleep(0.6)
+                for _ in range(40):                  # the run key comes back on the ground, never against a wall in the air
+                    await asyncio.sleep(0.03)
+                    if await self._eval("!!player.resting || !!player.dead || !!player.dying"):
+                        break
                 await self._down(R, S)
                 return True
         await self._down(R, S)
@@ -351,8 +404,12 @@ class Game:
         if not isinstance(st, dict) or not st.get("ready"):
             return False
         near = self._approaching(st)
-        if near and near["dx"] <= 6.5 and (near["dx"] >= 2.5 or abs(st.get("xvel") or 0) < 3):
-            if await self._let_pass():
+        slow_now = abs(st.get("xvel") or 0) < 3
+        # the standing jump that lets an enemy under is for one about to arrive, or for one under a
+        # block row (where a running jump hits the blocks and drops onto it); a farther one in the
+        # open is jumped at a run from four tiles, which lands well past it
+        if near and near["dx"] <= 6.5 and (near["dx"] <= 3.0 or slow_now or self._blocks_overhead(st)):
+            if await self._let_pass(5.0 if self._blocks_overhead(st) else 3.5):
                 return True
             st = await self._eval(STATE_JS)              # the enemy is gone; what is ahead now
             if not isinstance(st, dict) or not st.get("ready"):
@@ -397,6 +454,12 @@ class Game:
         return rows[0]["dx"] if rows else 99.0
 
     @staticmethod
+    def _blocks_overhead(st: dict) -> bool:
+        """A block row within a running jump's flight: the state drops question blocks near an
+        enemy, so the fields carry the row for this purpose."""
+        return any(b["dx"] <= 6 for b in st.get("overhead") or [])
+
+    @staticmethod
     def _approaching(st: dict):
         """The nearest enemy walking at Mario from either side, within reach of mattering."""
         en, back = st.get("enemies") or [], st.get("behind") or []
@@ -425,7 +488,7 @@ class Game:
         if kind == "wall":
             if walls[0]["height"] < TALL:
                 return None, None                       # any distance within a step clears it
-            return "wall", 2.8
+            return "wall", 2.4
         if kind == "enemy":
             return ("enemy", 4.0) if fast and dx > 4.0 else (None, None)
         if kind == "block":
@@ -464,7 +527,9 @@ class Game:
 
     async def _settled(self) -> dict:
         """The state once the level is back after a death: while it restarts the clock is frozen and
-        the floors are gone (the gap that is not there); an action during that window is spent."""
+        the floors are gone (the gap that is not there); an action during that window is spent.
+        And never a state held inside a pipe's side: see _unstick."""
+        await self._unstick()
         st = await self._eval(STATE_JS)
         if isinstance(st, dict) and self._restarting(st):
             await self._up(*list(self._held))
