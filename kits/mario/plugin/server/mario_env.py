@@ -231,6 +231,13 @@ class Game:
         from the facts the state and its instructions carry."""
         R, S, U, L = KEY["right"], KEY["sprint"], KEY["jump"], KEY["left"]
         keys = {"run_right": (R, S), "jump_right": (R, S, U), "jump": (U,), "walk_left": (L,), "wait": ()}[name]
+        if U in keys and U in self._held and await self._eval("!!player.resting"):
+            # "jump" means press jump: a key still held from the last jump would do nothing on
+            # the ground (the game wants a release first), so it is let go and pressed again,
+            # the way a thumb does. Recorded: four lives to a jump that never happened
+            await self._eval(f"keyup({U}); 'ok'")
+            self._held.discard(U)
+            await asyncio.sleep(0.04)
         await self._keys(*keys)
         await asyncio.sleep(TICK)
 
@@ -338,7 +345,7 @@ class Game:
         if not on_ground:
             if held and rising:
                 return "keep jump_right held: Mario is still rising, and the jump grows as long as it is held."
-            return "falling: run_right keeps the run and frees the jump key for the next jump." if held else "in the air: run_right keeps the run."
+            return "falling: run_right keeps the run; jump_right again the moment Mario lands if something is close."
         near = next((e for e in en if abs(e["dy"]) < 1), None)
         near_next = (near["dx"] - lag - (0.5 if near.get("dir") == "toward" else 0)) if near else None
         back = next((b for b in st.get("behind") or [] if b.get("dir") == "toward" and abs(b["dy"]) < 1 and b["dx"] <= 2.5), None)
@@ -368,9 +375,11 @@ class Game:
             return "run_right toward the pipe; jump_right when it is about 5 tiles ahead at this speed."
         if near is not None and near["dx"] <= 9:
             if fast:
-                if near_next <= 3.6:
-                    return "jump_right now over the enemy: at this speed the take-off comes 3 to 4 tiles before it."
-                return "run_right; jump_right when the enemy is about 6 tiles ahead at this speed."
+                # measured: under the block row the take-off must be 3 to 4 tiles before it; in the
+                # open a running jump from farther lands past it just the same
+                if near_next <= (3.8 if overhead else 5.5):
+                    return "jump_right now over the enemy: at this speed the take-off comes a few tiles before it."
+                return "run_right; jump_right when the enemy is about 7 tiles ahead at this speed."
             if near.get("dir") == "toward":
                 return "jump now, standing: it is about to reach Mario." if near_next <= 1.5 else "wait, standing still; jump when it is 2 tiles away."
             return "run_right after it; jump_right when it is about 7 tiles ahead at a run."
@@ -454,8 +463,8 @@ class Game:
             parts.append(f"Mario has been stopped in place for {self._stopped} decisions by something he is pressed "
                          "against: walk_left, then run_right, then jump_right at 2 to 3 tiles.")
         held = [KEY_NAMES[c] for c in self._held]
-        if KEY["jump"] in self._held:
-            parts.append("The jump key is held: it must be let go (run_right or wait) before Mario can jump again.")
+        if KEY["jump"] in self._held and not st.get("on_ground"):
+            parts.append("The jump key is held; it keeps the jump growing while Mario rises.")
         parts.append(f"Lives {st.get('lives')}, coins {st.get('coins')}, time {st.get('time')}, score {st.get('score')}.")
         terminal = bool(st.get("ending")) or (bool(st.get("dead")) and (st.get("lives") or 0) <= 0)
         fields = {k: st.get(k) for k in ("x", "y", "level_x", "on_ground", "dead", "xvel", "lives", "coins", "time", "score", "world")}
