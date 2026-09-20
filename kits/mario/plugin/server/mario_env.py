@@ -107,7 +107,7 @@ STATE_JS = """(function(){
     overhead.push({dx: Math.round(Math.max(-1, dx) * 10) / 10});
     if (s.title !== 'Block' || s.used) return;
     if (enemies.length && enemies[0].dx <= 10) return;
-    blocks.push({dx: Math.round(Math.max(-1, dx) * 10) / 10, up: Math.round(up * 10) / 10});
+    blocks.push({dx: Math.round(Math.max(0, dx) * 10) / 10, up: Math.round(up * 10) / 10});
   });
   enemies.sort(function(a, b){ return a.dx - b.dx; }); walls.sort(function(a, b){ return a.dx - b.dx; }); gaps.sort(function(a, b){ return a.dx - b.dx; }); blocks.sort(function(a, b){ return a.dx - b.dx; });
   walls = walls.filter(function(w, i){ return i === 0 || w.dx !== walls[i - 1].dx || w.height !== walls[i - 1].height; });
@@ -627,7 +627,8 @@ class Game:
         blocks = st.get("blocks") or []
         if blocks:
             b = blocks[0]
-            parts.append(f"Question block overhead: {b['dx']} tiles ahead, {b['up']} tiles up; jump_right under it pays a coin.")
+            where = "right overhead" if b["dx"] <= 0 else f"{b['dx']} tiles ahead"
+            parts.append(f"Question block {where}, {b['up']} tiles up; jump_right under it pays a coin.")
         # what one step reaches, and what is inside it: the fact the rule needs, stated rather
         # than left for the model to work out from a speed and a distance (it jumped one step late)
         # measured on the live game: at a run the distance to a walking enemy closes about 5.5
