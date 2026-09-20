@@ -106,7 +106,7 @@ STATE_JS = """(function(){
   function amt(k){ return d[k] && d[k].amount !== undefined ? d[k].amount : null; }
   return {ready: true, x: tiles(p.left), y: tiles(ground - p.bottom), level_x: tiles(p.left + (window.__s1scroll || 0)),
           dying: !!p.dying,
-          screen_tiles: tiles(sr - sl), xvel: Math.round((p.xvel || 0) * 10) / 10, on_ground: !!p.resting, dead: !!p.dead,
+          screen_tiles: tiles(sr - sl), xvel: Math.round((p.xvel || 0) * 10) / 10, yvel: Math.round((p.yvel || 0) * 10) / 10, on_ground: !!p.resting, dead: !!p.dead,
           power: p.power || 1, enemies: enemies.slice(0, 3), behind: behind.slice(0, 2), gaps: gaps.slice(0, 2), walls: walls.slice(0, 2), blocks: blocks.slice(0, 2), overhead: overhead.slice(0, 4),
           lives: amt('lives'), time: amt('time'), score: amt('score'), coins: amt('coins'), world: amt('world'), paused: !!window.paused,
           ending: !!(window.map && map.ending)};
@@ -334,10 +334,21 @@ class Game:
         xv = abs(st.get("xvel") or 0)
         fast = xv >= 3
         lag = round(xv * 60 * 0.25 / (8 * 4), 1)          # tiles covered before the decision lands
+        rising = (st.get("yvel") or 0) < 0
         if not on_ground:
-            return "in the air, run_right keeps the run and lets the jump key go for the next jump." if held else "in the air, run_right keeps the run."
+            if held and rising:
+                return "keep jump_right held: Mario is still rising, and the jump grows as long as it is held."
+            return "falling: run_right keeps the run and frees the jump key for the next jump." if held else "in the air: run_right keeps the run."
         near = next((e for e in en if abs(e["dy"]) < 1), None)
         near_next = (near["dx"] - lag - (0.5 if near.get("dir") == "toward" else 0)) if near else None
+        back = next((b for b in st.get("behind") or [] if b.get("dir") == "toward" and abs(b["dy"]) < 1 and b["dx"] <= 2.5), None)
+        # an enemy about to touch him outranks everything: it is the lethal thing
+        if near is not None and near["dx"] <= 4 and not fast:
+            if near.get("dir") == "toward":
+                return "jump now, standing: the enemy is about to reach Mario." if near_next <= 1.5 else "wait, standing still; jump when it is 2 tiles away."
+            return "walk_left one decision to make room, then run_right and jump_right when it is about 7 tiles ahead."
+        if back is not None and not fast:
+            return "jump now, standing: an enemy at Mario's back is about to reach him."
         if walls and walls[0]["height"] >= TALL and walls[0]["dx"] <= 8:
             w = walls[0]; w_next = w["dx"] - lag
             if w["dx"] <= 0.3 and not fast:
@@ -351,9 +362,9 @@ class Game:
             return "run_right toward the pipe; jump_right when it is about 5 tiles ahead at this speed."
         if near is not None and near["dx"] <= 9:
             if fast:
-                if near_next <= 4.5:
+                if near_next <= 3.6:
                     return "jump_right now over the enemy: at this speed the take-off comes 3 to 4 tiles before it."
-                return "run_right; jump_right when the enemy is about 7 tiles ahead at this speed."
+                return "run_right; jump_right when the enemy is about 6 tiles ahead at this speed."
             if near.get("dir") == "toward":
                 return "jump now, standing: it is about to reach Mario." if near_next <= 1.5 else "wait, standing still; jump when it is 2 tiles away."
             return "run_right after it; jump_right when it is about 7 tiles ahead at a run."
