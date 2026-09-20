@@ -31,15 +31,16 @@ from pydantic import Field
 GAME_URL = os.environ.get("MARIO_URL", "https://supermarioplay.com/game/mario.html?v=1.0.1")
 TILE = 8                      # game units per tile; the game draws a tile as 8 * unitsize px
 HOLDS = {"short": 0.15, "medium": 0.35, "long": 0.6}
+RUN_MOMENT = 0.15          # a run action holds the keys this long, then the model decides again
 KEY = {"left": 37, "right": 39, "jump": 38, "down": 40, "sprint": 16}
 ITEMS = {"Coin", "Mushroom", "FireFlower", "Star", "Vine", "Text", "Shell", "Fireball"}
-INSTRUCTIONS = ("You play a side-scrolling platform game as Mario. Each step says where Mario is, whether he is on "
-                "the ground, and what is ahead with distances in tiles. One step lasts about half a second and "
-                "covers up to 4 tiles at a run. Keep moving right. The state names any enemy, gap or wall that is "
-                "within one step: jump over it now, with jump_right, held as long as the state says (a taller "
-                "wall or a wider gap needs a longer hold). A question block overhead within one step pays a coin: "
-                "jump_right under it. Otherwise run right. When Mario has just died, wait. Finish when the level "
-                "is cleared. Escalate when Mario has no lives left.")
+INSTRUCTIONS = ("You play a side-scrolling platform game as Mario, deciding several times a second. Each step "
+                "says where Mario is, whether he is on the ground, and what is ahead with distances in tiles. "
+                "Keep moving right, and jump often: a running jump clears an enemy, a pipe or a gap and lands "
+                "well past it, so jump_right whenever anything is within one step, held as long as the state "
+                "says. A question block overhead within one step pays a coin: jump_right under it. In the air, "
+                "run_right keeps the run going. Otherwise run right. When Mario has just died, wait. Finish when "
+                "the level is cleared. Escalate when Mario has no lives left.")
 # Measured on the live game, feet above the ground at the apex: a short hold reaches 3.1 tiles, a
 # medium 3.9, a long 4.1, standing or at a run. So a 2-tile pipe takes a short hold, a 3-tile one a
 # medium, and a 4-tile one a long hold with the run-up the jump_right macro provides (from against
@@ -164,9 +165,7 @@ class Game:
         self.steps = 0
         self.frames = 0
         self._stopped = 0          # consecutive runs that moved nothing
-        self._stopped_short = None # the enemy a run stopped short of, for the result text
-        self._walked_off = False   # a jump asked for on a pipe's top that became a step off it
-        self._waited = False       # a jump asked for beside an enemy walking away that became a wait
+        self._stopped_short = None # what a run stopped short of, for the result text
         self._lives = None
         self._restarting_until = 0.0
         self._held: set[int] = set()
@@ -241,33 +240,13 @@ class Game:
             await self._down(R, S)
             self._stopped_short = None
             t0 = time.time()
-            while time.time() - t0 < hold:
+            while time.time() - t0 < RUN_MOMENT:
                 await asyncio.sleep(0.03)
                 st = await self._eval(STATE_JS)
                 if not isinstance(st, dict) or not st.get("ready"):
                     continue
-                en = self._approaching(st)
                 w = (st.get("walls") or [None])[0]
                 gap = (st.get("gaps") or [None])[0]
-                if en and en.get("side") == "behind":
-                    # one at his back is outrun; one already on him, with a wall ahead, is let under
-                    if en["dx"] <= 1.2 and w and w["dx"] <= 1.0:
-                        await self._up(R, S)
-                        await self._let_pass(2.0)
-                        self._stopped_short = {"kind": en["kind"] + " at his back, let under a jump"}
-                        break
-                    en = None
-                if en and en["dx"] <= 5.0 and abs(en["dy"]) < 1:
-                    # a run into an enemy walking at him ended in it every time (measured, nine
-                    # lives in one run); the run stops five tiles short, where the standing jump
-                    # that lets it under is taken from. One already within two tiles is let under
-                    # here and now: a decision later is a decision too late (measured at x 106)
-                    await self._up(R, S)
-                    self._stopped_short = {"kind": en["kind"] + " walking at him"}
-                    if en["dx"] <= 2.5:
-                        await self._let_pass(2.5)
-                        self._stopped_short = {"kind": en["kind"] + " walking at him, let under a jump"}
-                    break
                 if w and w["height"] >= TALL and w["dx"] <= 3.0:
                     # pressed against a tall pipe, a jump with the run key held rode up its side
                     # and left Mario embedded in it, "falling" in place (measured); the run stops
@@ -275,28 +254,27 @@ class Game:
                     await self._up(R, S)
                     self._stopped_short = {"kind": f"{w['kind']} {w['height']} tiles tall"}
                     break
-                if gap and gap["dx"] <= 1.2 and st.get("on_ground"):
+                if gap and gap["dx"] <= (1.5 if st.get("on_ground") else 2.5):
+                    # a run carried into the gap after a landing beside it (recorded)
                     await self._up(R, S)
                     self._stopped_short = {"kind": "gap"}
                     break
         elif name == "jump_right":
             await self._up(L)
             await self._down(R, S)
-            await self._land()
-            await self._peel()
-            if await self._approach():          # the jump was taken inside (an enemy let under)
+            if not await self._eval("!!player.resting"):
+                await asyncio.sleep(RUN_MOMENT)          # in the air a jump is a moment of running
                 return
+            await self._peel()
+            await self._approach()
             await self._eval(f"keydown({U}); 'ok'")
             await asyncio.sleep(hold)
             await self._eval(f"keyup({U}); 'ok'")
-            await asyncio.sleep(max(0.0, 0.75 - hold))      # the flight, run key still down
         elif name == "jump":
             await self._up(R, S, L)
-            await self._land()
             await self._eval(f"keydown({U}); 'ok'")
             await asyncio.sleep(hold)
             await self._eval(f"keyup({U}); 'ok'")
-            await asyncio.sleep(max(0.0, 0.6 - hold))
         elif name == "walk_left":
             await self._up(R, S)
             await self._down(L)
@@ -305,18 +283,6 @@ class Game:
         else:
             await self._up(R, S, L)
             await asyncio.sleep(0.25)
-
-    async def _land(self) -> None:
-        """A jump key pressed in the air does nothing in this game, so a jump asked for mid-flight
-        is taken on landing: the action means what it says instead of being spent. Mario held
-        against a pipe's side mid-air, "falling" in place at terminal speed (measured: yvel 7, no
-        movement, for seven decisions), is freed by letting go of the run key and stepping left."""
-        for i in range(30):
-            if await self._eval("!!player.resting || !!player.dead || !!player.dying"):
-                return
-            if i == 12:
-                await self._unstick()
-            await asyncio.sleep(0.03)
 
     async def _unstick(self) -> None:
         """Held into a pipe's side in the air, Mario "falls" in place at terminal speed for as long
@@ -366,149 +332,27 @@ class Game:
             return hold_for(walls[0]["height"])
         return None
 
-    async def _wait_enemy(self) -> bool:
-        R, S = KEY["right"], KEY["sprint"]
-        await self._up(R, S)
-        for _ in range(60):                                      # up to 6 s
-            st = await self._eval(STATE_JS)
-            if not isinstance(st, dict) or not st.get("ready") or st.get("dying") or st.get("dead"):
-                break
-            near = self._approaching(st)
-            if near:
-                return await self._let_pass(5.0)
-            if not any(e["dx"] <= 9 and e["dy"] < 1 for e in st.get("enemies") or []):
-                break                                            # gone: the next decision runs on
-            await asyncio.sleep(0.1)
-        await self._down(R, S)
-        self._waited = True
-        return True
-
-    async def _let_pass(self, seconds: float = 3.5) -> bool:
-        """An enemy walking toward Mario is let under a standing jump: stop, wait until it is a
-        tile away, jump straight up, land, run on. Measured six times out of six between 0.8 and
-        1.2 tiles with a medium hold; a running jump over the first Goomba hit the block row above
-        it and dropped Mario onto it, every life. Returns whether the jump was taken here."""
-        R, S, U = KEY["right"], KEY["sprint"], KEY["jump"]
-        await self._up(R, S)
-        for _ in range(int(seconds / 0.02)):
-            await asyncio.sleep(0.02)
-            st = await self._eval(STATE_JS)
-            if not isinstance(st, dict) or not st.get("ready") or st.get("dying") or st.get("dead"):
-                await self._down(R, S)
-                return True
-            en = self._approaching(st)
-            if not en:
-                break                            # gone, or turned away: the running jump follows
-            if en["dy"] < -1:
-                continue                         # below him (he stands on something): it cannot reach him; let it pass or turn
-            if st.get("on_ground") and (en["dx"] <= 0.6 or (en["dx"] <= 1.0 and abs(st.get("xvel") or 0) < 0.6)):
-                w = (st.get("walls") or [None])[0]
-                if w and w["dx"] <= 0.05:
-                    # against a pipe, a jump here followed by the run key mid-air rode up its side
-                    # and embedded him (measured: every life at the fourth pipe); a step back first
-                    await self._down(KEY["left"])
-                    await asyncio.sleep(0.12)
-                    await self._up(KEY["left"])
-                await self._eval(f"keydown({U}); 'ok'")
-                await asyncio.sleep(HOLDS["medium"])
-                await self._eval(f"keyup({U}); 'ok'")
-                for _ in range(40):                  # the run key comes back on the ground, never against a wall in the air
-                    await asyncio.sleep(0.03)
-                    if await self._eval("!!player.resting || !!player.dead || !!player.dying"):
-                        break
-                await self._down(R, S)
-                return True
-        await self._down(R, S)
-        return False
-
-    async def _approach(self) -> bool:
-        """The model decides to jump; when to leave the ground is the environment's, the way
-        holding the keys is. A decision lands every half second or so and a jump is a one-tile
-        affair, so a jump taken the moment it is chosen is early or late by luck. Measured on the
-        live game: a wall 4 tiles tall is cleared by a long jump from 1.5 to 3 tiles back and from
-        nowhere else (from against it the apex is level with the top; at a run from 4 back it
-        peaks early and hits the side); a running jump covers about 9 tiles, so a gap is best left
-        from its edge at speed; an enemy walking at Mario is let under a standing jump (see
-        _let_pass). So: an approaching enemy first; then keep running until the nearest thing
-        ahead is at its distance, backing off first when there is no room for the run-up."""
+    async def _approach(self) -> None:
+        """The model decides to jump; where to leave the ground is the environment's, the way
+        holding the keys is, for the two things a jump's timing decides. Measured on the live
+        game: a wall 4 tiles tall is cleared only by a long jump at speed, taken 2.4 tiles back
+        after a run-up (from against it the apex is level with the top, and from every standing
+        distance the apex is 3.8); a gap is best left from its edge. Everything else is jumped
+        where the model asked: a running jump lands nine tiles on, and standing beside an enemy
+        to time anything cost more lives than it saved (recorded)."""
         st = await self._eval(STATE_JS)
         if not isinstance(st, dict) or not st.get("ready"):
-            return False
-        if await self._eval("!!(player.resting && player.resting.title === 'Pipe')") and any(
-                e["dy"] < -1 and e["dx"] <= 9 for e in st.get("enemies") or []):
-            # from a pipe's top a jump lands nine tiles on, among the enemies below, and a step
-            # off the edge at a run dropped him onto them (both seen on the recording). Up here
-            # nothing reaches him: wait for the pair to be walking away and four tiles off, then
-            # step off slowly, and meet them at his height on the way
-            R, S = KEY["right"], KEY["sprint"]
-            await self._up(R, S)
-            for _ in range(70):                                  # up to 7 s
-                below = [e for e in st.get("enemies") or [] if e["dy"] < -1 and e["dx"] <= 9]
-                if not below or all(e.get("dir") == "away" and e["dx"] >= 4 for e in below):
-                    break
-                await asyncio.sleep(0.1)
-                st = await self._eval(STATE_JS)
-                if not isinstance(st, dict) or not st.get("ready"):
-                    return False
-            await self._down(R)                                  # a walk, not a run: drops a tile past the edge
-            for _ in range(40):
-                await asyncio.sleep(0.03)
-                if not await self._eval("!!(player.resting && player.resting.title === 'Pipe')"):
-                    break
-            await asyncio.sleep(0.5)
-            await self._down(R, S)
-            self._walked_off = True
-            return True
-        near = self._approaching(st)
-        slow_now = abs(st.get("xvel") or 0) < 3
-        # the standing jump that lets an enemy under is for a block row overhead (a running jump
-        # there hits the blocks and drops onto it) or for one already on a Mario with no speed;
-        # anything else in the open is jumped at a run from four tiles, which lands well past it
-        # (on the recording, waiting beside the pair for seconds ended in them every time)
-        if near and near["dx"] <= 6.5 and (self._blocks_overhead(st) or (near["dx"] <= 2.0 and slow_now)):
-            if await self._let_pass(5.0 if self._blocks_overhead(st) else 2.5):
-                return True
-            st = await self._eval(STATE_JS)              # the enemy is gone; what is ahead now
-            if not isinstance(st, dict) or not st.get("ready"):
-                return False
+            return
         target, want = self._target(st)
-        if target == "enemy" and want == "wait":
-            # without speed a forward jump lands a tile or two on, on the enemy (seen on the
-            # recording, four lives at the third pipe). One walking at him is let under; one
-            # walking away is waited for, since the pair turns at the next pipe and comes back
-            return await self._wait_enemy()
-        if target is None or not isinstance(want, (int, float)):
-            return False
+        if target is None:
+            return
         R, S, L = KEY["right"], KEY["sprint"], KEY["left"]
-        # a running jump lands about 9 tiles on; an enemy standing where it ends took a life at the
-        # 3-tile gap (twice) and beyond the fourth pipe (three times). One walking at Mario is let
-        # under first (a Goomba walking at a gap falls into it); one walking away is given time to
-        # leave; then the run-up
-        if target in ("gap", "wall"):
-            zone_from = self._distance(st, target) + 1.0
-            for _ in range(int((8.0 if target == "gap" else 3.0) / 0.1)):
-                zone = [e for e in st.get("enemies") or [] if zone_from <= e["dx"] <= zone_from + 9 and e["dy"] < 1]
-                if not zone:
-                    break
-                await self._up(R, S)                         # it comes to him (or into the gap); no jump into it
-                await asyncio.sleep(0.1)
-                st = await self._eval(STATE_JS)
-                if not isinstance(st, dict) or not st.get("ready") or st.get("dying") or st.get("dead"):
-                    return False
-                near = self._approaching(st)
-                if near and near["dx"] <= 1.2:
-                    if await self._let_pass(2.0):
-                        return True
-            await self._down(R, S)
         dx = self._distance(st, target)
         slow = abs(st.get("xvel") or 0) < 3
-        if slow and dx < want + 1.5 and st.get("on_ground"):
-            # no room for the run-up: step back first, unless something is there. A jump from
-            # 1.6 tiles back with no speed cleared the pipe and landed 2 tiles past it, on the
-            # enemies that pace there (measured: four lives in a row); three tiles of run-up
-            # give the jump its speed and the landing its distance
-            if any(b["dx"] <= 3.5 or (b.get("dir") == "toward" and b["dx"] <= 6) for b in st.get("behind") or []):
-                return False
+        if target == "wall" and slow and dx < want + 1.5 and st.get("on_ground"):
+            # no room for the run-up: step back first, unless something is at his back
+            if any(b["dx"] <= 3.5 for b in st.get("behind") or []):
+                return
             await self._up(R, S)
             await self._down(L)
             for _ in range(70):
@@ -525,10 +369,9 @@ class Game:
             await asyncio.sleep(0.03)
             st = await self._eval(STATE_JS)
             if not isinstance(st, dict) or st.get("dying") or st.get("dead"):
-                return False
+                return
             if self._distance(st, target) <= want:
-                return False
-        return False
+                return
 
     @staticmethod
     def _distance(st: dict, kind: str) -> float:
@@ -536,45 +379,23 @@ class Game:
         return rows[0]["dx"] if rows else 99.0
 
     @staticmethod
-    def _blocks_overhead(st: dict) -> bool:
-        """A block row within a running jump's flight: the state drops question blocks near an
-        enemy, so the fields carry the row for this purpose."""
-        return any(b["dx"] <= 6 for b in st.get("overhead") or [])
-
-    @staticmethod
-    def _approaching(st: dict):
-        """The nearest enemy walking at Mario from either side, within reach of mattering."""
-        en, back = st.get("enemies") or [], st.get("behind") or []
-        near = [{**e, "side": "ahead"} for e in en if e.get("dir") == "toward" and e["dx"] <= 12 and abs(e["dy"]) < 1]
-        near += [{**e, "side": "behind"} for e in back if e.get("dir") == "toward" and e["dx"] <= 6 and e["dy"] < 1]
-        return min(near, key=lambda e: e["dx"]) if near else None
-
-    @staticmethod
     def _target(st: dict):
-        """What the jump is for and the distance to leave the ground at: (kind, tiles), with
-        None tiles meaning jump now."""
+        """What the jump's timing is for and the distance to leave the ground at: (kind, tiles),
+        or (None, None) for a jump taken where the model asked."""
+        walls, gaps, blocks = st.get("walls") or [], st.get("gaps") or [], st.get("blocks") or []
         near = []
-        en, walls, gaps, blocks = st.get("enemies") or [], st.get("walls") or [], st.get("gaps") or [], st.get("blocks") or []
-        if en and en[0]["dx"] <= 10 and en[0]["dy"] < 1:
-            near.append((en[0]["dx"], "enemy"))
-        if blocks and blocks[0]["dx"] <= 6:
-            near.append((blocks[0]["dx"], "block"))
-        if walls and walls[0]["dx"] <= 6:
+        if walls and walls[0]["dx"] <= 6 and walls[0]["height"] >= TALL:
             near.append((walls[0]["dx"], "wall"))
         if gaps and gaps[0]["dx"] <= 6:
             near.append((gaps[0]["dx"], "gap"))
+        if blocks and blocks[0]["dx"] <= 6:
+            near.append((blocks[0]["dx"], "block"))
         if not near:
             return None, None
         dx, kind = min(near)
         fast = abs(st.get("xvel") or 0) >= 3
         if kind == "wall":
-            if walls[0]["height"] < TALL:
-                return None, None                       # any distance within a step clears it
-            return "wall", (2.4 if fast else 1.7)
-        if kind == "enemy":
-            if fast:
-                return ("enemy", 4.0) if dx > 4.0 else (None, None)
-            return "enemy", "wait"
+            return "wall", 2.4
         if kind == "block":
             # measured: at a run a medium jump started 1 to 1.5 tiles before the block hits it,
             # from 2 tiles or more it peaks short of it
@@ -657,15 +478,9 @@ class Game:
         if name == "walk_left":
             self._stopped = 0
         short = self._stopped_short if name == "run_right" else None
-        off = self._walked_off if name == "jump_right" else False
-        waited = self._waited if name == "jump_right" else False
-        self._walked_off = False
-        self._waited = False
+
         d["text"] = (f"{name} held {seconds:.2f} s" + (f" ({taken}: what lay ahead needed it)" if taken else "")
-                     + (f", stopped short of the {short['kind']}" if short else "")
-                     + (" (walked off the pipe instead: the enemies below are where the jump would land)" if off else "")
-                     + (" (waited instead: a jump from a standstill lands on the enemy walking away)" if waited else "")
-                     + ". " + d["text"])
+                     + (f", stopped short of the {short['kind']}" if short else "") + ". " + d["text"])
         return d
 
     def wait(self) -> dict:
