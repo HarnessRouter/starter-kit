@@ -63,7 +63,7 @@ STATE_JS = """(function(){
     if (!c.alive || c === player || c.title === undefined) return;
     if (['Coin','Mushroom','FireFlower','Star','Vine','Text','Shell','Fireball'].indexOf(c.title) >= 0) return;
     var dx = (c.left - p.right) / T, dy = (p.bottom - c.bottom) / T, back = (p.left - c.right) / T;
-    if (dx >= 0 && dx <= 12) enemies.push({kind: c.title, dx: Math.round(dx * 10) / 10, dy: Math.round(dy * 10) / 10, dir: (c.xvel || 0) < 0 ? 'toward' : 'away'});
+    if (dx >= 0 && dx <= 16) enemies.push({kind: c.title, dx: Math.round(dx * 10) / 10, dy: Math.round(dy * 10) / 10, dir: (c.xvel || 0) < 0 ? 'toward' : 'away'});
     else if (back >= 0 && back <= 8) behind.push({kind: c.title, dx: Math.round(back * 10) / 10, dy: Math.round(dy * 10) / 10, dir: (c.xvel || 0) > 0 ? 'toward' : 'away'});
   });
   var floors = (window.solids || []).filter(function(s){ return s.alive && (s.title === 'Floor' || s.title === 'Stone') && s.top >= p.bottom - 4; });
@@ -458,7 +458,7 @@ class Game:
             parts.append(f"Nearest enemy: {e['kind']} {e['dx']} tiles ahead, {where}, walking {'toward Mario' if e.get('dir') == 'toward' else 'away'}{arrives}."
                          + (f" {len(en) - 1} more behind it." if len(en) > 1 else ""))
         else:
-            parts.append("No enemy within 12 tiles ahead.")
+            parts.append("No enemy within 16 tiles ahead.")
         back = st.get("behind") or []
         if back:
             b = back[0]
