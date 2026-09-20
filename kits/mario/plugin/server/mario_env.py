@@ -434,9 +434,11 @@ class Game:
             return "walk_left one decision to make room, then run_right and jump_right when it is about 6 tiles ahead."
         if back is not None and not fast:
             return "jump, standing (the jump tool, not jump_right): the enemy at Mario's back passes under him."
-        if above is not None and (near is None or near["dx"] > 6):
+        edge = min([g["dx"] for g in gaps] + [d["dx"] for d in drops] + [99])
+        if above is not None and (near is None or near["dx"] > 6) and edge > lag + 3:
             # recorded five times: the Goomba on the ledge walks off its edge and drops onto a Mario
-            # running under it
+            # running under it. Not with a gap at his feet: letting the keys go a tile before the
+            # 3-tile gap dropped him in (the follower's one death on the level)
             return "wait, standing still: the enemy above is about to drop off its ledge; jump_right when it is 2 tiles away at Mario's height."
         things = []
         if walls and walls[0]["dx"] <= 8:

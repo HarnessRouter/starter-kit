@@ -31,40 +31,38 @@ rate of frames it actually displayed.
 
 ### What is measured, not tuned
 
-The state is literal and the numbers in it come from the game: where Mario is, the nearest enemy
-ahead and whether it walks toward him, the nearest enemy behind him, the next gap, wall and
-question block with distances in tiles, and how far one step reaches. The things below were
-measured on the live game and written into the environment rather than left to the model:
+The state is literal and the numbers in it come from the game: where Mario is and whether he is
+on the ground, the ground ahead as a profile (the next gap, the next drop and what follows it, the
+next step or wall and its height), the nearest enemy ahead and whether it walks toward him, the
+nearest enemy behind him, the block rows overhead, the next question block, how far one decision
+carries him at the loop's own measured pace, and a closing line beginning "Now:" that says what the
+measured facts call for at this moment. The environment executes key states and times nothing:
+an action sets the keys and returns, the keys stay set until the next action, and the model
+chooses every step. Two things about the keys are the input layer's, the way a thumb plays:
 
-- **Jump heights.** Feet above the ground at the apex: a short hold reaches 3.1 tiles, a medium 3.9,
-  a long 4.1, standing or at a run. So the state says which hold clears the wall ahead (short for
-  2 tiles, medium for 3, long for 4), and when the model's hold is shorter than what lies ahead
-  needs, the environment takes the needed one and says so in the result.
-- **When to leave the ground.** A decision lands every half second and a jump is a one-tile affair.
-  A wall 4 tiles tall is cleared by a long jump from 1.5 to 3 tiles back and from nowhere else; a
-  running jump covers about 9 tiles, so a gap is left from its edge at speed; a question block is
-  hit by a jump started 1 to 1.5 tiles before it at a run and missed from 2. So `jump_right` keeps
-  running until the nearest thing ahead is at its distance, steps back first when there is no room
-  for the run-up (and nothing behind), and waits for the landing when asked to jump mid-air.
-- **Enemies.** A running jump over the first Goomba hit the block row above it and dropped Mario
-  onto it, every life. An enemy walking toward Mario is instead let under a standing jump taken
-  when it is about one tile away (six of six tries between 0.8 and 1.2 tiles), and `run_right`
-  stops five tiles short of an enemy walking at him so that jump is taken standing. An enemy
-  below him, when he stands on a pipe, is waited out rather than jumped onto.
+- **A jump means a press.** `jump_right` or `jump` on the ground with the jump key still held from
+  the last jump lets it go and presses it again; the game wants the release.
+- **A jump held in the air goes again on landing.** `jump_right` chosen while Mario is in the air
+  keeps the key down and presses it the moment he lands (any later action cancels it), so hops
+  chain the way they do under a held button. Recorded nine times in a row before this: the jump
+  over the fourth pipe comes down a tile before the first gap, and no decision could arrive in
+  time; the hop is now chosen in the air.
 
-The model decides to jump; the timing is the environment's, the way holding the keys is. Heights
-are measured from where Mario stands (his feet on the ground, the level he last stood on in the
-air), so a jump does not shrink the wall ahead and a stair step is one tile tall from the step
-below it.
+The facts the "Now:" line and the kit's instructions carry were measured on the live game, not
+tuned: a running jump started 1.5 to 4 tiles before the first Goomba survives, 5 to 9 tiles hits
+the block row and drops onto it, so when that window cannot be hit at the loop's pace the stop and
+the standing jump (1 to 2.5 tiles, eight of eight) take over; a 4-tile pipe is cleared only at a
+full run with the jump held long, taken 2 to 3 tiles before it; a gap or a drop is left from its
+edge; a one-tile step is a hop and a stair is a hop per step; the ground is read from Mario's level
+rather than his feet, so the floor is still there when he is below its top (read from his feet it
+vanished, and three lives went to a "gap 12 tiles wide"); and the nearest thing ahead decides (a
+gap five tiles on outranked the one-tile step he was pressed against for 284 decisions, until the
+clock ran out). Each of these came from a recording: a copy of every frame the page shows, cut into
+a contact sheet around each death, read, then measured with a probe before the environment changed.
 
-On the model's own runs after these changes (Jev 1.13 through OpenRouter, 400 steps): all four
-pipes of the first level are cleared, the question blocks pay (10 coins and a score of 17,300 in
-one 119-action run), the run moves at about two seconds an action, and the furthest point reached
-is about half the level. The level is not won yet: the lives go to the Goomba pair pacing around
-the third and fourth pipes, to the landing beyond the 3-tile gap where a Goomba waits, and to a
-pair near the middle of the level. Each of those is a state question, not a model question, and
-each earlier death class was removed the same way: read the trace, measure the game, write the
-fact into the environment.
+A player that obeys the state's own "Now:" line with a model-like delay of 0.2 s is the
+environment's test bench, apart from any model: on the level's current environment it clears 1-1
+in 50 game seconds with one death (2026-09-20). The model's own runs are recorded the same way.
 
 ### Launching again after an update
 
