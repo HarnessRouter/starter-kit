@@ -1,0 +1,27 @@
+{
+  "id": "mario",
+  "title": "Super Mario",
+  "tagline": "A System One model plays a platform game several times a second, and you watch its browser.",
+  "description": "Full Screen Mario runs in a headless browser inside this deployment. The System One base reads the game's own state each step as a few literal sentences (where Mario is, what is ahead and how far) and chooses one control to hold, a few hundred milliseconds a decision, with no screenshot and no text generation. The left pane shows the frame of the browser the model is playing in; the right pane is the harness. Credits: the game is Full Screen Mario, played at supermarioplay.com; the browser is driven with Browser Use (MIT); the model is TypeSafe's Jev through OpenRouter.",
+  "icon": "tabler:device-gamepad-2",
+  "accent": "#E4572E",
+  "harness": {
+    "name": "Super Mario",
+    "base": "systemone",
+    "recommended": [
+      { "base": "systemone", "model": "jev-1.13" },
+      { "base": "systemone", "model": "jev-latest" }
+    ],
+    "plugin": "plugin",
+    "mcp_servers": [],
+    "system_prompt": "You play a side-scrolling platform game as Mario. Each step says where Mario is, whether he is on the ground, and what is ahead with distances in tiles. Keep moving right. Jump over an enemy when it is within 3 tiles, over a gap when its edge is within 2 tiles, and over a pipe or wall when it is within 2 tiles; hold the jump longer for a taller wall or a wider gap. Finish when the level is cleared. Escalate when Mario has no lives left."
+  },
+  "app": {
+    "route": "/kits/mario"
+  },
+  "session": {
+    "$comment": "One session is one run of the game. The frame the page shows is frame.jpg in the session's workspace, written by the environment on every step.",
+    "artifact": "frame.jpg",
+    "title_from": "meta.title"
+  }
+}

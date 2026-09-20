@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Super Mario</title>
+<link rel="stylesheet" href="/kits/mario/app.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><img src="/kits/mario/icon.svg" alt="" width="28" height="28"><h1>Super Mario</h1></div>
+  <span id="status" class="pill">ready</span>
+</header>
+<main class="panes">
+  <section class="stage">
+    <div class="frame-box">
+      <img id="frame" alt="The frame of the browser the model is playing in" hidden>
+      <div id="frameNote" class="frame-note">Press Start. The frame of the browser the model plays in appears here, written by the environment on every step.</div>
+    </div>
+    <p class="credits">The game is <a href="https://supermarioplay.com/game/mario.html?v=1.0.1" target="_blank" rel="noopener">Full Screen Mario at supermarioplay.com</a>; Mario belongs to Nintendo and none of the game's files ship here. The browser is driven with <a href="https://github.com/browser-use/browser-use" target="_blank" rel="noopener">Browser Use</a> (MIT). The model is <a href="https://typesafe.ai" target="_blank" rel="noopener">Jev</a> by TypeSafe, a System One model, through OpenRouter. The harness is the open-source <a href="https://github.com/HarnessRouter/SystemOneHarness" target="_blank" rel="noopener">System One Harness</a>.</p>
+  </section>
+  <section class="panel">
+    <div class="row between">
+      <strong id="harnessName">Super Mario</strong>
+      <span id="harnessModel" class="note"></span>
+    </div>
+    <label for="goal">Goal</label>
+    <textarea id="goal" rows="2">Play the level: keep running right, jump over enemies, gaps and pipes, and get as far as you can.</textarea>
+    <div class="row">
+      <button id="startBtn">Start</button>
+      <button id="cancelBtn" class="stop" hidden>Stop</button>
+      <button id="continueBtn" class="quiet" hidden>Continue</button>
+    </div>
+    <p id="taskNote" class="note"></p>
+    <div class="row between">
+      <strong id="traceTitle">Steps</strong>
+      <span id="traceMeta" class="note"></span>
+    </div>
+    <ol id="steps"></ol>
+    <p id="final" class="final" hidden></p>
+  </section>
+</main>
+<script src="/kits/mario/app.js"></script>
+</body>
+</html>
