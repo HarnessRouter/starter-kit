@@ -342,13 +342,19 @@ class Game:
         near = next((e for e in en if abs(e["dy"]) < 1), None)
         near_next = (near["dx"] - lag - (0.5 if near.get("dir") == "toward" else 0)) if near else None
         back = next((b for b in st.get("behind") or [] if b.get("dir") == "toward" and abs(b["dy"]) < 1 and b["dx"] <= 2.5), None)
-        # an enemy about to touch him outranks everything: it is the lethal thing
+        # an enemy about to touch him outranks everything: it is the lethal thing. Measured: from
+        # standing, jump_right as it arrives (1 to 2.5 tiles) survives every time
+        above = next((e for e in en if e["dy"] > 1 and e["dx"] <= 5 and e.get("dir") == "toward"), None)
         if near is not None and near["dx"] <= 4 and not fast:
             if near.get("dir") == "toward":
-                return "jump now, standing: the enemy is about to reach Mario." if near_next <= 1.5 else "wait, standing still; jump when it is 2 tiles away."
-            return "walk_left one decision to make room, then run_right and jump_right when it is about 7 tiles ahead."
+                return "jump_right now: the enemy is about to reach Mario." if near_next <= 2.2 else "wait, standing still; jump_right when it is 2 tiles away."
+            return "walk_left one decision to make room, then run_right and jump_right when it is about 6 tiles ahead."
         if back is not None and not fast:
-            return "jump now, standing: an enemy at Mario's back is about to reach him."
+            return "jump_right now: an enemy at Mario's back is about to reach him."
+        if above is not None and (near is None or near["dx"] > 6):
+            # recorded five times: the Goomba on the ledge walks off its edge and drops onto a Mario
+            # running under it
+            return "wait, standing still: the enemy above is about to drop off its ledge; jump_right when it is 2 tiles away at Mario's height."
         if walls and walls[0]["height"] >= TALL and walls[0]["dx"] <= 8:
             w = walls[0]; w_next = w["dx"] - lag
             if w["dx"] <= 0.3 and not fast:
