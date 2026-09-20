@@ -322,34 +322,49 @@ class Game:
         return d
 
     def _now(self, st: dict, reach: float, en: list, gaps: list, walls: list, blocks: list, overhead: list) -> str:
-        """What the measured facts call for in this state, in one sentence. The environment
-        executes nothing here; the model reads it and chooses."""
+        """What the measured facts call for, said for the moment the decision will land: a
+        decision arrives about a quarter second after this state, and at a run Mario covers
+        2.5 tiles in that time, so every distance here is projected by that much. Measured on
+        the live game: a running jump started 3 to 4 tiles before the first Goomba survives
+        every time (5 to 9 tiles hits the block row and drops onto it); a 4-tile pipe is cleared
+        by a long jump taken 2 to 3 tiles before it at speed; a gap by a running jump from its
+        edge. The environment executes nothing here; the model reads it and chooses."""
         held = KEY["jump"] in self._held
         on_ground = st.get("on_ground")
-        fast = abs(st.get("xvel") or 0) >= 3
+        xv = abs(st.get("xvel") or 0)
+        fast = xv >= 3
+        lag = round(xv * 60 * 0.25 / (8 * 4), 1)          # tiles covered before the decision lands
         if not on_ground:
             return "in the air, run_right keeps the run and lets the jump key go for the next jump." if held else "in the air, run_right keeps the run."
-        near = en[0] if en else None
-        if near and near.get("dir") == "toward" and abs(near["dy"]) < 1 and near["dx"] <= 6 and (overhead or not fast):
-            if near["dx"] <= 1.3:
-                return "the enemy is a tile away: jump now, standing."
-            return "an enemy walks at Mario" + (" under blocks" if overhead else "") + ": wait (stand still) and jump when it is a tile away."
-        if walls and walls[0]["height"] >= TALL and walls[0]["dx"] <= 6:
-            w = walls[0]
+        near = next((e for e in en if abs(e["dy"]) < 1), None)
+        near_next = (near["dx"] - lag - (0.5 if near.get("dir") == "toward" else 0)) if near else None
+        if walls and walls[0]["height"] >= TALL and walls[0]["dx"] <= 8:
+            w = walls[0]; w_next = w["dx"] - lag
             if w["dx"] <= 0.3 and not fast:
                 return "stopped at a tall pipe: walk_left for two decisions, then run_right, then jump_right at 2 to 3 tiles."
-            if fast and 2.0 <= w["dx"] <= 3.2:
-                return "jump_right now, and keep it held for three decisions: the pipe's take-off point is here."
-            if not fast and w["dx"] <= 3.2:
+            if not fast and w["dx"] <= 4:
                 return "too slow for the pipe from here: walk_left for two decisions, then run_right and jump_right at 2 to 3 tiles."
-            return "run_right toward the pipe; jump_right when it is 2 to 3 tiles ahead."
-        if gaps and gaps[0]["dx"] <= reach + 0.5:
-            return "jump_right now, from the gap's edge, at a run." if fast else "too slow for the gap: walk_left two decisions, then run_right and jump_right at its edge."
-        if walls and walls[0]["dx"] <= reach + 0.5:
+            if fast and 1.8 <= w_next <= 3.4:
+                return "jump_right now, and keep it held for three decisions: the pipe's take-off point is here."
+            if fast and w_next < 1.8:
+                return "jump_right now and hold it three decisions."
+            return "run_right toward the pipe; jump_right when it is about 5 tiles ahead at this speed."
+        if near is not None and near["dx"] <= 9:
+            if fast:
+                if near_next <= 4.5:
+                    return "jump_right now over the enemy: at this speed the take-off comes 3 to 4 tiles before it."
+                return "run_right; jump_right when the enemy is about 7 tiles ahead at this speed."
+            if near.get("dir") == "toward":
+                return "jump now, standing: it is about to reach Mario." if near_next <= 1.5 else "wait, standing still; jump when it is 2 tiles away."
+            return "run_right after it; jump_right when it is about 7 tiles ahead at a run."
+        if gaps and gaps[0]["dx"] <= 8:
+            g_next = gaps[0]["dx"] - lag
+            if fast:
+                return "jump_right now, from the gap's edge, at a run." if g_next <= 2.0 else "run_right to the gap; jump_right when its edge is about 4 tiles ahead at this speed."
+            return "too slow for the gap: walk_left two decisions, then run_right and jump_right when its edge is 4 tiles ahead."
+        if walls and walls[0]["dx"] - lag <= 1.5:
             return "jump_right now over the wall ahead."
-        if near and near["dx"] <= reach + 0.5 and abs(near["dy"]) < 1:
-            return "jump_right now over the enemy at a run." if fast else "wait, and jump when the enemy is a tile away."
-        if blocks and blocks[0]["dx"] <= reach + 0.5:
+        if blocks and blocks[0]["dx"] - lag <= 1.8:
             return "jump_right now, under the question block, for the coin."
         return "nothing within reach: run_right."
 
