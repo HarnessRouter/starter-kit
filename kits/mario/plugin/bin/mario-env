@@ -3,12 +3,22 @@
 # the System One base's own Python (the venv the image installs for that base, which carries
 # browser-use and the MCP SDK) and on the Chromium installed beside it; outside the image, any
 # python3 with `systemone-harness[browser]` and a Chrome on the machine will do.
+#
+# An MCP stdio server gets a restricted environment from the SDK, so nothing the image exported
+# reaches this script, and a hosted sandbox's HOME is made per session, so a home-relative venv
+# never matches one the image installed. The interpreter and the browsers are therefore found
+# here, by name: SYSTEMONE_PYTHON if the host set it for the server, then the known venv paths;
+# PLAYWRIGHT_BROWSERS_PATH if set, then the known browser roots that hold a chromium-* directory.
 here="$(cd "$(dirname "$0")/.." && pwd)"
 py=python3
-for cand in /data/agent-tools/systemone-venv/bin/python "$HOME/.systemone-venv/bin/python"; do
-  if [ -x "$cand" ]; then py="$cand"; break; fi
+for cand in "$SYSTEMONE_PYTHON" /data/agent-tools/systemone-venv/bin/python /opt/systemone-venv/bin/python "$HOME/.systemone-venv/bin/python"; do
+  if [ -n "$cand" ] && [ -x "$cand" ]; then py="$cand"; break; fi
 done
-if [ -z "$PLAYWRIGHT_BROWSERS_PATH" ] && [ -d /data/agent-tools/ms-playwright ]; then
-  export PLAYWRIGHT_BROWSERS_PATH=/data/agent-tools/ms-playwright
+if [ -z "$PLAYWRIGHT_BROWSERS_PATH" ]; then
+  for root in /data/agent-tools/ms-playwright /opt/ms-playwright /ms-playwright "$HOME/.cache/ms-playwright"; do
+    if [ -d "$root" ] && ls -d "$root"/chromium-* >/dev/null 2>&1; then
+      export PLAYWRIGHT_BROWSERS_PATH="$root"; break
+    fi
+  done
 fi
 exec "$py" "$here/server/mario_env.py"
