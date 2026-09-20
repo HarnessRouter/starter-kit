@@ -1,0 +1,12 @@
+// The kit's mark: the same drawing as kits/mario/icon.svg, which the console renders.
+export function MkMark({ size = 20 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
+      <rect width="64" height="64" rx="14" fill="#E4572E" />
+      <rect x="14" y="36" width="36" height="14" rx="3" fill="#7A2E12" />
+      <rect x="24" y="16" width="16" height="20" rx="4" fill="#FFE8D6" />
+      <rect x="20" y="12" width="24" height="8" rx="3" fill="#B71C1C" />
+      <circle cx="29" cy="25" r="2" fill="#1F1F1F" /><circle cx="35" cy="25" r="2" fill="#1F1F1F" />
+    </svg>
+  );
+}

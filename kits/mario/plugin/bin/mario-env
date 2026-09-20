@@ -1,0 +1,14 @@
+#!/bin/sh
+# The game environment, started by the runner as the harness's MCP server for a turn. It runs on
+# the System One base's own Python (the venv the image installs for that base, which carries
+# browser-use and the MCP SDK) and on the Chromium installed beside it; outside the image, any
+# python3 with `systemone-harness[browser]` and a Chrome on the machine will do.
+here="$(cd "$(dirname "$0")/.." && pwd)"
+py=python3
+for cand in /data/agent-tools/systemone-venv/bin/python "$HOME/.systemone-venv/bin/python"; do
+  if [ -x "$cand" ]; then py="$cand"; break; fi
+done
+if [ -z "$PLAYWRIGHT_BROWSERS_PATH" ] && [ -d /data/agent-tools/ms-playwright ]; then
+  export PLAYWRIGHT_BROWSERS_PATH=/data/agent-tools/ms-playwright
+fi
+exec "$py" "$here/server/mario_env.py"

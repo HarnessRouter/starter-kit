@@ -1,0 +1,114 @@
+/* Super Mario: what this app composes for itself.
+ *
+ * The shell, the app bar, the conversation column and the popovers come from reifyui and are
+ * styled by library.css / chat.css / panels.css. What is here is only the part that is about
+ * WATCHING A GAME: the stage the frame plays on, the figures over it, and how the bar sheds its
+ * contents as it narrows.
+ */
+
+/* ── The page ─────────────────────────────────────────────────────────── */
+.mk-root { height: 100vh; display: flex; flex-direction: column; background: var(--bg); overflow: hidden; }
+.mk-body { flex: 1; min-height: 0; display: flex; }
+/* The conversation column is sized to the viewport by the shared stylesheet; here it sits under
+   the app bar, so it takes the height that is left, or its composer hangs below the fold. As a
+   drawer (narrow) the same height keeps its bottom on the window's bottom edge. */
+.mk-body > .uic-chat { height: calc(100vh - 56px); }
+.mk-main {
+  flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 12px;
+  padding: 18px 22px 16px; overflow: auto;
+}
+
+/* ── The app bar ──────────────────────────────────────────────────────── */
+.mk-back {
+  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 9px;
+  border-radius: 7px; color: var(--mute); text-decoration: none; font-size: 13px; white-space: nowrap;
+}
+.mk-back:hover { background: var(--line-soft); color: var(--ink); }
+.mk-sep { width: 1px; height: 20px; background: var(--line); flex-shrink: 0; }
+.mk-chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px; min-width: 0;
+  border-radius: var(--r-pill); font-size: 12px; white-space: nowrap;
+  background: var(--surface); color: var(--ink-2); border: 1px solid var(--line);
+}
+.mk-chip-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; max-width: 22ch; }
+.mk-chip.is-live { background: var(--brand-50); color: var(--brand-ink); border-color: var(--brand-soft); }
+.mk-chip.is-ok { background: var(--ok-soft); color: #047857; border-color: #A7F3D0; }
+.mk-chip.is-bad { background: var(--hot-soft); color: #B91C1C; border-color: #FCA5A5; }
+.mk-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--brand); animation: mk-blink 1.2s ease-in-out infinite; }
+@keyframes mk-blink { 0%, 100% { opacity: .35; } 50% { opacity: 1; } }
+.mk-who { padding: 10px 12px 8px; font-size: 13px; font-weight: 600; color: var(--ink); }
+.mk-danger { color: #B91C1C; }
+
+/* ── The stage ────────────────────────────────────────────────────────── */
+.mk-stage-wrap { display: flex; flex-direction: column; gap: 10px; }
+/* Keeps the game's shape and fits the window: the width is capped at what the height budget
+   allows once the bar, the credits and the row of cards are taken out, so on a wide short window
+   the whole column stays in view instead of the cards falling below the fold. */
+.mk-stage {
+  --mk-below: 250px;
+  position: relative; width: 100%; max-width: calc((100vh - 56px - var(--mk-below)) * 1.6);
+  margin: 0 auto; aspect-ratio: 16 / 10;
+  min-height: 220px; background: #0B1020; border-radius: 16px; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 30px 60px -32px rgba(15, 23, 42, .55), 0 0 0 1px rgba(15, 23, 42, .06);
+}
+.mk-frame { width: 100%; height: 100%; object-fit: contain; display: block; image-rendering: pixelated; }
+
+.mk-hud {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  display: flex; align-items: center; gap: 16px; padding: 22px 16px 12px;
+  background: linear-gradient(to top, rgba(6, 9, 22, .88), rgba(6, 9, 22, 0));
+  color: #E5E7EB; font-size: 12px;
+}
+.mk-live { display: inline-flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+.mk-live-dot { width: 8px; height: 8px; border-radius: 999px; background: #EF4444; box-shadow: 0 0 0 3px rgba(239, 68, 68, .25); animation: mk-blink 1.2s ease-in-out infinite; }
+.mk-hud-spacer { flex: 1; }
+.mk-stat { display: inline-flex; align-items: baseline; gap: 5px; white-space: nowrap; }
+.mk-stat b { font-variant-numeric: tabular-nums; font-weight: 600; color: #fff; font-size: 13px; }
+.mk-stat span { color: #A3A9B8; }
+.btn.mk-stop { height: 28px; padding: 0 10px; background: rgba(255, 255, 255, .12); border-color: rgba(255, 255, 255, .22); color: #fff; }
+.btn.mk-stop:hover { background: rgba(255, 255, 255, .2); }
+
+.mk-empty {
+  display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center;
+  color: #B8C0D0; font-size: 13.5px; line-height: 1.5; padding: 24px; max-width: 46ch;
+}
+.mk-empty-t { font-size: 19px; font-weight: 600; color: #fff; letter-spacing: -.01em; }
+.mk-play { height: 44px; padding: 0 24px; margin-top: 6px; font-size: 15px; font-weight: 600; border-radius: 999px; gap: 8px; }
+.mk-pulse { width: 10px; height: 10px; border-radius: 999px; background: var(--brand); animation: mk-blink 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .mk-dot, .mk-live-dot, .mk-pulse { animation: none; } }
+
+.mk-credits { margin: 0; font-size: 12px; line-height: 1.55; color: var(--mute); }
+.mk-credits a { color: var(--ink-2); }
+
+.mk-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 4px; }
+.mk-fact { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 12px 14px; box-shadow: var(--shadow-1); min-width: 0; }
+.mk-fact-k { display: flex; align-items: center; gap: 7px; font-size: 11.5px; font-weight: 700; color: var(--brand-ink); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 5px; }
+.mk-fact-v { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
+
+/* ── Narrow ───────────────────────────────────────────────────────────── */
+/* Keep-priority in the app bar as space runs out: the status > the model > the brand text >
+   the labels on the buttons. */
+.uic-topbar { container-type: inline-size; }
+@container (max-width: 760px) { .uic-topbar .mk-chip-t { max-width: 12ch; } }
+@container (max-width: 640px) {
+  .uic-topbar .wm-text { display: none; }
+  .uic-topbar .btn .lbl, .uic-topbar .mk-back .lbl { display: none; }
+  .uic-topbar .btn { padding: 0 9px; }
+}
+@container (max-width: 460px) { .uic-topbar .mk-model { display: none; } }
+/* The cards are the first thing shed: below this width they would stack into a column that pushes
+   past the fold, and on a short window they would take the stage's room. */
+@media (max-width: 1100px), (max-height: 700px) { .mk-facts { display: none; } }
+@media (max-width: 900px) {
+  .mk-main { padding: 12px 12px 12px; gap: 10px; }
+  /* Narrow: the cards stack and the column scrolls; the stage takes the width it has. */
+  .mk-stage { border-radius: 12px; max-width: none; }
+  .mk-hud { gap: 10px; padding: 18px 12px 10px; }
+  .mk-stat span { display: none; }
+}
+@media (max-width: 640px) {
+  .uic-topbar { padding: 0 10px; gap: 6px; }
+  .mk-empty { padding: 16px; font-size: 13px; }
+  .mk-empty-t { font-size: 16px; }
+}
