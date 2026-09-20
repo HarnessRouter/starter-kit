@@ -321,6 +321,38 @@ class Game:
         d["text"] = f"{name}: holding {held}. " + d["text"]
         return d
 
+    def _now(self, st: dict, reach: float, en: list, gaps: list, walls: list, blocks: list, overhead: list) -> str:
+        """What the measured facts call for in this state, in one sentence. The environment
+        executes nothing here; the model reads it and chooses."""
+        held = KEY["jump"] in self._held
+        on_ground = st.get("on_ground")
+        fast = abs(st.get("xvel") or 0) >= 3
+        if not on_ground:
+            return "in the air, run_right keeps the run and lets the jump key go for the next jump." if held else "in the air, run_right keeps the run."
+        near = en[0] if en else None
+        if near and near.get("dir") == "toward" and abs(near["dy"]) < 1 and near["dx"] <= 6 and (overhead or not fast):
+            if near["dx"] <= 1.3:
+                return "the enemy is a tile away: jump now, standing."
+            return "an enemy walks at Mario" + (" under blocks" if overhead else "") + ": wait (stand still) and jump when it is a tile away."
+        if walls and walls[0]["height"] >= TALL and walls[0]["dx"] <= 6:
+            w = walls[0]
+            if w["dx"] <= 0.3 and not fast:
+                return "stopped at a tall pipe: walk_left for two decisions, then run_right, then jump_right at 2 to 3 tiles."
+            if fast and 2.0 <= w["dx"] <= 3.2:
+                return "jump_right now, and keep it held for three decisions: the pipe's take-off point is here."
+            if not fast and w["dx"] <= 3.2:
+                return "too slow for the pipe from here: walk_left for two decisions, then run_right and jump_right at 2 to 3 tiles."
+            return "run_right toward the pipe; jump_right when it is 2 to 3 tiles ahead."
+        if gaps and gaps[0]["dx"] <= reach + 0.5:
+            return "jump_right now, from the gap's edge, at a run." if fast else "too slow for the gap: walk_left two decisions, then run_right and jump_right at its edge."
+        if walls and walls[0]["dx"] <= reach + 0.5:
+            return "jump_right now over the wall ahead."
+        if near and near["dx"] <= reach + 0.5 and abs(near["dy"]) < 1:
+            return "jump_right now over the enemy at a run." if fast else "wait, and jump when the enemy is a tile away."
+        if blocks and blocks[0]["dx"] <= reach + 0.5:
+            return "jump_right now, under the question block, for the coin."
+        return "nothing within reach: run_right."
+
     def _describe(self, st: dict) -> dict:
         if not st.get("ready"):
             return {"ok": True, "text": "The game is loading.", "fields": {"ready": False}, "candidates": {}, "terminal": False, "realtime": True}
@@ -341,7 +373,8 @@ class Game:
         if en:
             e = en[0]
             where = "at Mario's height" if abs(e["dy"]) < 1 else ("above" if e["dy"] > 0 else "below")
-            parts.append(f"Nearest enemy: {e['kind']} {e['dx']} tiles ahead, {where}, walking {'toward Mario' if e.get('dir') == 'toward' else 'away'}."
+            arrives = f", at Mario in about {max(1, round(e['dx'] / 0.6))} decisions if he stands still" if e.get("dir") == "toward" and abs(e["dy"]) < 1 else ""
+            parts.append(f"Nearest enemy: {e['kind']} {e['dx']} tiles ahead, {where}, walking {'toward Mario' if e.get('dir') == 'toward' else 'away'}{arrives}."
                          + (f" {len(en) - 1} more behind it." if len(en) > 1 else ""))
         else:
             parts.append("No enemy within 12 tiles ahead.")
@@ -360,6 +393,9 @@ class Game:
             parts.append(f"Wall ahead: {w['kind']} {w['dx']} tiles ahead, {w['height']} tiles tall; it takes {need}.")
         else:
             parts.append("No pipe or wall within 8 tiles.")
+        overhead = [o for o in st.get("overhead") or [] if o["dx"] <= 6]
+        if overhead:
+            parts.append(f"Blocks overhead {overhead[0]['dx']} tiles ahead: a running jump there hits them and drops Mario straight down.")
         blocks = st.get("blocks") or []
         if blocks:
             b = blocks[0]
@@ -381,6 +417,7 @@ class Game:
         within += [f"the question block {blocks[0]['dx']} tiles ahead"] if blocks and blocks[0]["dx"] <= reach + 0.5 else []
         parts.append(f"Until the next decision Mario covers about {reach} tiles, and a walking enemy closes about {closing}. "
                      + (f"Within one step: {'; '.join(within)}." if within else "Nothing is within one step."))
+        parts.append("Now: " + self._now(st, reach, en, gaps, walls, blocks, overhead))
         if self._stopped >= 2:
             parts.append(f"Mario has been stopped in place for {self._stopped} decisions by something he is pressed "
                          "against: walk_left, then run_right, then jump_right at 2 to 3 tiles.")
