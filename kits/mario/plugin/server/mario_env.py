@@ -391,6 +391,15 @@ class Game:
             return "run_right after it; jump_right when it is about 7 tiles ahead at a run."
         if gaps and gaps[0]["dx"] <= 8:
             g_next = gaps[0]["dx"] - lag
+            # recorded six times: the jump across lands nine tiles on, among the enemies waiting
+            # there (a pair beyond the gap, a Goomba dropping off its ledge). Ones walking toward
+            # the gap come to it and fall in; the jump waits for a clear landing
+            zone = [e for e in en if gaps[0]["dx"] + 1 <= e["dx"] <= gaps[0]["dx"] + 11]
+            if zone and any(e.get("dir") == "toward" for e in zone):
+                if xv < 1 and gaps[0]["dx"] <= 4:
+                    return "wait, standing still at the gap: the enemies beyond it are walking to it and will fall in; jump_right when none stands within 10 tiles past the edge, or when one is 2 tiles away."
+                if gaps[0]["dx"] <= 4:
+                    return "wait (let every key go) before the gap: enemies wait where the jump would land."
             if xv >= 4:
                 return "jump_right now, from the gap's edge, at a run." if g_next <= 2.0 else "run_right to the gap; jump_right when its edge is about 4 tiles ahead at this speed."
             if gaps[0]["dx"] >= 3.5:
