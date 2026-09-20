@@ -358,7 +358,15 @@ class Game:
         if not on_ground:
             if held and rising:
                 return "keep jump_right held: Mario is still rising, and the jump grows as long as it is held."
-            return "falling: run_right keeps the run; jump_right again the moment Mario lands if something is close."
+            # measured: right kept through the descent lands 9.4 tiles on and slides 2 more; left
+            # held brakes the flight to 6.8 tiles and lands him stopped. Recorded five times: the
+            # jump over the fourth pipe lands a tile before the first gap and the run carries him in
+            gap_close = gaps and gaps[0]["dx"] <= 4.5
+            foe_close = any(abs(e["dy"]) < 1 and e["dx"] <= 4 for e in en)
+            if fast and (gap_close or foe_close):
+                what = "the gap" if gap_close else "the enemy"
+                return f"walk_left now: in the air it brakes, and Mario lands stopped short of {what}; then jump_right from there at a run."
+            return "falling: run_right keeps the run."
         near = next((e for e in en if abs(e["dy"]) < 1), None)
         near_next = (near["dx"] - lag - (0.5 if near.get("dir") == "toward" else 0)) if near else None
         back = next((b for b in st.get("behind") or [] if b.get("dir") == "toward" and abs(b["dy"]) < 1 and b["dx"] <= 2.5), None)
