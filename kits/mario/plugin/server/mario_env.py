@@ -357,20 +357,26 @@ class Game:
                 return "jump_right now: the enemy is about to reach Mario." if near_next <= 2.2 else "wait, standing still; jump_right when it is 2 tiles away."
             return "walk_left one decision to make room, then run_right and jump_right when it is about 6 tiles ahead."
         if back is not None and not fast:
-            return "jump_right now: an enemy at Mario's back is about to reach him."
+            return "jump, standing (the jump tool, not jump_right): the enemy at Mario's back passes under him."
         if above is not None and (near is None or near["dx"] > 6):
             # recorded five times: the Goomba on the ledge walks off its edge and drops onto a Mario
             # running under it
             return "wait, standing still: the enemy above is about to drop off its ledge; jump_right when it is 2 tiles away at Mario's height."
         if walls and walls[0]["height"] >= TALL and walls[0]["dx"] <= 8:
+            # measured: the pipe is cleared at near full speed (4.9 and up) with the jump held
+            # long; at a jog the apex is level with its top and the side stops him (recorded)
             w = walls[0]; w_next = w["dx"] - lag
-            if w["dx"] <= 0.3 and not fast:
-                return "stopped at a tall pipe: walk_left for two decisions, then run_right, then jump_right at 2 to 3 tiles."
-            if not fast and w["dx"] <= 4:
-                return "too slow for the pipe from here: walk_left for two decisions, then run_right and jump_right at 2 to 3 tiles."
-            if fast and 1.8 <= w_next <= 3.4:
+            full = xv >= 4.5
+            follower = next((b for b in st.get("behind") or [] if b.get("dir") == "toward" and abs(b["dy"]) < 1 and b["dx"] <= 6), None)
+            if not full and w["dx"] <= 4.5:
+                if follower is not None:
+                    return "jump, standing (the jump tool): the enemy behind passes under; then walk_left two decisions and run at the pipe."
+                return "too slow for the pipe from here: walk_left for two decisions, then run_right to full speed and jump_right at 2 to 3 tiles."
+            if not full:
+                return "run_right to full speed; jump_right when the pipe is about 5 tiles ahead and Mario is running flat out."
+            if 1.8 <= w_next <= 3.4:
                 return "jump_right now, and keep it held for three decisions: the pipe's take-off point is here."
-            if fast and w_next < 1.8:
+            if w_next < 1.8:
                 return "jump_right now and hold it three decisions."
             return "run_right toward the pipe; jump_right when it is about 5 tiles ahead at this speed."
         if near is not None and near["dx"] <= 9:
@@ -385,8 +391,10 @@ class Game:
             return "run_right after it; jump_right when it is about 7 tiles ahead at a run."
         if gaps and gaps[0]["dx"] <= 8:
             g_next = gaps[0]["dx"] - lag
-            if fast:
+            if xv >= 4:
                 return "jump_right now, from the gap's edge, at a run." if g_next <= 2.0 else "run_right to the gap; jump_right when its edge is about 4 tiles ahead at this speed."
+            if gaps[0]["dx"] >= 3.5:
+                return "run_right to gain speed for the gap; jump_right when its edge is about 4 tiles ahead at a run."
             return "too slow for the gap: walk_left two decisions, then run_right and jump_right when its edge is 4 tiles ahead."
         if walls and walls[0]["dx"] - lag <= 1.5:
             return "jump_right now over the wall ahead."
