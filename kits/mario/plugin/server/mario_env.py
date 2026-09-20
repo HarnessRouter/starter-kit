@@ -155,6 +155,7 @@ class Game:
         self.steps = 0
         self.frames = 0
         self._stopped = 0          # consecutive runs that moved nothing
+        self._acted_at: list[float] = []   # when each action landed: the loop's own pace, measured
 
         self._lives = None
         self._restarting_until = 0.0
@@ -314,7 +315,19 @@ class Game:
             self._restarting_until = max(self._restarting_until, time.time() + 3.0)
         return time.time() < self._restarting_until
 
+    def lag(self) -> float:
+        """Seconds from the state a decision reads to the moment it lands, measured as the loop
+        runs: the median of the last intervals between actions, less the tick itself. The pace
+        differs by deployment (3.4 decisions a second here, 2.2 through a relay), so a constant
+        would say "now" at the wrong tile."""
+        gaps = [b - a for a, b in zip(self._acted_at[-8:], self._acted_at[-7:])]
+        if len(gaps) < 3:
+            return 0.3
+        gaps.sort()
+        return min(0.9, max(0.12, gaps[len(gaps) // 2] - TICK))
+
     def act(self, name: str) -> dict:
+        self._acted_at.append(time.time())
         async def go():
             await self._start()
             await self._tick(name)
@@ -340,7 +353,7 @@ class Game:
         on_ground = st.get("on_ground")
         xv = abs(st.get("xvel") or 0)
         fast = xv >= 3
-        lag = round(xv * 60 * 0.25 / (8 * 4), 1)          # tiles covered before the decision lands
+        lag = round(xv * 60 * self.lag() / (8 * 4), 1)    # tiles covered before the decision lands, at the measured pace
         rising = (st.get("yvel") or 0) < 0
         if not on_ground:
             if held and rising:
@@ -433,7 +446,7 @@ class Game:
         if en:
             e = en[0]
             where = "at Mario's height" if abs(e["dy"]) < 1 else ("above" if e["dy"] > 0 else "below")
-            arrives = f", at Mario in about {max(1, round(e['dx'] / 0.6))} decisions if he stands still" if e.get("dir") == "toward" and abs(e["dy"]) < 1 else ""
+            arrives = f", at Mario in about {max(1, round(e['dx'] / (1.5 * (self.lag() + TICK))))} decisions if he stands still" if e.get("dir") == "toward" and abs(e["dy"]) < 1 else ""
             parts.append(f"Nearest enemy: {e['kind']} {e['dx']} tiles ahead, {where}, walking {'toward Mario' if e.get('dir') == 'toward' else 'away'}{arrives}."
                          + (f" {len(en) - 1} more behind it." if len(en) > 1 else ""))
         else:
@@ -467,9 +480,9 @@ class Game:
         # to 7.8 tiles a step (11.5 -> 6 -> 1.3; 9.8 -> 2), a standing wall about 4; the hold, the
         # model's answer and the enemy's own walk all fit in one step, and an enemy 2 tiles away
         # at a run is already too close to jump, so it is named a step earlier than it arrives
-        # measured: a decision lands about every 0.35 s; at a full run (9 tiles a second) that is
+        # at the loop's measured pace: at a full run (9 tiles a second) a third of a second is
         # 3 tiles, and a walking enemy adds about half a tile of its own
-        reach = round(max(0.5, abs(st.get("xvel") or 0) * 60 * 0.35 / (8 * 4)), 1)
+        reach = round(max(0.5, abs(st.get("xvel") or 0) * 60 * (self.lag() + TICK) / (8 * 4)), 1)
         closing = round(reach + 0.6, 1)
         within = [f"the {en[0]['kind']} {en[0]['dx']} tiles ahead"] if en and en[0]["dx"] <= closing + 2.5 else []
         within += [f"the gap {gaps[0]['dx']} tiles ahead"] if gaps and gaps[0]["dx"] <= reach + 0.5 else []

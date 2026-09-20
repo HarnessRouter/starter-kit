@@ -49,8 +49,8 @@ export function turnRunning(detail) {
  *  not one of its observations. */
 export function readObservation(text) {
   const t = String(text || '');
-  const m = /Lives (\d+), time (\d+), score (\d+)\./.exec(t);
-  if (m) return { lives: +m[1], time: +m[2], score: +m[3] };
+  const m = /Lives (\d+), coins (\d+), time (\d+), score (\d+)\./.exec(t);
+  if (m) return { lives: +m[1], coins: +m[2], time: +m[3], score: +m[4] };
   const d = /Mario has just died\. Lives left: (\d+)/.exec(t);
   return d ? { lives: +d[1] } : null;
 }
