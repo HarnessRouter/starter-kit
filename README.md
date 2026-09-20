@@ -9,8 +9,8 @@
 </div>
 
 <div align="center">
-  <h3>Launch a working agent product. Then make it yours.</h3>
-  <p><strong>Production kits and readable demos for HarnessRouter, the world's first unified interface for agent harnesses.</strong></p>
+  <h3>Five working products. Two readable demos. One place to start.</h3>
+  <p><strong>Starter Kits and reference implementations for HarnessRouter.</strong></p>
 </div>
 
 <p align="center">
@@ -22,17 +22,32 @@
 
 <br>
 
-**Start with finished work, then open the code.** Launch a complete agent-powered product from a Starter Kit, or study a compact demo that shows the integration patterns in code you can read in an afternoon.
+This repository is a catalog of working agent products and the code patterns behind them.
 
-[HarnessRouter](https://harnessrouter.ai) gives supported agent harnesses one shared interface. Your app sends a task through one Agent API. The harness gets a sandbox, tools, and a loop, then returns finished files and artifacts instead of only tokens.
+**Kits** (`kits/`) are complete products you can launch and make your own. **Demos** (`demos/`)
+are small MIT-licensed apps that show streaming, sessions, follow-up turns, cancellation, and file
+download in code you can read in an afternoon.
 
-<p align="center">
-  <img src=".github/images/kits/kit-mario-gameplay.gif" width="100%" alt="A System One model uses the Super Mario Starter Kit to play a live browser game by choosing one typed action per step.">
-  <br>
-  <sub><strong>A System One model playing a live browser game through a Starter Kit.</strong> It reads structured game state, chooses one typed action per step, and never generates control text.</sub>
-</p>
+[HarnessRouter](https://harnessrouter.ai) is the world's first unified interface for agent
+harnesses. Each Kit packages the app, the Harness it needs, and the Skills that make the product
+work.
 
-<p align="center"><sub>The demo uses <a href="https://supermarioplay.com/game/mario.html?v=1.0.1">Full Screen Mario</a>. Mario and its characters belong to Nintendo. No game files ship with this repository.</sub></p>
+> [!TIP]
+> **Want a product to build from?** Start with [the Kits](#the-kits). **Want to learn the API?** Start with [the Demos](#demos).
+
+## The kits
+
+Five working products, each launched from **Starter Kits** in the HarnessRouter console. Launching
+one provisions the Harness it needs and serves the app from the HarnessRouter image. There is no
+separate service to deploy, no database to configure, and no API key to paste into the app.
+
+| Kit | What it gives you |
+|---|---|
+| **[Slides](./kits/slides)** | An editable presentation designed through conversation. |
+| **[Sheets](./kits/sheets)** | A spreadsheet where an agent can fill a column, row by row. |
+| **[Dashboards](./kits/dashboard)** | Live charts generated from questions about your database. |
+| **[Videos](./kits/video)** | A storyboard, timeline, and exported film from one description. |
+| **[Super Mario](./kits/mario)** | A live browser game controlled by a System One decision loop. |
 
 <a href="https://github.com/HarnessRouter/starter-kit" title="Star HarnessRouter Starter Kit on GitHub">
   <picture>
@@ -40,24 +55,6 @@
     <img src=".github/images/github-readme-star-cta-desktop.svg" width="100%" alt="Build from working agent products. Star this repo.">
   </picture>
 </a>
-
-> [!TIP]
-> **Start here:** [Choose a kit](#the-kits) · [Run a demo](#demos) · [See the repository structure](#repository-structure) · [Review the licenses](#licensing)
-
-## Choose your starting point
-
-| | Starter Kits | Demos |
-|---|---|---|
-| **Use them to** | Launch a working product and make it your own. | Learn the API from a small local app. |
-| **What is included** | The app, harness configuration, and Skills plugin. | Frontend, server, tests, agent mapping, and documentation. |
-| **How they run** | Launch from the HarnessRouter console. | Run locally with Node.js and a HarnessRouter API key. |
-| **License** | [HarnessRouter Starter Kit License](./kits/LICENSE.md) | [MIT](./LICENSE) |
-
-## The kits
-
-Five working products, each launched from **Starter Kits** in the HarnessRouter console. Launching
-one provisions the Harness it needs and serves the app from the HarnessRouter image. There is no
-separate service to deploy, no database to configure, and no API key to paste into the app.
 
 Each kit's Skills ship as a plugin, a package in the
 [Agent Plugins](https://agent-plugins.org) format at `kits/<kit>/plugin/`: `plugin.json` names and
@@ -130,6 +127,12 @@ A System One model plays a live platform game several decisions a second while y
 browser. The environment reads the game's structured state, presents a finite action space, and
 holds each chosen key state until the next decision. The model never sees a pixel and never writes
 control text.
+
+<p align="center">
+  <img src=".github/images/kits/kit-mario-gameplay.gif" width="100%" alt="A System One model uses the Super Mario Starter Kit to play a live browser game by choosing one typed action per step.">
+  <br>
+  <sub>Jev plays through typed decisions while the Kit streams its browser. The game is <a href="https://supermarioplay.com/game/mario.html?v=1.0.1">Full Screen Mario</a>. Mario and its characters belong to Nintendo. No game files ship with this repository.</sub>
+</p>
 
 **[Open the Super Mario kit →](./kits/mario)**
 
