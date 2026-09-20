@@ -16,6 +16,7 @@ every other tool an action whose parameters are enumerable. The browser is Brows
 """
 
 import asyncio
+import base64
 import glob
 import os
 import pathlib
@@ -35,15 +36,27 @@ ITEMS = {"Coin", "Mushroom", "FireFlower", "Star", "Vine", "Text", "Shell", "Fir
 INSTRUCTIONS = ("You play a side-scrolling platform game as Mario. Each step says where Mario is, whether he is on "
                 "the ground, and what is ahead with distances in tiles. One step lasts about half a second and "
                 "covers up to 4 tiles at a run. Keep moving right. The state names any enemy, gap or wall that is "
-                "within one step: jump over it now, with jump_right; hold the jump longer for a taller wall or a "
-                "wider gap. Otherwise run right. When Mario has just died, wait. Finish when the level is cleared. "
-                "Escalate when Mario has no lives left.")
+                "within one step: jump over it now, with jump_right, held as long as the state says (a taller "
+                "wall or a wider gap needs a longer hold). Otherwise run right. When Mario has just died, wait. "
+                "Finish when the level is cleared. Escalate when Mario has no lives left.")
+# Measured on the live game, feet above the ground at the apex: a short hold reaches 3.1 tiles, a
+# medium 3.9, a long 4.1, standing or at a run. So a 2-tile pipe takes a short hold, a 3-tile one a
+# medium, and a 4-tile one a long hold with the run-up the jump_right macro provides (from against
+# it the apex is level with the top and the side blocks the way; from 1.5 to 3 tiles back it clears).
+def hold_for(height: float) -> str:
+    return "short" if height <= 2 else "medium" if height <= 3 else "long"
+
+TALL = 4          # a wall this tall needs the run-up
+# The frame the kit's page shows: Chrome's own screencast, a JPEG for every third frame the game
+# draws (about twenty a second), each written whole to frame.jpg. The page reads that file.
+SCREENCAST = {"format": "jpeg", "quality": 45, "maxWidth": 960, "maxHeight": 600, "everyNthFrame": 3}
 
 STATE_JS = """(function(){
   if (!window.player || !window.gamescreen) return {ready: false};
   var u = window.unitsize || 4, T = 8 * u, p = player, sl = gamescreen.left, sr = gamescreen.right;
   function tiles(px){ return Math.round(px / T * 10) / 10; }
   var enemies = [], gaps = [], walls = [];
+  var ground = (window.map && map.floor) ? map.floor * u : p.bottom;   // the ground under him, not his feet: heights must not shrink mid-jump
   (window.characters || []).forEach(function(c){
     if (!c.alive || c === player || c.title === undefined) return;
     if (['Coin','Mushroom','FireFlower','Star','Vine','Text','Shell','Fireball'].indexOf(c.title) >= 0) return;
@@ -60,15 +73,20 @@ STATE_JS = """(function(){
   if (gapStart !== null) gaps.push({dx: tiles(gapStart), width: tiles(12 * T - gapStart)});
   (window.solids || []).forEach(function(s){
     if (!s.alive || ['Pipe','Block','Brick','Stone'].indexOf(s.title) < 0) return;
-    var dx = (s.left - p.right) / T;
-    if (dx >= 0 && dx <= 8 && s.bottom > p.top - T && s.top < p.bottom) {
-      walls.push({kind: s.title.toLowerCase(), dx: Math.round(dx * 10) / 10, height: tiles(p.bottom - s.top)});
-    }
+    // anything whose far edge is still ahead of Mario counts, including the pipe he is pressed
+    // against (he overlaps its edge by a tenth of a tile there, and a dx >= 0 filter lost it:
+    // forty steps of "no wall within 8 tiles" against a pipe). A wall stands on the ground: what
+    // sits at or below the ground is floor, and what floats a tile or more above it (the block
+    // rows) is run under, not jumped
+    if (s.right <= p.left || s.top >= ground - 2 || s.bottom < ground - T) return;
+    var dx = Math.max(0, (s.left - p.right) / T);
+    if (dx <= 8) walls.push({kind: s.title.toLowerCase(), dx: Math.round(dx * 10) / 10, height: tiles(ground - s.top)});
   });
   enemies.sort(function(a, b){ return a.dx - b.dx; }); walls.sort(function(a, b){ return a.dx - b.dx; }); gaps.sort(function(a, b){ return a.dx - b.dx; });
+  walls = walls.filter(function(w, i){ return i === 0 || w.dx !== walls[i - 1].dx || w.height !== walls[i - 1].height; });
   var d = window.data || {};
   function amt(k){ return d[k] && d[k].amount !== undefined ? d[k].amount : null; }
-  return {ready: true, x: tiles(p.left), y: tiles((window.map && map.floor ? map.floor * u : p.bottom) - p.bottom),
+  return {ready: true, x: tiles(p.left), y: tiles(ground - p.bottom),
           dying: !!p.dying,
           screen_tiles: tiles(sr - sl), xvel: Math.round((p.xvel || 0) * 10) / 10, on_ground: !!p.resting, dead: !!p.dead,
           power: p.power || 1, enemies: enemies.slice(0, 3), gaps: gaps.slice(0, 2), walls: walls.slice(0, 2),
@@ -117,6 +135,7 @@ class Game:
         self.frame_path = workspace_root() / "frame.jpg"
         self.started_at = time.time()
         self.steps = 0
+        self.frames = 0
         self._lives = None
         self._restarting_until = 0.0
         self._held: set[int] = set()
@@ -137,6 +156,8 @@ class Game:
         await self._session.start()
         await self._session.navigate_to(GAME_URL)
         self._cdp = await self._session.get_or_create_cdp_session()
+        self._cdp.cdp_client.register.Page.screencastFrame(self._on_frame)
+        await self._screencast()
         for _ in range(80):
             st = await self._eval(STATE_JS)
             if isinstance(st, dict) and st.get("ready"):
@@ -144,22 +165,27 @@ class Game:
             await asyncio.sleep(0.25)
         await self._eval("window.unpause && unpause(); 'ok'")
 
+    async def _screencast(self) -> None:
+        await self._cdp.cdp_client.send.Page.startScreencast(params=SCREENCAST, session_id=self._cdp.session_id)
+
+    def _on_frame(self, ev: dict, session_id=None) -> None:
+        """Runs on the browser loop for every screencast frame: the JPEG goes to frame.jpg whole
+        (a temp file renamed over it, so a reader never sees half a picture), and the frame is
+        acknowledged, without which Chrome stops sending."""
+        try:
+            tmp = self.frame_path.with_suffix(".jpg.tmp")
+            tmp.write_bytes(base64.b64decode(ev["data"]))
+            os.replace(tmp, self.frame_path)
+            self.frames += 1
+        except Exception:  # noqa: BLE001 - a missed frame is a missed frame, never a failed step
+            pass
+        self._loop.create_task(self._cdp.cdp_client.send.Page.screencastFrameAck(
+            params={"sessionId": ev["sessionId"]}, session_id=self._cdp.session_id))
+
     async def _eval(self, expression: str):
         r = await self._cdp.cdp_client.send.Runtime.evaluate(params={"expression": expression, "returnByValue": True},
                                                              session_id=self._cdp.session_id)
         return (r.get("result") or {}).get("value")
-
-    async def _frame(self) -> None:
-        try:
-            r = await self._cdp.cdp_client.send.Page.captureScreenshot(params={"format": "jpeg", "quality": 45},
-                                                                       session_id=self._cdp.session_id)
-            import base64
-            data = base64.b64decode(r["data"])
-            tmp = self.frame_path.with_suffix(".jpg.tmp")
-            tmp.write_bytes(data)
-            os.replace(tmp, self.frame_path)
-        except Exception:  # noqa: BLE001 - a missed frame is a missed frame, never a failed step
-            pass
 
     async def _down(self, *codes: int) -> None:
         for c in codes:
@@ -186,12 +212,15 @@ class Game:
         elif name == "jump_right":
             await self._up(L)
             await self._down(R, S)
+            await self._land()
+            await self._approach()
             await self._eval(f"keydown({U}); 'ok'")
             await asyncio.sleep(hold)
             await self._eval(f"keyup({U}); 'ok'")
             await asyncio.sleep(max(0.0, 0.75 - hold))      # the flight, run key still down
         elif name == "jump":
             await self._up(R, S, L)
+            await self._land()
             await self._eval(f"keydown({U}); 'ok'")
             await asyncio.sleep(hold)
             await self._eval(f"keyup({U}); 'ok'")
@@ -205,6 +234,84 @@ class Game:
             await self._up(R, S, L)
             await asyncio.sleep(0.25)
 
+    async def _land(self) -> None:
+        """A jump key pressed in the air does nothing in this game, so a jump asked for mid-flight
+        is taken on landing: the action means what it says instead of being spent."""
+        for _ in range(30):
+            if await self._eval("!!player.resting || !!player.dead || !!player.dying"):
+                return
+            await asyncio.sleep(0.03)
+
+    async def _approach(self) -> None:
+        """The model decides to jump; when to leave the ground is the environment's, the way
+        holding the keys is. A decision lands every half second or so and a jump is a one-tile
+        affair, so a jump taken the moment it is chosen is early or late by luck. Measured on the
+        live game: a wall 4 tiles tall is cleared by a long jump from 1.5 to 3 tiles back and from
+        nowhere else (from against it the apex is level with the top; at a run from 4 back it
+        peaks early and hits the side); a running jump covers about 9 tiles, so an enemy jumped
+        from 4 tiles is landed well past, one jumped from 2 at a run is hit on take-off, and a gap
+        is best left from its edge. So: keep running until the nearest thing ahead is at its
+        distance, or, pressed against a tall wall with no speed, step back first."""
+        st = await self._eval(STATE_JS)
+        if not isinstance(st, dict) or not st.get("ready"):
+            return
+        target, want = self._target(st)
+        if target is None:
+            return
+        R, S, L = KEY["right"], KEY["sprint"], KEY["left"]
+        if target == "wall" and want is None:      # pressed against a tall wall, standing
+            await self._up(R, S)
+            await self._down(L)
+            for _ in range(40):
+                await asyncio.sleep(0.03)
+                st = await self._eval(STATE_JS)
+                w = ((st or {}).get("walls") or [None])[0]
+                if not w or w["dx"] >= 1.6:
+                    break
+            await self._up(L)
+            await self._down(R, S)
+            await asyncio.sleep(0.05)
+            return
+        for _ in range(34):                        # at most a second of running
+            await asyncio.sleep(0.03)
+            st = await self._eval(STATE_JS)
+            if not isinstance(st, dict) or st.get("dying") or st.get("dead"):
+                return
+            t, w = self._target(st)
+            if t != target or w is None or self._distance(st, t) <= w:
+                return
+
+    @staticmethod
+    def _distance(st: dict, kind: str) -> float:
+        rows = st.get({"enemy": "enemies", "wall": "walls", "gap": "gaps"}[kind]) or []
+        return rows[0]["dx"] if rows else 99.0
+
+    @staticmethod
+    def _target(st: dict):
+        """What the jump is for and the distance to leave the ground at: (kind, tiles), with
+        None tiles meaning jump now, and ("wall", None) meaning pressed against a tall wall."""
+        near = []
+        en, walls, gaps = st.get("enemies") or [], st.get("walls") or [], st.get("gaps") or []
+        if en and en[0]["dx"] <= 10:
+            near.append((en[0]["dx"], "enemy"))
+        if walls and walls[0]["dx"] <= 6:
+            near.append((walls[0]["dx"], "wall"))
+        if gaps and gaps[0]["dx"] <= 6:
+            near.append((gaps[0]["dx"], "gap"))
+        if not near:
+            return None, None
+        dx, kind = min(near)
+        fast = abs(st.get("xvel") or 0) >= 3
+        if kind == "wall":
+            if walls[0]["height"] < TALL:
+                return None, None                       # any distance within a step clears it
+            if dx < 1.4 and not fast and st.get("on_ground"):
+                return "wall", None
+            return "wall", 2.8
+        if kind == "enemy":
+            return ("enemy", 4.0) if fast and dx > 4.0 else (None, None)
+        return ("gap", 1.5) if dx > 1.5 else (None, None)
+
     # ── the tools ──
     def reset(self, goal: str) -> dict:
         async def go():
@@ -216,7 +323,10 @@ class Game:
                     break
                 await asyncio.sleep(0.25)
             await self._eval("window.unpause && unpause(); 'ok'")
-            await self._frame()
+            try:
+                await self._screencast()
+            except Exception:  # noqa: BLE001 - already running across the navigation
+                pass
             return {"ok": True}
         self.steps = 0
         return self._run(go())
@@ -225,7 +335,6 @@ class Game:
         async def go():
             await self._start()
             st = await self._eval(STATE_JS)
-            await self._frame()
             return st if isinstance(st, dict) else {"ready": False}
         st = self._run(go())
         return self._describe(st)
@@ -260,9 +369,7 @@ class Game:
             await self._start()
             await self._macro(name, seconds)
             await asyncio.sleep(0.05)
-            st = await self._settled()
-            await self._frame()
-            return st
+            return await self._settled()
         st = self._run(go())
         self.steps += 1
         d = self._describe(st)
@@ -273,9 +380,7 @@ class Game:
         async def go():
             await self._start()
             await self._macro("wait", 0.25)
-            st = await self._settled()
-            await self._frame()
-            return st
+            return await self._settled()
         d = self._describe(self._run(go()))
         d["text"] = "Waited 0.25 s. " + d["text"]
         return d
@@ -307,18 +412,23 @@ class Game:
         parts.append(f"Gap in the ground: edge {gaps[0]['dx']} tiles ahead, {gaps[0]['width']} tiles wide." if gaps
                      else "No gap in the ground within 12 tiles.")
         walls = st.get("walls") or []
-        parts.append(f"Wall ahead: {walls[0]['kind']} {walls[0]['dx']} tiles ahead, {walls[0]['height']} tiles tall." if walls
-                     else "No pipe or wall within 8 tiles.")
+        if walls:
+            w = walls[0]
+            parts.append(f"Wall ahead: {w['kind']} {w['dx']} tiles ahead, {w['height']} tiles tall; "
+                         f"jump_right held {hold_for(w['height'])} clears it.")
+        else:
+            parts.append("No pipe or wall within 8 tiles.")
         # what one step reaches, and what is inside it: the fact the rule needs, stated rather
         # than left for the model to work out from a speed and a distance (it jumped one step late)
         # measured on the live game: at a run the distance to a walking enemy closes about 5.5
-        # tiles a step (11.5 -> 6 -> 1.3), a standing wall about 4; the hold, the model's answer
-        # and the enemy's own walk all fit in one step
+        # to 7.8 tiles a step (11.5 -> 6 -> 1.3; 9.8 -> 2), a standing wall about 4; the hold, the
+        # model's answer and the enemy's own walk all fit in one step, and an enemy 2 tiles away
+        # at a run is already too close to jump, so it is named a step earlier than it arrives
         reach = round(max(1.0, abs(st.get("xvel") or 0) * 60 * 0.6 / (8 * 4)), 1)
         closing = round(reach + 1.5, 1)
-        within = [f"the {en[0]['kind']} {en[0]['dx']} tiles ahead"] if en and en[0]["dx"] <= closing + 0.5 else []
-        within += [f"the gap {gaps[0]['dx']} tiles ahead"] if gaps and gaps[0]["dx"] <= reach + 0.5 else []
-        within += [f"the {walls[0]['kind']} {walls[0]['dx']} tiles ahead"] if walls and walls[0]["dx"] <= reach + 0.5 else []
+        within = [f"the {en[0]['kind']} {en[0]['dx']} tiles ahead"] if en and en[0]["dx"] <= closing + 2.5 else []
+        within += [f"the gap {gaps[0]['dx']} tiles ahead (hold long)"] if gaps and gaps[0]["dx"] <= reach + 0.5 else []
+        within += [f"the {walls[0]['kind']} {walls[0]['dx']} tiles ahead (hold {hold_for(walls[0]['height'])})"] if walls and walls[0]["dx"] <= reach + 0.5 else []
         parts.append(f"One step reaches about {reach} tiles, and a walking enemy closes about {closing}. "
                      + (f"Within one step: {'; '.join(within)}." if within else "Nothing is within one step."))
         parts.append(f"Lives {st.get('lives')}, time {st.get('time')}, score {st.get('score')}.")
@@ -326,7 +436,7 @@ class Game:
         fields = {k: st.get(k) for k in ("x", "y", "on_ground", "dead", "xvel", "lives", "time", "score", "world")}
         fields["enemies"] = en
         fields["gaps"] = gaps
-        fields["walls"] = walls
+        fields["walls"] = [{**w, "hold": hold_for(w["height"])} for w in walls]
         fields["step_reach_tiles"] = reach
         fields["within_one_step"] = within
         return {"ok": True, "text": " ".join(parts), "fields": fields, "candidates": {}, "terminal": terminal}
