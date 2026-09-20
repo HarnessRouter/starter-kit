@@ -8,9 +8,15 @@ const esc = (s) => String(s ?? '').replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<'
 
 function setStatus(text, cls) { const s = $('status'); s.textContent = text; s.className = 'pill' + (cls ? ' ' + cls : ''); }
 function addStep(html, cls) {
-  const li = document.createElement('li'); li.className = cls || ''; li.innerHTML = html; $('steps').appendChild(li);
-  li.scrollIntoView({ block: 'nearest' });
+  const list = $('steps');
+  const li = document.createElement('li'); li.className = cls || ''; li.innerHTML = html; list.appendChild(li);
+  while (list.children.length > 150) list.removeChild(list.firstChild);   // the last 150 items, the run goes on
+  state.itemsTotal = (state.itemsTotal || 0) + 1;
+  list.start = state.itemsTotal - list.children.length + 1;      // numbering continues past the trim
+  const panel = list.closest('.panel');
+  if (panel) panel.scrollTop = panel.scrollHeight;
 }
+let calls = 0;
 
 async function harness() {
   if (state.harness) return state.harness;
@@ -46,8 +52,8 @@ async function start(previous) {
   $('steps').innerHTML = ''; $('final').hidden = true; $('traceMeta').textContent = ''; $('taskNote').textContent = '';
   $('startBtn').disabled = true; $('cancelBtn').hidden = false; $('continueBtn').hidden = true;
   setStatus('running', 'running');
-  state.controller = new AbortController(); state.startedAt = performance.now();
-  let calls = 0;
+  state.controller = new AbortController(); state.startedAt = performance.now(); state.itemsTotal = 0;
+  calls = 0;
   try {
     const r = await fetch(`${API}/responses`, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'text/event-stream' },
       body: JSON.stringify(body), signal: state.controller.signal, cache: 'no-store' });
