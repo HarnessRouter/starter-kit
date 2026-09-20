@@ -9,34 +9,52 @@
 </div>
 
 <div align="center">
-  <h3>Starter demos and production kits for HarnessRouter.</h3>
+  <h3>Five working products. Two readable demos. One place to start.</h3>
+  <p><strong>Starter Kits and reference implementations for HarnessRouter.</strong></p>
 </div>
 
-<div align="center">
-
-[![License](https://img.shields.io/badge/License-MIT_%2B_Commercial-blue.svg)](./LICENSE)
-[![Built on HarnessRouter](https://img.shields.io/badge/Built_on-HarnessRouter-111111)](https://github.com/HarnessRouter/harnessrouter)
-[![Discord](https://img.shields.io/badge/Discord-join-5865F2?logo=discord&logoColor=white)](https://discord.gg/nPcbwqVPb2)
-[![X](https://img.shields.io/badge/Follow-%40HARNESSROUTER-000000?logo=x&logoColor=white)](https://x.com/HARNESSROUTER)
-
-</div>
+<p align="center">
+  <a href="https://github.com/HarnessRouter/starter-kit" title="Star HarnessRouter Starter Kit on GitHub"><img src="https://img.shields.io/github/stars/HarnessRouter/starter-kit?style=flat&amp;logo=github&amp;logoColor=white&amp;label=Stars&amp;labelColor=444c56&amp;color=285aff" alt="GitHub stars"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/License-Mixed-285AFF?style=flat&amp;labelColor=444c56" alt="Mixed license: MIT demos and separately licensed kits"></a>
+  <a href="./kits"><img src="https://img.shields.io/badge/Starter_Kits-5-285AFF?style=flat&amp;labelColor=444c56" alt="Five starter kits"></a>
+  <a href="https://discord.gg/nPcbwqVPb2"><img src="https://img.shields.io/badge/Discord-Join-5865F2?style=flat&amp;logo=discord&amp;logoColor=white&amp;labelColor=444c56" alt="Join the HarnessRouter Discord"></a>
+</p>
 
 <br>
 
-Starter demos and production-ready kits for [HarnessRouter](https://harnessrouter.ai), the unified API for running agent harnesses such as Codex and Claude Code as your product backend.
+This repository is a catalog of working agent products and the code patterns behind them.
 
-An LLM returns tokens. A harness gives it a sandbox, tools, and a loop, so it returns the actual file. HarnessRouter lets your app send a task through one API and get back finished work.
+**Kits** (`kits/`) are complete products you can launch and make your own. **Demos** (`demos/`)
+are small MIT-licensed apps that show streaming, sessions, follow-up turns, cancellation, and file
+download in code you can read in an afternoon.
 
-This repository holds two kinds of thing. **Kits** (`kits/`) are whole products you can launch and
-use today — Slides, Sheets, Dashboards and Videos — each a foundation to build your own on.
-**Demos** (`demos/`) are small MIT-licensed apps that show the integration patterns in code you can
-read in an afternoon.
+[HarnessRouter](https://harnessrouter.ai) is the world's first unified interface for agent
+harnesses. Each Kit packages the app, the Harness it needs, and the Skills that make the product
+work.
+
+> [!TIP]
+> **Want a product to build from?** Start with [the Kits](#the-kits). **Want to learn the API?** Start with [the Demos](#demos).
 
 ## The kits
 
-Four working products, each launched from **Starter Kits** in the HarnessRouter console. Launching
-one provisions the Harness it needs and serves the app from the HarnessRouter image — there is no
+Five working products, each launched from **Starter Kits** in the HarnessRouter console. Launching
+one provisions the Harness it needs and serves the app from the HarnessRouter image. There is no
 separate service to deploy, no database to configure, and no API key to paste into the app.
+
+| Kit | What it gives you |
+|---|---|
+| **[Slides](./kits/slides)** | An editable presentation designed through conversation. |
+| **[Sheets](./kits/sheets)** | A spreadsheet where an agent can fill a column, row by row. |
+| **[Dashboards](./kits/dashboard)** | Live charts generated from questions about your database. |
+| **[Videos](./kits/video)** | A storyboard, timeline, and exported film from one description. |
+| **[Super Mario](./kits/mario)** | A live browser game controlled by a System One decision loop. |
+
+<a href="https://github.com/HarnessRouter/starter-kit" title="Star HarnessRouter Starter Kit on GitHub">
+  <picture>
+    <source media="(max-width: 600px)" srcset=".github/images/github-readme-star-cta-mobile.svg">
+    <img src=".github/images/github-readme-star-cta-desktop.svg" width="100%" alt="Build from working agent products. Star this repo.">
+  </picture>
+</a>
 
 Each kit's Skills ship as a plugin, a package in the
 [Agent Plugins](https://agent-plugins.org) format at `kits/<kit>/plugin/`: `plugin.json` names and
@@ -46,17 +64,18 @@ into any other server that speaks the
 [Unified Harness Protocol](https://unifiedharnessprotocol.org/spec/2026-09-12/plugins) or any client that
 reads the format.
 
-Every one of them is the same idea in a different shape: **a session is a document**. The list of
-decks, sheets, dashboards or films *is* the Harness's session list, and the document is a file in
-that session's workspace. Delete the session and the work goes with it.
+The four document kits share one idea: **a session is a document**. The list of decks, sheets,
+dashboards, or films is the Harness's session list, and the document is a file in that session's
+workspace. Delete the session and the work goes with it. Super Mario uses the same kit boundary
+for a live environment instead of a document editor.
 
 <br>
 
-### Slides — design a deck by talking about it
+### Slides: design a deck by talking about it
 
 Ask for a presentation and the agent works the way a designer does: structure first, then a style
-system, then slide by slide. Everything it makes is an object on the canvas you can drag, retype
-and restyle — it hands you a deck, not a picture of one.
+system, then slide by slide. Everything it makes is an object on the canvas you can drag, retype,
+and restyle. It hands you a deck, not a picture of one.
 
 ![The Slides kit: the request at the top of the conversation, the run beneath it, and the finished deck on the canvas](.github/images/kits/kit-slides.png)
 
@@ -64,7 +83,7 @@ and restyle — it hands you a deck, not a picture of one.
 
 <br>
 
-### Sheets — a column that is an agent
+### Sheets: a column that is an agent
 
 Rows are your data. An **agent column** runs one of your other agents once per row, builds its
 input from the columns to its left, and fills each cell with what that agent said and made. Two
@@ -76,7 +95,7 @@ hundred rows is two hundred runs you did not have to orchestrate.
 
 <br>
 
-### Dashboards — ask your database a question
+### Dashboards: ask your database a question
 
 Say what you want to understand. The agent reads your schema, decides which charts answer it,
 writes the SQL for each and lays them out. Opening the dashboard re-runs every query, so the
@@ -89,12 +108,12 @@ before it runs.
 
 <br>
 
-### Videos — describe the film, watch the shots arrive
+### Videos: describe the film, watch the shots arrive
 
 The agent plans the shots, writes a prompt for each, renders them, and lays them on a canvas while
-they land. Cut them on a real timeline — trim, split, layers, a music bed, a voice-over — and
-export one file. Shots can be seeded from a still or continue from the frame the last one ended
-on, which is how two clips join without a jump.
+they land. Cut them on a real timeline with trimming, splitting, layers, a music bed, and a
+voice-over, then export one file. Shots can be seeded from a still or continue from the frame the
+last one ended on, which is how two clips join without a jump.
 
 ![The Videos kit: a two-shot cinematic teaser on the timeline, its shots on the canvas, and the exported film playing](.github/images/kits/kit-video.png)
 
@@ -102,13 +121,30 @@ on, which is how two clips join without a jump.
 
 <br>
 
-They are launched from one page in the console:
+### Super Mario: watch a System One model decide
+
+A System One model plays a live platform game several decisions a second while you watch its
+browser. The environment reads the game's structured state, presents a finite action space, and
+holds each chosen key state until the next decision. The model never sees a pixel and never writes
+control text.
+
+<p align="center">
+  <img src=".github/images/kits/kit-mario-gameplay.gif" width="100%" alt="A System One model uses the Super Mario Starter Kit to play a live browser game by choosing one typed action per step.">
+  <br>
+  <sub>Jev plays through typed decisions while the Kit streams its browser. The game is <a href="https://supermarioplay.com/game/mario.html?v=1.0.1">Full Screen Mario</a>. Mario and its characters belong to Nintendo. No game files ship with this repository.</sub>
+</p>
+
+**[Open the Super Mario kit →](./kits/mario)**
+
+<br>
+
+All five are launched from one page in the console:
 
 ![The Starter Kits page in the HarnessRouter console](.github/images/kits/starter-kits-page.png)
 
 ## Licensing at a glance
 
-The kits under `kits/` are **not** MIT — they carry the
+The kits under `kits/` are **not** MIT. They carry the
 [HarnessRouter Starter Kit License Agreement](./kits/LICENSE.md). Individual local use is free;
 so is internal use for up to three people, or any size on HarnessRouter Cloud. Selling or hosting
 one for an external customer needs the
@@ -117,8 +153,8 @@ terms are [below](#licensing).
 
 ## Demos
 
-Smaller, MIT-licensed, and meant to be read: these show the HarnessRouter integration patterns —
-streaming, sessions, follow-up turns, cancellation, file download — in as little code as possible.
+Smaller, MIT-licensed, and meant to be read: these show streaming, sessions, follow-up turns,
+cancellation, and file download in as little code as possible.
 
 ### 1. Cursor-style coding app
 
@@ -161,7 +197,8 @@ Run one demo at a time because both use port `3000` by default.
 │   ├── slides/                # Design a deck by conversation
 │   ├── sheets/                # A spreadsheet where a column is an agent
 │   ├── dashboard/             # Ask your database a question
-│   └── video/                 # Describe the film, watch the shots arrive
+│   ├── video/                 # Describe the film, watch the shots arrive
+│   └── mario/                 # Watch a System One model play a browser game
 ├── .env.example               # Shared local configuration template
 ├── package.json               # npm workspace commands
 └── README.md                  # Repository and demo index
@@ -172,7 +209,7 @@ Each demo owns its frontend, server, tests, agent mapping, and documentation. Th
 ## Prerequisites
 
 - Node.js 22 or newer
-- A HarnessRouter API key, from the [quickstart](https://app.harnessrouter.ai/quickstart?ref=github-starter) — the kits need none; only the demos do
+- A HarnessRouter API key, from the [quickstart](https://app.harnessrouter.ai/quickstart?ref=github-starter). The kits need none; only the demos do.
 - A HarnessRouter coding-agent ID for the primary demo
 
 ## Commands
@@ -188,10 +225,10 @@ Credentials belong in an ignored `.env` file and never in source control. See ea
 
 ## Resources
 
-- **[HarnessRouter](https://github.com/HarnessRouter/harnessrouter)** — the open-source engine these demos and kits run on.
-- **[Documentation and Cloud](https://harnessrouter.ai)** — hosted service, guides, and pricing.
-- **[Unified Harness Protocol](https://unifiedharnessprotocol.org)** — the open standard behind it.
-- **[Discord](https://discord.gg/nPcbwqVPb2)** — community for questions and integrations.
+- **[HarnessRouter](https://github.com/HarnessRouter/harnessrouter):** the open-source engine these demos and kits run on.
+- **[Documentation and Cloud](https://harnessrouter.ai):** hosted service, guides, and pricing.
+- **[Unified Harness Protocol](https://unifiedharnessprotocol.org):** the open standard behind it.
+- **[Discord](https://discord.gg/nPcbwqVPb2):** community for questions and integrations.
 
 ## Licensing
 

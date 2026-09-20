@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="64" viewBox="0 0 480 64" role="img" aria-labelledby="title">
+  <title id="title">Build from working agent products. Star this repo.</title>
+  <rect width="480" height="64" rx="6" fill="#eef3ff"/>
+  <g font-family="Arial,Helvetica,sans-serif" text-anchor="middle">
+    <text x="240" y="24" font-size="16" fill="#231815">Build from working agent products.</text>
+    <text x="240" y="49" font-size="18" font-weight="700" fill="#2247D5"><tspan fill="#e3b341">★ </tspan>Star this repo →</text>
+  </g>
+</svg>
