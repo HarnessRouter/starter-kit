@@ -394,8 +394,10 @@ class Game:
             # recorded six times: the jump across lands nine tiles on, among the enemies waiting
             # there (a pair beyond the gap, a Goomba dropping off its ledge). Ones walking toward
             # the gap come to it and fall in; the jump waits for a clear landing
-            zone = [e for e in en if gaps[0]["dx"] + 1 <= e["dx"] <= gaps[0]["dx"] + 11]
-            if zone and any(e.get("dir") == "toward" for e in zone):
+            # an enemy above the landing (on the ledge past the first gap) drops off its edge
+            # whichever way it walks now, so it counts whatever its direction (recorded five times)
+            zone = [e for e in en if gaps[0]["dx"] + 1 <= e["dx"] <= gaps[0]["dx"] + 11 and (e["dy"] > 1 or e.get("dir") == "toward")]
+            if zone:
                 if xv < 1 and gaps[0]["dx"] <= 4:
                     return "wait, standing still at the gap: the enemies beyond it are walking to it and will fall in; jump_right when none stands within 10 tiles past the edge, or when one is 2 tiles away."
                 if gaps[0]["dx"] <= 4:
