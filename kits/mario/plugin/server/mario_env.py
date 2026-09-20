@@ -28,14 +28,14 @@ import time
 
 GAME_URL = os.environ.get("MARIO_URL", "https://supermarioplay.com/game/mario.html?v=1.0.1")
 TILE = 8                      # game units per tile; the game draws a tile as 8 * unitsize px
-TICK = 0.10                   # an action sets the keys and holds them this long; they stay set until the next
+# an action sets the keys and returns; they stay set until the next action changes them
 KEY = {"left": 37, "right": 39, "jump": 38, "down": 40, "sprint": 16}
 KEY_NAMES = {37: "left", 39: "right", 38: "jump", 40: "down", 16: "run"}
 ITEMS = {"Coin", "Mushroom", "FireFlower", "Star", "Vine", "Text", "Shell", "Fireball"}
 INSTRUCTIONS = ("You play a side-scrolling platform game as Mario, deciding several times a second. Each action sets "
-                "the keys for the next moment and they stay set until you change them: run_right holds right and run, "
-                "jump_right holds right, run and jump, jump holds jump alone, walk_left holds left, wait lets every "
-                "key go. The state says where Mario is, what he is doing, what is ahead and behind with distances in "
+                "the keys for the next moment and they stay set until you change them: run_right holds right and run; "
+                "jump_right holds right, run and jump, and a jump held in the air goes again the moment Mario lands, "
+                "so holding it hops him along; jump holds jump alone; walk_left holds left; wait lets every key go. The state says where Mario is, what he is doing, what is ahead and behind with distances in "
                 "tiles, and which keys are held. Keep moving right and jump over what is within one step. Finish when "
                 "the level is cleared. Escalate when Mario has no lives left.")
 TALL = 4                      # a wall this tall is cleared only at a run
@@ -53,7 +53,7 @@ STATE_JS = """(function(){
   }
   var u = window.unitsize || 4, T = 8 * u, p = player, sl = gamescreen.left, sr = gamescreen.right;
   function tiles(px){ return Math.round(px / T * 10) / 10; }
-  var enemies = [], behind = [], gaps = [], walls = [], blocks = [], overhead = [];
+  var enemies = [], behind = [], gaps = [], walls = [], blocks = [], overhead = [], drops = [];
   // heights are measured from where Mario stands: his feet on the ground, and in the air the
   // level he last stood on, so a jump does not shrink the wall ahead and a stair step is one
   // tile tall from the step below it, not four from the floor
@@ -66,14 +66,28 @@ STATE_JS = """(function(){
     if (dx >= 0 && dx <= 16) enemies.push({kind: c.title, dx: Math.round(dx * 10) / 10, dy: Math.round(dy * 10) / 10, dir: (c.xvel || 0) < 0 ? 'toward' : 'away'});
     else if (back >= 0 && back <= 8) behind.push({kind: c.title, dx: Math.round(back * 10) / 10, dy: Math.round(dy * 10) / 10, dir: (c.xvel || 0) > 0 ? 'toward' : 'away'});
   });
-  var floors = (window.solids || []).filter(function(s){ return s.alive && (s.title === 'Floor' || s.title === 'Stone') && s.top >= p.bottom - 4; });
-  var x = p.right, gapStart = null;
-  for (var i = 0; i <= 12 * T; i += T / 4) {
-    var covered = floors.some(function(f){ return f.left <= x + i && x + i <= f.right; });
-    if (!covered && gapStart === null) gapStart = i;
-    if (covered && gapStart !== null) { if (i - gapStart >= T / 2) gaps.push({dx: tiles(gapStart), width: tiles(i - gapStart)}); gapStart = null; }
+  // the ground ahead as a profile from where Mario stands: each quarter tile, the highest surface
+  // of floor, stone or pipe within five tiles above his level and eight below it (the block rows
+  // float higher: run under, never walked on). No surface at all is a pit; a surface a tile or
+  // more below his level is a drop, until the ground is back level, or a wall, or a pit. Read
+  // from his level and not from his feet: below the floor's top (falling into a gap, standing in
+  // the slot between two stairs) the floor is still there, and read from his feet it vanished,
+  // the "gap 12 tiles wide" three lives were lost to
+  var terrain = (window.solids || []).filter(function(s){ return s.alive && (s.title === 'Floor' || s.title === 'Stone' || s.title === 'Pipe'); });
+  function surface(x0, x1){ var best = null; terrain.forEach(function(f){ if (f.left < x1 && x0 < f.right && f.top >= ground - 5 * T && f.top <= ground + 8 * T && (best === null || f.top < best)) best = f.top; }); return best === null ? null : Math.round((ground - best) / T * 10) / 10; }
+  var x = p.right, prof = [];
+  for (var i = 0; i <= 14 * T; i += T / 4) prof.push(surface(x + i, x + i + 1));
+  var gapStart = null, dropStart = null;
+  for (var k = 0; k < prof.length; k++) {
+    var h = prof[k];
+    if (h === null) { if (gapStart === null) gapStart = k; }
+    else if (gapStart !== null) { if (k - gapStart >= 2) gaps.push({dx: tiles(gapStart * T / 4), width: tiles((k - gapStart) * T / 4)}); gapStart = null; }
+    if (h !== null && h <= -1) { if (dropStart === null) dropStart = k; }
+    else if (dropStart !== null) { drops.push({dx: tiles(dropStart * T / 4), depth: -Math.min.apply(null, prof.slice(dropStart, k)), width: tiles((k - dropStart) * T / 4), then: h === null ? 'pit' : (h >= 1 ? 'wall' : 'level')}); dropStart = null; }
   }
-  if (gapStart !== null && 12 * T - gapStart >= T / 2) gaps.push({dx: tiles(gapStart), width: tiles(12 * T - gapStart)});
+  if (gapStart !== null && prof.length - gapStart >= 2) gaps.push({dx: tiles(gapStart * T / 4), width: tiles((prof.length - gapStart) * T / 4), open: true});
+  if (dropStart !== null) drops.push({dx: tiles(dropStart * T / 4), depth: -Math.min.apply(null, prof.slice(dropStart)), width: tiles((prof.length - dropStart) * T / 4), then: 'unknown'});
+  var overPit = !p.resting && surface(p.left, p.right) === null;
   (window.solids || []).forEach(function(s){
     if (!s.alive || ['Pipe','Block','Brick','Stone'].indexOf(s.title) < 0) return;
     // anything whose far edge is still ahead of Mario counts, including the pipe he is pressed
@@ -107,7 +121,7 @@ STATE_JS = """(function(){
   return {ready: true, x: tiles(p.left), y: tiles(ground - p.bottom), level_x: tiles(p.left + (window.__s1scroll || 0)),
           dying: !!p.dying,
           screen_tiles: tiles(sr - sl), xvel: Math.round((p.xvel || 0) * 10) / 10, yvel: Math.round((p.yvel || 0) * 10) / 10, on_ground: !!p.resting, dead: !!p.dead,
-          power: p.power || 1, enemies: enemies.slice(0, 3), behind: behind.slice(0, 2), gaps: gaps.slice(0, 2), walls: walls.slice(0, 2), blocks: blocks.slice(0, 2), overhead: overhead.slice(0, 4),
+          power: p.power || 1, enemies: enemies.slice(0, 3), behind: behind.slice(0, 2), gaps: gaps.slice(0, 2), drops: drops.slice(0, 2), over_pit: overPit, walls: walls.slice(0, 2), blocks: blocks.slice(0, 2), overhead: overhead.slice(0, 4),
           lives: amt('lives'), time: amt('time'), score: amt('score'), coins: amt('coins'), world: amt('world'), paused: !!window.paused,
           ending: !!(window.map && map.ending)};
 })()"""
@@ -160,6 +174,8 @@ class Game:
         self._lives = None
         self._restarting_until = 0.0
         self._held: set[int] = set()
+        self._armed = None         # the landing re-press a jump chosen in the air is waiting for
+        self._world = None         # the level the run started in; the next one means it is cleared
 
     def _run(self, coro, timeout: float = 120.0):
         return asyncio.run_coroutine_threadsafe(coro, self._loop).result(timeout)
@@ -227,20 +243,52 @@ class Game:
                 self._held.discard(c)
 
     async def _tick(self, name: str) -> None:
-        """The key state each action means, held for one tick. The environment executes; it
-        does not time anything for the model: where to leave the ground is the model's call,
-        from the facts the state and its instructions carry."""
+        """The key state each action means. The environment executes; it does not time anything
+        for the model: where to leave the ground is the model's call, from the facts the state
+        and its instructions carry. The keys are set and the call returns; the game runs on
+        while the next decision is made."""
         R, S, U, L = KEY["right"], KEY["sprint"], KEY["jump"], KEY["left"]
         keys = {"run_right": (R, S), "jump_right": (R, S, U), "jump": (U,), "walk_left": (L,), "wait": ()}[name]
-        if U in keys and U in self._held and await self._eval("!!player.resting"):
-            # "jump" means press jump: a key still held from the last jump would do nothing on
-            # the ground (the game wants a release first), so it is let go and pressed again,
-            # the way a thumb does. Recorded: four lives to a jump that never happened
-            await self._eval(f"keyup({U}); 'ok'")
-            self._held.discard(U)
-            await asyncio.sleep(0.04)
+        if self._armed is not None:
+            self._armed.cancel()
+            self._armed = None
+        if U in keys:
+            if await self._eval("!!player.resting"):
+                if U in self._held:
+                    # "jump" means press jump: a key still held from the last jump would do nothing on
+                    # the ground (the game wants a release first), so it is let go and pressed again,
+                    # the way a thumb does. Recorded: four lives to a jump that never happened
+                    await self._eval(f"keyup({U}); 'ok'")
+                    self._held.discard(U)
+                    await asyncio.sleep(0.04)
+            else:
+                # in the air the jump key stays held and is pressed again the moment Mario lands: a
+                # held jump button is a jump on landing, the way a thumb plays it, and any later
+                # action cancels it. Recorded nine times in a row: the jump over the fourth pipe
+                # comes down a tile before the first gap, and no decision could arrive in time
+                self._armed = self._loop.create_task(self._jump_on_landing())
         await self._keys(*keys)
-        await asyncio.sleep(TICK)
+
+    async def _jump_on_landing(self) -> None:
+        U = KEY["jump"]
+        for _ in range(150):
+            await asyncio.sleep(0.016)
+            if await self._eval("!!player.dead || !!player.dying"):
+                return
+            if await self._eval("!!player.resting"):
+                break
+        else:
+            return
+        # one evaluation, so a cancellation cannot leave the key half way: the game takes the
+        # release and the press in the same tick
+        await self._eval(f"keyup({U}); keydown({U}); 'ok'")
+        self._held.add(U)
+
+    async def _down(self, *codes: int) -> None:
+        for c in codes:
+            if c not in self._held:
+                await self._eval(f"keydown({c}); 'ok'")
+                self._held.add(c)
 
     async def _unstick(self) -> None:
         """Held into a pipe's side in the air, Mario "falls" in place at terminal speed for as long
@@ -279,6 +327,7 @@ class Game:
                 pass
             return {"ok": True}
         self.steps = 0
+        self._world = None
         return self._run(go())
 
     def observe(self) -> dict:
@@ -324,7 +373,7 @@ class Game:
         if len(gaps) < 3:
             return 0.3
         gaps.sort()
-        return min(0.9, max(0.12, gaps[len(gaps) // 2] - TICK))
+        return min(0.9, max(0.12, gaps[len(gaps) // 2]))
 
     def act(self, name: str) -> dict:
         self._acted_at.append(time.time())
@@ -341,14 +390,17 @@ class Game:
         d["text"] = f"{name}: holding {held}. " + d["text"]
         return d
 
-    def _now(self, st: dict, reach: float, en: list, gaps: list, walls: list, blocks: list, overhead: list) -> str:
+    def _now(self, st: dict, reach: float, en: list, gaps: list, walls: list, blocks: list, overhead: list, drops: list) -> str:
         """What the measured facts call for, said for the moment the decision will land: a
-        decision arrives about a quarter second after this state, and at a run Mario covers
-        2.5 tiles in that time, so every distance here is projected by that much. Measured on
-        the live game: a running jump started 3 to 4 tiles before the first Goomba survives
-        every time (5 to 9 tiles hits the block row and drops onto it); a 4-tile pipe is cleared
-        by a long jump taken 2 to 3 tiles before it at speed; a gap by a running jump from its
-        edge. The environment executes nothing here; the model reads it and chooses."""
+        decision lands a fraction of a second after this state, and at a run Mario covers two
+        to three tiles in that time, so every distance here is projected by that much. The
+        nearest thing ahead governs; a farther one waits its turn (recorded: a gap five tiles
+        on outranked the one-tile step Mario was pressed against, for 284 decisions, until the
+        clock ran out). Measured on the live game: a running jump started 1.5 to 4 tiles before
+        the first Goomba survives (5 to 9 tiles hits the block row above it and drops onto it);
+        a 4-tile pipe is cleared by a long jump taken 2 to 3 tiles before it at speed; a gap or
+        a drop by a jump from its edge; and a jump held in the air goes again as Mario lands, so
+        hops chain. The environment executes nothing here; the model reads it and chooses."""
         held = KEY["jump"] in self._held
         on_ground = st.get("on_ground")
         xv = abs(st.get("xvel") or 0)
@@ -356,26 +408,29 @@ class Game:
         lag = round(xv * 60 * self.lag() / (8 * 4), 1)    # tiles covered before the decision lands, at the measured pace
         rising = (st.get("yvel") or 0) < 0
         if not on_ground:
+            if st.get("over_pit"):
+                return "Mario is over the gap and nothing changes the fall now; when he has died, wait."
             if held and rising:
                 return "keep jump_right held: Mario is still rising, and the jump grows as long as it is held."
-            # measured: right kept through the descent lands 9.4 tiles on and slides 2 more; left
-            # held brakes the flight to 6.8 tiles and lands him stopped. Recorded five times: the
-            # jump over the fourth pipe lands a tile before the first gap and the run carries him in
-            gap_close = gaps and gaps[0]["dx"] <= 4.5
-            foe_close = any(abs(e["dy"]) < 1 and e["dx"] <= 4 for e in en)
-            if fast and (gap_close or foe_close):
-                what = "the gap" if gap_close else "the enemy"
-                return f"walk_left now: in the air it brakes, and Mario lands stopped short of {what}; then jump_right from there at a run."
+            # recorded nine times in a row: the jump over the fourth pipe comes down a tile before
+            # the first gap, and neither a brake in the air (he dropped in from 0.8 tiles) nor the
+            # run (it carried him in before the next decision) saved him. A held jump goes again
+            # the moment he lands, so the hop over what is ahead is chosen now, in the air
+            soon = ((gaps and gaps[0]["dx"] <= 12) or (drops and drops[0]["dx"] <= 12) or (walls and walls[0]["dx"] <= 12)
+                    or any(e["dx"] <= 12 and e["dy"] > -1 for e in en))
+            if soon:
+                return "jump_right, and keep it held: the held jump goes again the moment Mario lands, over what is ahead."
             return "falling: run_right keeps the run."
         near = next((e for e in en if abs(e["dy"]) < 1), None)
-        near_next = (near["dx"] - lag - (0.5 if near.get("dir") == "toward" else 0)) if near else None
+        toward = near is not None and near.get("dir") == "toward"
+        takeoff = (near["dx"] - lag - (0.5 if toward else 0)) if near else None   # where a jump chosen now leaves the ground
         back = next((b for b in st.get("behind") or [] if b.get("dir") == "toward" and abs(b["dy"]) < 1 and b["dx"] <= 2.5), None)
+        above = next((e for e in en if e["dy"] > 1 and e["dx"] <= 5 and e.get("dir") == "toward"), None)
         # an enemy about to touch him outranks everything: it is the lethal thing. Measured: from
         # standing, jump_right as it arrives (1 to 2.5 tiles) survives every time
-        above = next((e for e in en if e["dy"] > 1 and e["dx"] <= 5 and e.get("dir") == "toward"), None)
         if near is not None and near["dx"] <= 4 and not fast:
-            if near.get("dir") == "toward":
-                return "jump_right now: the enemy is about to reach Mario." if near_next <= 2.2 else "wait, standing still; jump_right when it is 2 tiles away."
+            if toward:
+                return "jump_right now: the enemy is about to reach Mario." if takeoff <= 2.2 else "wait, standing still; jump_right when it is 2 tiles away."
             return "walk_left one decision to make room, then run_right and jump_right when it is about 6 tiles ahead."
         if back is not None and not fast:
             return "jump, standing (the jump tool, not jump_right): the enemy at Mario's back passes under him."
@@ -383,35 +438,66 @@ class Game:
             # recorded five times: the Goomba on the ledge walks off its edge and drops onto a Mario
             # running under it
             return "wait, standing still: the enemy above is about to drop off its ledge; jump_right when it is 2 tiles away at Mario's height."
-        if walls and walls[0]["height"] >= TALL and walls[0]["dx"] <= 8:
-            # measured: the pipe is cleared at near full speed (4.9 and up) with the jump held
-            # long; at a jog the apex is level with its top and the side stops him (recorded)
-            w = walls[0]; w_next = w["dx"] - lag
-            full = xv >= 4.5
-            follower = next((b for b in st.get("behind") or [] if b.get("dir") == "toward" and abs(b["dy"]) < 1 and b["dx"] <= 6), None)
-            if not full and w["dx"] <= 4.5:
-                if follower is not None:
-                    return "jump, standing (the jump tool): the enemy behind passes under; then walk_left two decisions and run at the pipe."
-                return "too slow for the pipe from here: walk_left for two decisions, then run_right to full speed and jump_right at 2 to 3 tiles."
-            if not full:
-                return "run_right to full speed; jump_right when the pipe is about 5 tiles ahead and Mario is running flat out."
-            if 1.8 <= w_next <= 3.4:
-                return "jump_right now, and keep it held for three decisions: the pipe's take-off point is here."
-            if w_next < 1.8:
-                return "jump_right now and hold it three decisions."
-            return "run_right toward the pipe; jump_right when it is about 5 tiles ahead at this speed."
-        if near is not None and near["dx"] <= 9:
-            if fast:
-                # measured: under the block row the take-off must be 3 to 4 tiles before it; in the
-                # open a running jump from farther lands past it just the same. The jump goes when
-                # the next state would already be past the window at this pace
-                if near_next <= (3.8 if overhead else 5.5) or near_next - lag <= 1.5:
-                    return "jump_right now over the enemy: at this speed the take-off comes a few tiles before it."
-                return "run_right; jump_right the moment the enemy comes within reach."
-            if near.get("dir") == "toward":
-                return "jump now, standing: it is about to reach Mario." if near_next <= 1.5 else "wait, standing still; jump when it is 2 tiles away."
-            return "run_right after it; jump_right when it is about 7 tiles ahead at a run."
+        things = []
+        if walls and walls[0]["dx"] <= 8:
+            things.append((walls[0]["dx"], "wall"))
+        if drops and drops[0]["dx"] <= 12:
+            things.append((drops[0]["dx"], "drop"))
         if gaps and gaps[0]["dx"] <= 14:
+            things.append((gaps[0]["dx"], "gap"))
+        if near is not None and near["dx"] <= 9:
+            things.append((near["dx"], "enemy"))
+        things.sort()
+        kind = things[0][1] if things else None
+        if kind == "wall":
+            w = walls[0]; w_next = w["dx"] - lag
+            if w["height"] >= TALL:
+                # measured: the pipe is cleared at near full speed (4.9 and up) with the jump held
+                # long; at a jog the apex is level with its top and the side stops him (recorded)
+                w = walls[0]; w_next = w["dx"] - lag
+                full = xv >= 4.5
+                follower = next((b for b in st.get("behind") or [] if b.get("dir") == "toward" and abs(b["dy"]) < 1 and b["dx"] <= 6), None)
+                if not full and w["dx"] <= 4.5:
+                    if follower is not None:
+                        return "jump, standing (the jump tool): the enemy behind passes under; then walk_left two decisions and run at the pipe."
+                    return "too slow for the pipe from here: walk_left for two decisions, then run_right to full speed and jump_right at 2 to 3 tiles."
+                if not full:
+                    return "run_right to full speed; jump_right when the pipe is about 5 tiles ahead and Mario is running flat out."
+                if 1.8 <= w_next <= 3.4:
+                    return "jump_right now, and keep it held for three decisions: the pipe's take-off point is here."
+                if w_next < 1.8:
+                    return "jump_right now and hold it three decisions."
+                return "run_right toward the pipe; jump_right when it is about 5 tiles ahead at this speed."
+            if w_next <= 1.5:
+                return "jump_right now over the " + w["kind"] + " ahead" + (": a hop clears a step." if w["height"] <= 1 else ".")
+            return "run_right; jump_right when the " + w["kind"] + " is about a tile and a half ahead at this pace."
+        if kind == "drop":
+            d = drops[0]
+            if d["dx"] - lag <= 1.5:
+                return "jump_right now across the drop: the hop lands past it, and walking off the edge falls in."
+            return "run_right; jump_right at the drop's edge, never off it."
+        if kind == "enemy":
+            if fast:
+                # measured: under the block row the take-off must be 1.5 to 4 tiles before it (5 to 9
+                # hits the blocks and drops onto it); in the open a running jump from farther lands
+                # past it just the same. The jump goes when the take-off falls in the window, or now
+                # when the next state would already be past it; under the blocks a miss is a death,
+                # so there the stop and the standing jump (8 of 8) take over instead
+                under_blocks = any(o["dx"] <= near["dx"] + 1 for o in overhead)
+                lo, hi = (1.5, 4.0) if under_blocks else (1.5, 6.5)
+                if lo <= takeoff <= hi:
+                    return "jump_right now over the enemy: this is the take-off."
+                if takeoff > hi:
+                    if takeoff - (lag + 0.6) >= lo:
+                        return "run_right; jump_right the moment the enemy comes within reach."
+                    if under_blocks:
+                        return "walk_left now to stop short of the enemy (a jump from here hits the blocks above it); then jump_right when it is 1 to 2.5 tiles away."
+                    return "jump_right now over the enemy: the next decision would come too late."
+                return "jump_right now over the enemy: the last chance."
+            if toward:
+                return "jump now, standing: it is about to reach Mario." if takeoff <= 1.5 else "wait, standing still; jump when it is 2 tiles away."
+            return "run_right after it; jump_right when it is about 7 tiles ahead at a run."
+        if kind == "gap":
             g = gaps[0]["dx"]; g_next = g - lag
             # recorded six times: the jump across lands nine tiles on, among the enemies waiting
             # there (a pair beyond the gap, a Goomba dropping off its ledge). Ones walking toward
@@ -434,8 +520,6 @@ class Game:
             if g >= 3.5:
                 return "run_right to gain speed for the gap; jump_right the moment its edge comes within reach."
             return "too slow for the gap: walk_left two decisions, then run_right and jump_right at its edge."
-        if walls and walls[0]["dx"] - lag <= 1.5:
-            return "jump_right now over the wall ahead."
         if blocks and blocks[0]["dx"] - lag <= 1.8:
             return "jump_right now, under the question block, for the coin."
         return "nothing within reach: run_right."
@@ -443,6 +527,14 @@ class Game:
     def _describe(self, st: dict) -> dict:
         if not st.get("ready"):
             return {"ok": True, "text": "The game is loading.", "fields": {"ready": False}, "candidates": {}, "terminal": False, "realtime": True}
+        if self._world is None and st.get("world"):
+            self._world = st["world"]
+        if st.get("ending") or (self._world and st.get("world") and st.get("world") != self._world):
+            # the flag: the game plays its own walk to the castle and rolls into the next level
+            # (recorded: the follower was well into the underground before anything said so)
+            return {"ok": True, "text": f"Level {self._world} is cleared: Mario reached the flag. Lives {st.get('lives')}, coins {st.get('coins')}, score {st.get('score')}. Finish.",
+                    "fields": {"cleared": True, "world": self._world, "lives": st.get("lives"), "coins": st.get("coins"), "score": st.get("score")},
+                    "candidates": {}, "terminal": True, "realtime": True}
         restarting = self._restarting(st)
         if restarting:
             lives = st.get("lives")
@@ -460,7 +552,7 @@ class Game:
         if en:
             e = en[0]
             where = "at Mario's height" if abs(e["dy"]) < 1 else ("above" if e["dy"] > 0 else "below")
-            arrives = f", at Mario in about {max(1, round(e['dx'] / (1.5 * (self.lag() + TICK))))} decisions if he stands still" if e.get("dir") == "toward" and abs(e["dy"]) < 1 else ""
+            arrives = f", at Mario in about {max(1, round(e['dx'] / (1.5 * self.lag())))} decisions if he stands still" if e.get("dir") == "toward" and abs(e["dy"]) < 1 else ""
             parts.append(f"Nearest enemy: {e['kind']} {e['dx']} tiles ahead, {where}, walking {'toward Mario' if e.get('dir') == 'toward' else 'away'}{arrives}."
                          + (f" {len(en) - 1} more behind it." if len(en) > 1 else ""))
         else:
@@ -470,13 +562,25 @@ class Game:
             b = back[0]
             parts.append(f"Behind Mario: {b['kind']} {b['dx']} tiles back, walking {'toward him' if b.get('dir') == 'toward' else 'away'}.")
         gaps = st.get("gaps") or []
-        parts.append(f"Gap in the ground: edge {gaps[0]['dx']} tiles ahead, {gaps[0]['width']} tiles wide; a running jump from the edge crosses it, a standing one falls in." if gaps
-                     else "No gap in the ground within 12 tiles.")
+        drops = st.get("drops") or []
+        if st.get("over_pit"):
+            parts.append("Mario is over a gap, falling.")
+        elif gaps:
+            g = gaps[0]
+            width = f"at least {g['width']} tiles wide, its far side out of sight" if g.get("open") else f"{g['width']} tiles wide"
+            parts.append(f"Gap in the ground: edge {g['dx']} tiles ahead, {width}; a running jump from the edge crosses it, a standing one falls in.")
+        else:
+            parts.append("No gap in the ground within 14 tiles.")
+        if drops:
+            d = drops[0]
+            then = {"level": "comes back level", "wall": "meets a wall", "pit": "opens into a gap"}.get(d["then"], "goes on out of sight")
+            parts.append(f"The ground drops {d['depth']} tiles, {d['dx']} tiles ahead, for {d['width']} tiles, then {then}; "
+                         "jump_right from the edge lands past it, and walking off the edge falls in.")
         walls = st.get("walls") or []
         if walls:
             w = walls[0]
             need = ("a jump held for three decisions from a run, leaving the ground 2 to 3 tiles before it; from against it or from standing it is never cleared"
-                    if w["height"] >= TALL else "a jump held for two decisions" if w["height"] >= 3 else "a jump")
+                    if w["height"] >= TALL else "a jump held for two decisions" if w["height"] >= 3 else "a hop (jump_right)" if w["height"] <= 1 else "a jump")
             parts.append(f"Wall ahead: {w['kind']} {w['dx']} tiles ahead, {w['height']} tiles tall; it takes {need}.")
         else:
             parts.append("No pipe or wall within 8 tiles.")
@@ -496,27 +600,30 @@ class Game:
         # at a run is already too close to jump, so it is named a step earlier than it arrives
         # at the loop's measured pace: at a full run (9 tiles a second) a third of a second is
         # 3 tiles, and a walking enemy adds about half a tile of its own
-        reach = round(max(0.5, abs(st.get("xvel") or 0) * 60 * (self.lag() + TICK) / (8 * 4)), 1)
+        reach = round(max(0.5, abs(st.get("xvel") or 0) * 60 * self.lag() / (8 * 4)), 1)
         closing = round(reach + 0.6, 1)
         within = [f"the {en[0]['kind']} {en[0]['dx']} tiles ahead"] if en and en[0]["dx"] <= closing + 2.5 else []
         within += [f"the gap {gaps[0]['dx']} tiles ahead"] if gaps and gaps[0]["dx"] <= reach + 0.5 else []
+        within += [f"the drop {drops[0]['dx']} tiles ahead"] if drops and drops[0]["dx"] <= reach + 0.5 else []
         within += [f"the {walls[0]['kind']} {walls[0]['dx']} tiles ahead"] if walls and walls[0]["dx"] <= reach + 0.5 else []
         within += [f"the question block {blocks[0]['dx']} tiles ahead"] if blocks and blocks[0]["dx"] <= reach + 0.5 else []
         parts.append(f"Until the next decision Mario covers about {reach} tiles, and a walking enemy closes about {closing}. "
                      + (f"Within one step: {'; '.join(within)}." if within else "Nothing is within one step."))
-        parts.append("Now: " + self._now(st, reach, en, gaps, walls, blocks, overhead))
+        parts.append("Now: " + self._now(st, reach, en, gaps, walls, blocks, overhead, drops))
         if self._stopped >= 2:
             parts.append(f"Mario has been stopped in place for {self._stopped} decisions by something he is pressed "
-                         "against: walk_left, then run_right, then jump_right at 2 to 3 tiles.")
+                         "against: jump_right hops a step; a tall pipe takes walk_left, then run_right, then jump_right at 2 to 3 tiles.")
         held = [KEY_NAMES[c] for c in self._held]
         if KEY["jump"] in self._held and not st.get("on_ground"):
-            parts.append("The jump key is held; it keeps the jump growing while Mario rises.")
+            parts.append("The jump key is held; it keeps the jump growing while Mario rises"
+                         + (", and goes again the moment he lands." if self._armed is not None and not self._armed.done() else "."))
         parts.append(f"Lives {st.get('lives')}, coins {st.get('coins')}, time {st.get('time')}, score {st.get('score')}.")
-        terminal = bool(st.get("ending")) or (bool(st.get("dead")) and (st.get("lives") or 0) <= 0)
+        terminal = bool(st.get("dead")) and (st.get("lives") or 0) <= 0
         fields = {k: st.get(k) for k in ("x", "y", "level_x", "on_ground", "dead", "xvel", "lives", "coins", "time", "score", "world")}
         fields["enemies"] = en
         fields["behind"] = st.get("behind") or []
         fields["gaps"] = gaps
+        fields["drops"] = drops
         fields["walls"] = walls
         fields["blocks"] = blocks
         fields["stopped_steps"] = self._stopped
