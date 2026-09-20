@@ -16,11 +16,17 @@ function parseHash() {
 }
 
 export default function App() {
-  const [route, setRoute] = useState(parseHash);
+  const [route, setRoute] = useState(() => ({ ...parseHash(), seq: 0 }));
   useEffect(() => {
-    const onHash = () => setRoute(parseHash());
+    const onHash = () => setRoute((r) => ({ ...parseHash(), seq: r.seq }));
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
-  return <DialogHost><GamePage key={route.id} id={route.id} /></DialogHost>;
+  // A run rewrites the URL to its own id without a navigation, so "New run" cannot rely on a hash
+  // change to start over: the page is remounted outright, and the URL put back to the start.
+  const newRun = () => {
+    window.history.replaceState(null, '', `${window.location.pathname}#/`);
+    setRoute((r) => ({ id: PENDING, seq: r.seq + 1 }));
+  };
+  return <DialogHost><GamePage key={`${route.id}:${route.seq}`} id={route.id} onNewRun={newRun} /></DialogHost>;
 }

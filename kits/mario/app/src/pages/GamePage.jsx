@@ -32,7 +32,7 @@ function count(stats, ev) {
   }
 }
 
-export function GamePage({ id: routeId }) {
+export function GamePage({ id: routeId, onNewRun }) {
   // The session id lives in state, not in the route: a run starts pending and becomes a session
   // when its first turn opens one, which arrives while the stream is open.
   const [id, setId] = useState(routeId);
@@ -84,10 +84,6 @@ export function GamePage({ id: routeId }) {
   }), []);
 
   const onStop = useCallback(() => { if (rid) cancelResponse(rid).catch(() => {}); }, [rid]);
-  const onNewRun = useCallback(() => {
-    window.location.hash = '#/';
-    if (isPending(id)) { setStatus(''); setRid(''); dispatch({ type: 'end' }); }
-  }, [id]);
 
   return (
     <div className="mk-root">
