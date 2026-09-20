@@ -37,8 +37,9 @@ INSTRUCTIONS = ("You play a side-scrolling platform game as Mario. Each step say
                 "the ground, and what is ahead with distances in tiles. One step lasts about half a second and "
                 "covers up to 4 tiles at a run. Keep moving right. The state names any enemy, gap or wall that is "
                 "within one step: jump over it now, with jump_right, held as long as the state says (a taller "
-                "wall or a wider gap needs a longer hold). Otherwise run right. When Mario has just died, wait. "
-                "Finish when the level is cleared. Escalate when Mario has no lives left.")
+                "wall or a wider gap needs a longer hold). A question block overhead within one step pays a coin: "
+                "jump_right under it. Otherwise run right. When Mario has just died, wait. Finish when the level "
+                "is cleared. Escalate when Mario has no lives left.")
 # Measured on the live game, feet above the ground at the apex: a short hold reaches 3.1 tiles, a
 # medium 3.9, a long 4.1, standing or at a run. So a 2-tile pipe takes a short hold, a 3-tile one a
 # medium, and a 4-tile one a long hold with the run-up the jump_right macro provides (from against
@@ -53,15 +54,26 @@ SCREENCAST = {"format": "jpeg", "quality": 45, "maxWidth": 960, "maxHeight": 600
 
 STATE_JS = """(function(){
   if (!window.player || !window.gamescreen) return {ready: false};
+  // the world scrolls under a player who stays near the screen middle; counting the scroll gives
+  // a position in the level (progress the page can show, and the stuck check a real distance)
+  if (!window.__s1wrapped && typeof window.scrollWindow === 'function') {
+    var _sw = window.scrollWindow; window.__s1scroll = 0; window.__s1wrapped = true;
+    window.scrollWindow = function(x){ window.__s1scroll += (x || 0); return _sw.apply(this, arguments); };
+  }
   var u = window.unitsize || 4, T = 8 * u, p = player, sl = gamescreen.left, sr = gamescreen.right;
   function tiles(px){ return Math.round(px / T * 10) / 10; }
-  var enemies = [], gaps = [], walls = [];
-  var ground = (window.map && map.floor) ? map.floor * u : p.bottom;   // the ground under him, not his feet: heights must not shrink mid-jump
+  var enemies = [], behind = [], gaps = [], walls = [], blocks = [];
+  // heights are measured from where Mario stands: his feet on the ground, and in the air the
+  // level he last stood on, so a jump does not shrink the wall ahead and a stair step is one
+  // tile tall from the step below it, not four from the floor
+  if (p.resting) window.__s1ground = p.bottom;
+  var ground = p.resting ? p.bottom : (window.__s1ground || ((window.map && map.floor) ? map.floor * u : p.bottom));
   (window.characters || []).forEach(function(c){
     if (!c.alive || c === player || c.title === undefined) return;
     if (['Coin','Mushroom','FireFlower','Star','Vine','Text','Shell','Fireball'].indexOf(c.title) >= 0) return;
-    var dx = (c.left - p.right) / T, dy = (p.bottom - c.bottom) / T;
-    if (dx >= 0 && dx <= 12) enemies.push({kind: c.title, dx: Math.round(dx * 10) / 10, dy: Math.round(dy * 10) / 10});
+    var dx = (c.left - p.right) / T, dy = (p.bottom - c.bottom) / T, back = (p.left - c.right) / T;
+    if (dx >= 0 && dx <= 12) enemies.push({kind: c.title, dx: Math.round(dx * 10) / 10, dy: Math.round(dy * 10) / 10, dir: (c.xvel || 0) < 0 ? 'toward' : 'away'});
+    else if (back >= 0 && back <= 8) behind.push({kind: c.title, dx: Math.round(back * 10) / 10, dy: Math.round(dy * 10) / 10, dir: (c.xvel || 0) > 0 ? 'toward' : 'away'});
   });
   var floors = (window.solids || []).filter(function(s){ return s.alive && s.title === 'Floor' && s.top >= p.bottom - 4; });
   var x = p.right, gapStart = null;
@@ -70,7 +82,7 @@ STATE_JS = """(function(){
     if (!covered && gapStart === null) gapStart = i;
     if (covered && gapStart !== null) { gaps.push({dx: tiles(gapStart), width: tiles(i - gapStart)}); gapStart = null; }
   }
-  if (gapStart !== null) gaps.push({dx: tiles(gapStart), width: tiles(12 * T - gapStart)});
+  if (gapStart !== null && 12 * T - gapStart >= T / 2) gaps.push({dx: tiles(gapStart), width: tiles(12 * T - gapStart)});
   (window.solids || []).forEach(function(s){
     if (!s.alive || ['Pipe','Block','Brick','Stone'].indexOf(s.title) < 0) return;
     // anything whose far edge is still ahead of Mario counts, including the pipe he is pressed
@@ -82,15 +94,25 @@ STATE_JS = """(function(){
     var dx = Math.max(0, (s.left - p.right) / T);
     if (dx <= 8) walls.push({kind: s.title.toLowerCase(), dx: Math.round(dx * 10) / 10, height: tiles(ground - s.top)});
   });
-  enemies.sort(function(a, b){ return a.dx - b.dx; }); walls.sort(function(a, b){ return a.dx - b.dx; }); gaps.sort(function(a, b){ return a.dx - b.dx; });
+  enemies.sort(function(a, b){ return a.dx - b.dx; }); behind.sort(function(a, b){ return a.dx - b.dx; });
+  (window.solids || []).forEach(function(s){
+    // a question block still holding something, at the height a jump reaches (the head gets to
+    // about 4.9 tiles); it pays when hit from below
+    if (!s.alive || s.title !== 'Block' || s.used || s.hidden) return;
+    if (enemies.length && enemies[0].dx <= 10) return;
+    var up = (ground - s.bottom) / T, dx = (s.left - p.right) / T;
+    if (up < 3 || up > 4.5 || s.right <= p.left || dx > 8) return;
+    blocks.push({dx: Math.round(Math.max(-1, dx) * 10) / 10, up: Math.round(up * 10) / 10});
+  });
+  enemies.sort(function(a, b){ return a.dx - b.dx; }); walls.sort(function(a, b){ return a.dx - b.dx; }); gaps.sort(function(a, b){ return a.dx - b.dx; }); blocks.sort(function(a, b){ return a.dx - b.dx; });
   walls = walls.filter(function(w, i){ return i === 0 || w.dx !== walls[i - 1].dx || w.height !== walls[i - 1].height; });
   var d = window.data || {};
   function amt(k){ return d[k] && d[k].amount !== undefined ? d[k].amount : null; }
-  return {ready: true, x: tiles(p.left), y: tiles(ground - p.bottom),
+  return {ready: true, x: tiles(p.left), y: tiles(ground - p.bottom), level_x: tiles(p.left + (window.__s1scroll || 0)),
           dying: !!p.dying,
           screen_tiles: tiles(sr - sl), xvel: Math.round((p.xvel || 0) * 10) / 10, on_ground: !!p.resting, dead: !!p.dead,
-          power: p.power || 1, enemies: enemies.slice(0, 3), gaps: gaps.slice(0, 2), walls: walls.slice(0, 2),
-          lives: amt('lives'), time: amt('time'), score: amt('score'), world: amt('world'), paused: !!window.paused,
+          power: p.power || 1, enemies: enemies.slice(0, 3), behind: behind.slice(0, 2), gaps: gaps.slice(0, 2), walls: walls.slice(0, 2), blocks: blocks.slice(0, 2),
+          lives: amt('lives'), time: amt('time'), score: amt('score'), coins: amt('coins'), world: amt('world'), paused: !!window.paused,
           ending: !!(window.map && map.ending)};
 })()"""
 
@@ -136,6 +158,8 @@ class Game:
         self.started_at = time.time()
         self.steps = 0
         self.frames = 0
+        self._stopped = 0          # consecutive runs that moved nothing
+        self._stopped_short = None # the enemy a run stopped short of, for the result text
         self._lives = None
         self._restarting_until = 0.0
         self._held: set[int] = set()
@@ -208,12 +232,40 @@ class Game:
         if name == "run_right":
             await self._up(L)
             await self._down(R, S)
-            await asyncio.sleep(hold)
+            self._stopped_short = None
+            t0 = time.time()
+            while time.time() - t0 < hold:
+                await asyncio.sleep(0.03)
+                st = await self._eval(STATE_JS)
+                if not isinstance(st, dict) or not st.get("ready"):
+                    continue
+                en = self._approaching(st)
+                w = (st.get("walls") or [None])[0]
+                gap = (st.get("gaps") or [None])[0]
+                if en and en["dx"] <= 5.0 and en["dy"] > -1:
+                    # a run into an enemy walking at him ended in it every time (measured, nine
+                    # lives in one run); the run stops five tiles short, where the standing jump
+                    # that lets it under is taken from
+                    await self._up(R, S)
+                    self._stopped_short = {"kind": en["kind"] + " walking at him"}
+                    break
+                if w and w["height"] >= TALL and w["dx"] <= 3.5:
+                    # pressed against a tall pipe, a jump with the run key held rode up its side
+                    # and left Mario embedded in it, "falling" in place (measured); the run stops
+                    # where the jump's run-up starts
+                    await self._up(R, S)
+                    self._stopped_short = {"kind": f"{w['kind']} {w['height']} tiles tall"}
+                    break
+                if gap and gap["dx"] <= 1.2 and st.get("on_ground"):
+                    await self._up(R, S)
+                    self._stopped_short = {"kind": "gap"}
+                    break
         elif name == "jump_right":
             await self._up(L)
             await self._down(R, S)
             await self._land()
-            await self._approach()
+            if await self._approach():          # the jump was taken inside (an enemy let under)
+                return
             await self._eval(f"keydown({U}); 'ok'")
             await asyncio.sleep(hold)
             await self._eval(f"keyup({U}); 'ok'")
@@ -242,58 +294,126 @@ class Game:
                 return
             await asyncio.sleep(0.03)
 
-    async def _approach(self) -> None:
+    def _needed_hold(self) -> str | None:
+        """The hold the nearest gap or wall within a step needs. A short hop into a gap and a
+        medium jump at a 4-tile pipe each cost a life (measured), so the environment takes the
+        hold the obstacle needs when the model's is shorter, and says so in the result."""
+        st = self._run(self._eval(STATE_JS), 10)
+        if not isinstance(st, dict) or not st.get("ready"):
+            return None
+        reach = max(1.0, abs(st.get("xvel") or 0) * 60 * 0.6 / (8 * 4))
+        gaps, walls = st.get("gaps") or [], st.get("walls") or []
+        if gaps and gaps[0]["dx"] <= reach + 0.5:
+            return "long"
+        if walls and walls[0]["dx"] <= reach + 0.5:
+            return hold_for(walls[0]["height"])
+        return None
+
+    async def _let_pass(self) -> bool:
+        """An enemy walking toward Mario is let under a standing jump: stop, wait until it is a
+        tile away, jump straight up, land, run on. Measured six times out of six between 0.8 and
+        1.2 tiles with a medium hold; a running jump over the first Goomba hit the block row above
+        it and dropped Mario onto it, every life. Returns whether the jump was taken here."""
+        R, S, U = KEY["right"], KEY["sprint"], KEY["jump"]
+        await self._up(R, S)
+        for _ in range(450):                    # up to 9 s of waiting: a Goomba twelve tiles off takes that long
+            await asyncio.sleep(0.02)
+            st = await self._eval(STATE_JS)
+            if not isinstance(st, dict) or not st.get("ready") or st.get("dying") or st.get("dead"):
+                await self._down(R, S)
+                return True
+            en = self._approaching(st)
+            if not en:
+                break                            # gone, or turned away: the running jump follows
+            if en["dy"] < -1:
+                continue                         # below him (he stands on something): it cannot reach him; let it pass or turn
+            if st.get("on_ground") and (en["dx"] <= 0.6 or (en["dx"] <= 1.0 and abs(st.get("xvel") or 0) < 0.6)):
+                await self._eval(f"keydown({U}); 'ok'")
+                await asyncio.sleep(HOLDS["medium"])
+                await self._eval(f"keyup({U}); 'ok'")
+                await asyncio.sleep(0.6)
+                await self._down(R, S)
+                return True
+        await self._down(R, S)
+        return False
+
+    async def _approach(self) -> bool:
         """The model decides to jump; when to leave the ground is the environment's, the way
         holding the keys is. A decision lands every half second or so and a jump is a one-tile
         affair, so a jump taken the moment it is chosen is early or late by luck. Measured on the
         live game: a wall 4 tiles tall is cleared by a long jump from 1.5 to 3 tiles back and from
         nowhere else (from against it the apex is level with the top; at a run from 4 back it
-        peaks early and hits the side); a running jump covers about 9 tiles, so an enemy jumped
-        from 4 tiles is landed well past, one jumped from 2 at a run is hit on take-off, and a gap
-        is best left from its edge. So: keep running until the nearest thing ahead is at its
-        distance, or, pressed against a tall wall with no speed, step back first."""
+        peaks early and hits the side); a running jump covers about 9 tiles, so a gap is best left
+        from its edge at speed; an enemy walking at Mario is let under a standing jump (see
+        _let_pass). So: an approaching enemy first; then keep running until the nearest thing
+        ahead is at its distance, backing off first when there is no room for the run-up."""
         st = await self._eval(STATE_JS)
         if not isinstance(st, dict) or not st.get("ready"):
-            return
+            return False
+        near = self._approaching(st)
+        if near and near["dx"] <= 6.5 and (near["dx"] >= 2.5 or abs(st.get("xvel") or 0) < 3):
+            if await self._let_pass():
+                return True
+            st = await self._eval(STATE_JS)              # the enemy is gone; what is ahead now
+            if not isinstance(st, dict) or not st.get("ready"):
+                return False
         target, want = self._target(st)
-        if target is None:
-            return
+        if target is None or not isinstance(want, (int, float)):
+            return False
         R, S, L = KEY["right"], KEY["sprint"], KEY["left"]
-        if target == "wall" and want is None:      # pressed against a tall wall, standing
+        dx = self._distance(st, target)
+        slow = abs(st.get("xvel") or 0) < 3
+        if slow and dx < want + 1.5 and st.get("on_ground"):
+            # no room for the run-up: step back first, unless something is there. A jump from
+            # 1.6 tiles back with no speed cleared the pipe and landed 2 tiles past it, on the
+            # enemies that pace there (measured: four lives in a row); three tiles of run-up
+            # give the jump its speed and the landing its distance
+            if any(b["dx"] <= 3.5 or (b.get("dir") == "toward" and b["dx"] <= 6) for b in st.get("behind") or []):
+                return False
             await self._up(R, S)
             await self._down(L)
-            for _ in range(40):
+            for _ in range(70):
                 await asyncio.sleep(0.03)
                 st = await self._eval(STATE_JS)
-                w = ((st or {}).get("walls") or [None])[0]
-                if not w or w["dx"] >= 1.6:
+                if not isinstance(st, dict) or st.get("dying") or st.get("dead"):
+                    break
+                if self._distance(st, target) >= want + 3.0:
                     break
             await self._up(L)
             await self._down(R, S)
             await asyncio.sleep(0.05)
-            return
-        for _ in range(34):                        # at most a second of running
+        for _ in range(40):                        # at most 1.2 s of running
             await asyncio.sleep(0.03)
             st = await self._eval(STATE_JS)
             if not isinstance(st, dict) or st.get("dying") or st.get("dead"):
-                return
-            t, w = self._target(st)
-            if t != target or w is None or self._distance(st, t) <= w:
-                return
+                return False
+            if self._distance(st, target) <= want:
+                return False
+        return False
 
     @staticmethod
     def _distance(st: dict, kind: str) -> float:
-        rows = st.get({"enemy": "enemies", "wall": "walls", "gap": "gaps"}[kind]) or []
+        rows = st.get({"enemy": "enemies", "wall": "walls", "gap": "gaps", "block": "blocks"}[kind]) or []
         return rows[0]["dx"] if rows else 99.0
+
+    @staticmethod
+    def _approaching(st: dict):
+        """The nearest enemy walking at Mario from either side, within reach of mattering."""
+        en, back = st.get("enemies") or [], st.get("behind") or []
+        near = [e for e in en if e.get("dir") == "toward" and e["dx"] <= 12 and e["dy"] < 1]
+        near += [e for e in back if e.get("dir") == "toward" and e["dx"] <= 6 and e["dy"] < 1]
+        return min(near, key=lambda e: e["dx"]) if near else None
 
     @staticmethod
     def _target(st: dict):
         """What the jump is for and the distance to leave the ground at: (kind, tiles), with
-        None tiles meaning jump now, and ("wall", None) meaning pressed against a tall wall."""
+        None tiles meaning jump now."""
         near = []
-        en, walls, gaps = st.get("enemies") or [], st.get("walls") or [], st.get("gaps") or []
+        en, walls, gaps, blocks = st.get("enemies") or [], st.get("walls") or [], st.get("gaps") or [], st.get("blocks") or []
         if en and en[0]["dx"] <= 10:
             near.append((en[0]["dx"], "enemy"))
+        if blocks and blocks[0]["dx"] <= 6:
+            near.append((blocks[0]["dx"], "block"))
         if walls and walls[0]["dx"] <= 6:
             near.append((walls[0]["dx"], "wall"))
         if gaps and gaps[0]["dx"] <= 6:
@@ -305,12 +425,15 @@ class Game:
         if kind == "wall":
             if walls[0]["height"] < TALL:
                 return None, None                       # any distance within a step clears it
-            if dx < 1.4 and not fast and st.get("on_ground"):
-                return "wall", None
             return "wall", 2.8
         if kind == "enemy":
             return ("enemy", 4.0) if fast and dx > 4.0 else (None, None)
-        return ("gap", 1.5) if dx > 1.5 else (None, None)
+        if kind == "block":
+            # measured: at a run a medium jump started 1 to 1.5 tiles before the block hits it,
+            # from 2 tiles or more it peaks short of it
+            want = 1.3 if fast else 0.5
+            return ("block", want) if dx > want else (None, None)
+        return "gap", 1.5
 
     # ── the tools ──
     def reset(self, goal: str) -> dict:
@@ -356,6 +479,7 @@ class Game:
         lives = st.get("lives")
         if self._lives is not None and lives is not None and lives < self._lives:
             self._restarting_until = time.time() + 4.0
+            self._loop.call_soon_threadsafe(lambda: self._loop.create_task(self._eval("window.__s1scroll = 0; 'ok'")))
         if lives is not None:
             self._lives = lives
         if st.get("dead") or st.get("dying"):
@@ -364,6 +488,10 @@ class Game:
 
     def act(self, name: str, hold: str) -> dict:
         seconds = HOLDS.get(hold, HOLDS["medium"])
+        needed = self._needed_hold() if name == "jump_right" else None
+        taken = needed if needed and HOLDS[needed] > seconds else None
+        if taken:
+            seconds = HOLDS[taken]
 
         async def go():
             await self._start()
@@ -372,8 +500,16 @@ class Game:
             return await self._settled()
         st = self._run(go())
         self.steps += 1
+        if name in ("run_right", "jump_right") and st.get("on_ground") and abs(st.get("xvel") or 0) < 0.5 and not st.get("dying"):
+            self._stopped += 1
+        else:
+            self._stopped = 0
         d = self._describe(st)
-        d["text"] = f"{name} held {seconds:.2f} s. " + d["text"]
+        if name == "walk_left":
+            self._stopped = 0
+        short = self._stopped_short if name == "run_right" else None
+        d["text"] = (f"{name} held {seconds:.2f} s" + (f" ({taken}: what lay ahead needed it)" if taken else "")
+                     + (f", stopped short of the {short['kind']}" if short else "") + ". " + d["text"])
         return d
 
     def wait(self) -> dict:
@@ -405,9 +541,14 @@ class Game:
         if en:
             e = en[0]
             where = "at Mario's height" if abs(e["dy"]) < 1 else ("above" if e["dy"] > 0 else "below")
-            parts.append(f"Nearest enemy: {e['kind']} {e['dx']} tiles ahead, {where}." + (f" {len(en) - 1} more behind it." if len(en) > 1 else ""))
+            parts.append(f"Nearest enemy: {e['kind']} {e['dx']} tiles ahead, {where}, walking {'toward Mario' if e.get('dir') == 'toward' else 'away'}."
+                         + (f" {len(en) - 1} more behind it." if len(en) > 1 else ""))
         else:
             parts.append("No enemy within 12 tiles ahead.")
+        back = st.get("behind") or []
+        if back:
+            b = back[0]
+            parts.append(f"Behind Mario: {b['kind']} {b['dx']} tiles back, walking {'toward him' if b.get('dir') == 'toward' else 'away'}.")
         gaps = st.get("gaps") or []
         parts.append(f"Gap in the ground: edge {gaps[0]['dx']} tiles ahead, {gaps[0]['width']} tiles wide." if gaps
                      else "No gap in the ground within 12 tiles.")
@@ -418,6 +559,10 @@ class Game:
                          f"jump_right held {hold_for(w['height'])} clears it.")
         else:
             parts.append("No pipe or wall within 8 tiles.")
+        blocks = st.get("blocks") or []
+        if blocks:
+            b = blocks[0]
+            parts.append(f"Question block overhead: {b['dx']} tiles ahead, {b['up']} tiles up; jump_right under it pays a coin.")
         # what one step reaches, and what is inside it: the fact the rule needs, stated rather
         # than left for the model to work out from a speed and a distance (it jumped one step late)
         # measured on the live game: at a run the distance to a walking enemy closes about 5.5
@@ -429,14 +574,21 @@ class Game:
         within = [f"the {en[0]['kind']} {en[0]['dx']} tiles ahead"] if en and en[0]["dx"] <= closing + 2.5 else []
         within += [f"the gap {gaps[0]['dx']} tiles ahead (hold long)"] if gaps and gaps[0]["dx"] <= reach + 0.5 else []
         within += [f"the {walls[0]['kind']} {walls[0]['dx']} tiles ahead (hold {hold_for(walls[0]['height'])})"] if walls and walls[0]["dx"] <= reach + 0.5 else []
+        within += [f"the question block {blocks[0]['dx']} tiles ahead (hold medium)"] if blocks and blocks[0]["dx"] <= reach + 0.5 else []
         parts.append(f"One step reaches about {reach} tiles, and a walking enemy closes about {closing}. "
                      + (f"Within one step: {'; '.join(within)}." if within else "Nothing is within one step."))
-        parts.append(f"Lives {st.get('lives')}, time {st.get('time')}, score {st.get('score')}.")
+        if self._stopped >= 2:
+            parts.append(f"Mario has been stopped in place for {self._stopped} steps by something he is pressed "
+                         "against: walk_left one step, then jump_right held long.")
+        parts.append(f"Lives {st.get('lives')}, coins {st.get('coins')}, time {st.get('time')}, score {st.get('score')}.")
         terminal = bool(st.get("ending")) or (bool(st.get("dead")) and (st.get("lives") or 0) <= 0)
-        fields = {k: st.get(k) for k in ("x", "y", "on_ground", "dead", "xvel", "lives", "time", "score", "world")}
+        fields = {k: st.get(k) for k in ("x", "y", "level_x", "on_ground", "dead", "xvel", "lives", "coins", "time", "score", "world")}
         fields["enemies"] = en
+        fields["behind"] = st.get("behind") or []
         fields["gaps"] = gaps
         fields["walls"] = [{**w, "hold": hold_for(w["height"])} for w in walls]
+        fields["blocks"] = blocks
+        fields["stopped_steps"] = self._stopped
         fields["step_reach_tiles"] = reach
         fields["within_one_step"] = within
         return {"ok": True, "text": " ".join(parts), "fields": fields, "candidates": {}, "terminal": terminal}

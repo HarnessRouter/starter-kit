@@ -9,6 +9,10 @@
 /* ── The page ─────────────────────────────────────────────────────────── */
 .mk-root { height: 100vh; display: flex; flex-direction: column; background: var(--bg); overflow: hidden; }
 .mk-body { flex: 1; min-height: 0; display: flex; }
+/* The conversation column is sized to the viewport by the shared stylesheet; here it sits under
+   the app bar, so it takes the height that is left, or its composer hangs below the fold. As a
+   drawer (narrow) the same height keeps its bottom on the window's bottom edge. */
+.mk-body > .uic-chat { height: calc(100vh - 56px); }
 .mk-main {
   flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 12px;
   padding: 18px 22px 16px; overflow: auto;
@@ -37,10 +41,13 @@
 
 /* ── The stage ────────────────────────────────────────────────────────── */
 .mk-stage-wrap { display: flex; flex-direction: column; gap: 10px; }
-/* Fills the column's width and keeps the game's shape; when the window is short it yields height
-   first and the picture letterboxes inside. */
+/* Keeps the game's shape and fits the window: the width is capped at what the height budget
+   allows once the bar, the credits and the row of cards are taken out, so on a wide short window
+   the whole column stays in view instead of the cards falling below the fold. */
 .mk-stage {
-  position: relative; width: 100%; aspect-ratio: 16 / 10; max-height: calc(100vh - 56px - 120px);
+  --mk-below: 250px;
+  position: relative; width: 100%; max-width: calc((100vh - 56px - var(--mk-below)) * 1.6);
+  margin: 0 auto; aspect-ratio: 16 / 10;
   min-height: 220px; background: #0B1020; border-radius: 16px; overflow: hidden;
   display: flex; align-items: center; justify-content: center;
   box-shadow: 0 30px 60px -32px rgba(15, 23, 42, .55), 0 0 0 1px rgba(15, 23, 42, .06);
@@ -90,10 +97,13 @@
   .uic-topbar .btn { padding: 0 9px; }
 }
 @container (max-width: 460px) { .uic-topbar .mk-model { display: none; } }
-@media (max-width: 1100px) { .mk-facts { grid-template-columns: 1fr; } }
+/* The cards are the first thing shed: below this width they would stack into a column that pushes
+   past the fold, and on a short window they would take the stage's room. */
+@media (max-width: 1100px), (max-height: 700px) { .mk-facts { display: none; } }
 @media (max-width: 900px) {
   .mk-main { padding: 12px 12px 12px; gap: 10px; }
-  .mk-stage { border-radius: 12px; max-height: calc(100vh - 56px - 96px); }
+  /* Narrow: the cards stack and the column scrolls; the stage takes the width it has. */
+  .mk-stage { border-radius: 12px; max-width: none; }
   .mk-hud { gap: 10px; padding: 18px 12px 10px; }
   .mk-stat span { display: none; }
 }

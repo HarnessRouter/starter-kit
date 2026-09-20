@@ -20,7 +20,7 @@
     ],
     "plugin": "plugin",
     "mcp_servers": [],
-    "system_prompt": "You play a side-scrolling platform game as Mario. Each step says where Mario is, whether he is on the ground, and what is ahead with distances in tiles. Keep moving right. The state names any enemy, gap or wall that is within one step: jump over it now with jump_right, held as long as the state says. Otherwise run right. When Mario has just died, wait. Finish when the level is cleared. Escalate when Mario has no lives left."
+    "system_prompt": "You play a side-scrolling platform game as Mario. Each step says where Mario is, whether he is on the ground, and what is ahead with distances in tiles. Keep moving right. The state names any enemy, gap or wall that is within one step: jump over it now with jump_right, held as long as the state says. A question block overhead within one step pays a coin: jump_right under it. Otherwise run right. When Mario has just died, wait. Finish when the level is cleared. Escalate when Mario has no lives left."
   },
   "app": {
     "dir": "app",

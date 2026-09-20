@@ -31,25 +31,39 @@ rate of frames it actually displayed.
 
 ### What is measured, not tuned
 
-The state is literal and the numbers in it come from the game. Two things were measured on the live
-game and are written into the environment rather than left to the model:
+The state is literal and the numbers in it come from the game: where Mario is, the nearest enemy
+ahead and whether it walks toward him, the nearest enemy behind him, the next gap, wall and
+question block with distances in tiles, and how far one step reaches. The things below were
+measured on the live game and written into the environment rather than left to the model:
 
 - **Jump heights.** Feet above the ground at the apex: a short hold reaches 3.1 tiles, a medium 3.9,
-  a long 4.1, standing or at a run. So the state says which hold clears the wall ahead: short for
-  2 tiles, medium for 3, long for 4.
+  a long 4.1, standing or at a run. So the state says which hold clears the wall ahead (short for
+  2 tiles, medium for 3, long for 4), and when the model's hold is shorter than what lies ahead
+  needs, the environment takes the needed one and says so in the result.
 - **When to leave the ground.** A decision lands every half second and a jump is a one-tile affair.
-  A wall 4 tiles tall is cleared by a long jump from 1.5 to 3 tiles back and from nowhere else:
-  from against it the apex is level with the top, and at a run from 4 tiles back the jump peaks
-  early and hits the side. A running jump covers about 9 tiles, so an enemy jumped from 4 tiles is
-  landed well past, and one jumped from 2 at a run is hit on take-off. The `jump_right` macro
-  therefore keeps running until the nearest thing ahead is at its distance, steps back first when
-  pressed against a tall wall, and waits for the landing when asked to jump mid-air. The model
-  decides to jump; the timing is the environment's, the way holding the keys is.
+  A wall 4 tiles tall is cleared by a long jump from 1.5 to 3 tiles back and from nowhere else; a
+  running jump covers about 9 tiles, so a gap is left from its edge at speed; a question block is
+  hit by a jump started 1 to 1.5 tiles before it at a run and missed from 2. So `jump_right` keeps
+  running until the nearest thing ahead is at its distance, steps back first when there is no room
+  for the run-up (and nothing behind), and waits for the landing when asked to jump mid-air.
+- **Enemies.** A running jump over the first Goomba hit the block row above it and dropped Mario
+  onto it, every life. An enemy walking toward Mario is instead let under a standing jump taken
+  when it is about one tile away (six of six tries between 0.8 and 1.2 tiles), and `run_right`
+  stops five tiles short of an enemy walking at him so that jump is taken standing. An enemy
+  below him, when he stands on a pipe, is waited out rather than jumped onto.
 
-On the model's own runs after these changes (Jev 1.13 through OpenRouter, 120 steps), all four
-pipes of the first level are cleared, three times in a row across restarts; before them a run
-stood against the first tall pipe for forty steps because the detector had dropped a pipe Mario
-overlapped by a tenth of a tile.
+The model decides to jump; the timing is the environment's, the way holding the keys is. Heights
+are measured from where Mario stands (his feet on the ground, the level he last stood on in the
+air), so a jump does not shrink the wall ahead and a stair step is one tile tall from the step
+below it.
+
+### Launching again after an update
+
+A launch captures the kit's package onto the harness. A kit updated afterwards (a new image)
+leaves the harness on the old package until something launches it again, so the page compares
+the package version it was built with against the harness and relaunches it in place when they
+differ. The base declares no built-in tools: its actions are the environment's, so the harness
+settings list none.
 
 ## Credits
 

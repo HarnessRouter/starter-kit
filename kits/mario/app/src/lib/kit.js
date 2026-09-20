@@ -14,4 +14,4 @@ export const CONSOLE_KITS = '/kits';
 export const FRAME_FILE = 'frame.jpg';
 
 /** The first message of a run when it is started with the Play button. */
-export const DEFAULT_GOAL = 'Play the level: keep running right, jump over enemies, gaps and pipes, and get as far as you can.';
+export const DEFAULT_GOAL = 'Play the level: keep running right, jump over enemies, gaps and pipes, hit the question blocks for coins, and get as far as you can.';
