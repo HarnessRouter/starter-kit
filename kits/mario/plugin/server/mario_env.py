@@ -403,31 +403,37 @@ class Game:
         if near is not None and near["dx"] <= 9:
             if fast:
                 # measured: under the block row the take-off must be 3 to 4 tiles before it; in the
-                # open a running jump from farther lands past it just the same
-                if near_next <= (3.8 if overhead else 5.5):
+                # open a running jump from farther lands past it just the same. The jump goes when
+                # the next state would already be past the window at this pace
+                if near_next <= (3.8 if overhead else 5.5) or near_next - lag <= 1.5:
                     return "jump_right now over the enemy: at this speed the take-off comes a few tiles before it."
-                return "run_right; jump_right when the enemy is about 7 tiles ahead at this speed."
+                return "run_right; jump_right the moment the enemy comes within reach."
             if near.get("dir") == "toward":
                 return "jump now, standing: it is about to reach Mario." if near_next <= 1.5 else "wait, standing still; jump when it is 2 tiles away."
             return "run_right after it; jump_right when it is about 7 tiles ahead at a run."
-        if gaps and gaps[0]["dx"] <= 8:
-            g_next = gaps[0]["dx"] - lag
+        if gaps and gaps[0]["dx"] <= 14:
+            g = gaps[0]["dx"]; g_next = g - lag
             # recorded six times: the jump across lands nine tiles on, among the enemies waiting
             # there (a pair beyond the gap, a Goomba dropping off its ledge). Ones walking toward
-            # the gap come to it and fall in; the jump waits for a clear landing
-            # an enemy above the landing (on the ledge past the first gap) drops off its edge
-            # whichever way it walks now, so it counts whatever its direction (recorded five times)
-            zone = [e for e in en if gaps[0]["dx"] + 1 <= e["dx"] <= gaps[0]["dx"] + 11 and (e["dy"] > 1 or e.get("dir") == "toward")]
+            # the gap come to it and fall in; the jump waits for a clear landing. And at full
+            # speed one decision covers up to eight tiles, so the stop must start early (a run
+            # needs about four tiles to stop) and the jump goes when the next state would be past
+            # its window
+            zone = [e for e in en if (g - 1 <= e["dx"] <= g + 11 and e["dy"] > 1)
+                    or (g + 1 <= e["dx"] <= g + 11 and abs(e["dy"]) < 1 and e.get("dir") == "toward")]
             if zone:
-                if xv < 1 and gaps[0]["dx"] <= 4:
+                if xv < 1 and g <= 4:
                     return "wait, standing still at the gap: the enemies beyond it are walking to it and will fall in; jump_right when none stands within 10 tiles past the edge, or when one is 2 tiles away."
-                if gaps[0]["dx"] <= 4:
-                    return "wait (let every key go) before the gap: enemies wait where the jump would land."
+                if fast and g_next <= 1.5:
+                    return "jump_right now: too close to the gap to stop; walk_left in the air to land short."
+                if xv >= 2:
+                    return "walk_left now to brake to a stop before the gap: enemies wait where the jump would land."
+                return "wait (let every key go) before the gap: enemies wait where the jump would land."
             if xv >= 4:
-                return "jump_right now, from the gap's edge, at a run." if g_next <= 2.0 else "run_right to the gap; jump_right when its edge is about 4 tiles ahead at this speed."
-            if gaps[0]["dx"] >= 3.5:
-                return "run_right to gain speed for the gap; jump_right when its edge is about 4 tiles ahead at a run."
-            return "too slow for the gap: walk_left two decisions, then run_right and jump_right when its edge is 4 tiles ahead."
+                return "jump_right now, from the gap's edge, at a run." if g_next <= lag + 2.5 else "run_right to the gap; jump_right the moment its edge comes within reach."
+            if g >= 3.5:
+                return "run_right to gain speed for the gap; jump_right the moment its edge comes within reach."
+            return "too slow for the gap: walk_left two decisions, then run_right and jump_right at its edge."
         if walls and walls[0]["dx"] - lag <= 1.5:
             return "jump_right now over the wall ahead."
         if blocks and blocks[0]["dx"] - lag <= 1.8:
