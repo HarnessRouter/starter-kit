@@ -57,6 +57,15 @@ are measured from where Mario stands (his feet on the ground, the level he last 
 air), so a jump does not shrink the wall ahead and a stair step is one tile tall from the step
 below it.
 
+On the model's own runs after these changes (Jev 1.13 through OpenRouter, 400 steps): all four
+pipes of the first level are cleared, the question blocks pay (10 coins and a score of 17,300 in
+one 119-action run), the run moves at about two seconds an action, and the furthest point reached
+is about half the level. The level is not won yet: the lives go to the Goomba pair pacing around
+the third and fourth pipes, to the landing beyond the 3-tile gap where a Goomba waits, and to a
+pair near the middle of the level. Each of those is a state question, not a model question, and
+each earlier death class was removed the same way: read the trace, measure the game, write the
+fact into the environment.
+
 ### Launching again after an update
 
 A launch captures the kit's package onto the harness. A kit updated afterwards (a new image)
