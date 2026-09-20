@@ -41,5 +41,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: python3 kits/video/skills/video-storyboard/validate_scene.py
+      - run: python3 kits/video/plugin/skills/video-storyboard/validate_scene.py
              --templates kits/video/templates/templates.json

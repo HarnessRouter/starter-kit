@@ -48,7 +48,7 @@ agent doing real work, one row at a time, and you can watch each cell arrive.
 | Path | What |
 |---|---|
 | `kit.json` | The Harness this kit needs, and where its app is served |
-| `skills/sheet-design/` | The `sheet.json` contract and how to design columns — read before anything is written |
+| `plugin/skills/sheet-design/` | The `sheet.json` contract and how to design columns — read before anything is written |
 | `templates/templates.json` | Starting points, including one with agent columns |
 | `app/` | The UI |
 
@@ -70,7 +70,7 @@ npm run build
 | `cell.js` | The dispatcher: one cell, one turn |
 | `sh.js` | What "sheet" adds on top of `reifyui/harness` |
 
-`model.test.mjs` and `run.test.mjs` cover both. `skills/sheet-design/validate_sheet.py` is the
+`model.test.mjs` and `run.test.mjs` cover both. `plugin/skills/sheet-design/validate_sheet.py` is the
 agent-side twin of `model.js`'s `validate()`; if the two ever disagree, the app is right.
 
 ## License

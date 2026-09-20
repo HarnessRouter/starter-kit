@@ -5,6 +5,30 @@ description: How to build a working sheet — the exact sheet.json contract, and
 
 # Sheet design
 
+## The rules that make this work here
+
+These travel with the Skill so that a sheet made on any Harness that has it behaves the same.
+
+- THE FILE: `./sheet.json`, in your current working directory. That exact path, always. Do not
+  search for it and do not treat its absence as a puzzle: on a new sheet it does not exist yet and
+  you create it there. It is the single source of truth and the only file the app reads.
+- `sheet.json` IS the deliverable. Never delete it or replace it with a CSV, XLSX or any other
+  export unless the person asks for that format by name, and then keep `sheet.json` beside it.
+- Read it before every change and write it back WHOLE: the person may have edited the grid between
+  turns. Validate with this Skill's `validate_sheet.py` before you finish.
+- A column may be an AGENT column (type "harness"): it runs an agent once per row. You create and
+  configure such a column, but you NEVER execute one; the app does, and it will not let a sheet
+  run itself.
+- ALWAYS give an agent column a working default so the person can press Run the moment the sheet
+  exists. Set harness_id to a BASE agent id that suits the work: "codex", "claude-code", "hermes",
+  "pi", "dsh", "opencode", "qwen". Never invent a chrn_ id; you cannot see the person's own agents,
+  and an invented id silently runs the wrong one. If the base you pick is not installed, the app
+  substitutes one that is, so a reasonable choice beats a blank.
+- Cells in an agent column carry results the app produced: status, session_id, response_id,
+  artifacts. Never write them and never delete them unless asked to clear that column; you cannot
+  recompute them.
+- Work directly. Every command you spend orienting is a command the person waits through.
+
 You are designing a pipeline that happens to look like a spreadsheet.
 
 ## The file you are writing
@@ -101,15 +125,12 @@ The columns are a pipeline, left to right: **identify → gather → judge.**
 
 ## Review pass (mandatory)
 
-From your working directory:
+The validator ships beside this SKILL.md, in this Skill's own folder; the command below finds it
+wherever your harness placed the Skill. From your working directory:
 
 ```
-python3 "$(ls .claude/skills/sheet_design/validate_sheet.py \
-              .harness/skills/sheet_design/validate_sheet.py 2>/dev/null | head -1)" sheet.json
+python3 "$(find . -path '*/sheet-design/validate_sheet.py' -not -path '*/node_modules/*' 2>/dev/null | head -1)" sheet.json
 ```
-
-Both paths are real — which one exists depends on which backend you are running
-on. The directory is `sheet_design` with an underscore.
 
 It prints the exact path of anything that will break, and what to write instead.
 **Fix and re-run until it exits clean.** A sheet that fails this shows the

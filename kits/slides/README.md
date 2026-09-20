@@ -34,7 +34,7 @@ service: nothing it makes is a flat picture you have to ask it to change.
 | Path | What |
 |---|---|
 | `kit.json` | The Harness this kit needs, and where its app is served |
-| `skills/slide-design/` | How to design a deck — read before any slide is written |
+| `plugin/skills/slide-design/` | How to design a deck — read before any slide is written |
 | `templates/templates.json` | 46 starting points |
 | `app/` | The UI |
 

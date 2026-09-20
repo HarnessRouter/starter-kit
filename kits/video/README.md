@@ -102,7 +102,7 @@ ended on, which is how a move carries across a join without a jump.
 | Path | What |
 |---|---|
 | `kit.json` | The Harness this kit needs, and where its app is served |
-| `skills/video-storyboard/` | The loop, the storyboard format, the continuity rules, and the validator — read before anything is generated |
+| `plugin/skills/video-storyboard/` | The loop, the storyboard format, the continuity rules, and the validator — read before anything is generated |
 | `templates/templates.json` | Five worked storyboards (product launch, explainer, teaser, story, how-to) as reference material |
 | `app/` | The UI |
 
@@ -120,13 +120,13 @@ Two rules about that file are worth stating outright because both fail silently:
 - **The order of `timeline.shots` is the cut order.** It is never inferred from where cards sit on
   the canvas, or dragging one to tidy the board would silently re-cut the film.
 
-The contract is stated once, in `skills/video-storyboard/SKILL.md`, and enforced twice — by the app
+The contract is stated once, in `plugin/skills/video-storyboard/SKILL.md`, and enforced twice — by the app
 and the export pipeline, and by `validate_scene.py`, which the agent runs before it finishes. If
 the two ever disagree, the running system is right and the validator is the bug.
 
 ```
-python3 skills/video-storyboard/validate_scene.py path/to/scene.excalidraw --expect-seconds 36
-python3 skills/video-storyboard/validate_scene.py --templates templates/templates.json
+python3 plugin/skills/video-storyboard/validate_scene.py path/to/scene.excalidraw --expect-seconds 36
+python3 plugin/skills/video-storyboard/validate_scene.py --templates templates/templates.json
 ```
 
 It catches what cannot be seen from inside a turn: a timeline shot that is still rendering, a shot

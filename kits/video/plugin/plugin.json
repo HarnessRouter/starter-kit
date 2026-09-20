@@ -1,0 +1,20 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "harnessrouter-video",
+  "version": "1.0.2",
+  "description": "Describe the film; watch the shots arrive on the canvas.",
+  "author": {
+    "name": "HarnessRouter",
+    "url": "https://harnessrouter.ai"
+  },
+  "homepage": "https://github.com/HarnessRouter/starter-kit/tree/main/kits/video",
+  "repository": "https://github.com/HarnessRouter/starter-kit",
+  "license": "LicenseRef-HarnessRouter-Starter-Kit-1.0.0",
+  "keywords": [
+    "harnessrouter",
+    "starter-kit",
+    "video",
+    "storyboard",
+    "media"
+  ]
+}

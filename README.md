@@ -38,6 +38,14 @@ Four working products, each launched from **Starter Kits** in the HarnessRouter 
 one provisions the Harness it needs and serves the app from the HarnessRouter image — there is no
 separate service to deploy, no database to configure, and no API key to paste into the app.
 
+Each kit's Skills ship as a plugin, a package in the
+[Agent Plugins](https://agent-plugins.org) format at `kits/<kit>/plugin/`: `plugin.json` names and
+versions it, `skills/` holds the Skills. Launching a kit installs that package on the Harness it
+provisions, so the Harness shows the kit as a named plugin it can export, and the same package installs
+into any other server that speaks the
+[Unified Harness Protocol](https://unifiedharnessprotocol.org/spec/2026-09-12/plugins) or any client that
+reads the format.
+
 Every one of them is the same idea in a different shape: **a session is a document**. The list of
 decks, sheets, dashboards or films *is* the Harness's session list, and the document is a file in
 that session's workspace. Delete the session and the work goes with it.
