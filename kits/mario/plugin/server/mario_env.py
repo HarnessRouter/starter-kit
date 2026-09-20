@@ -80,7 +80,7 @@ STATE_JS = """(function(){
   for (var i = 0; i <= 12 * T; i += T / 4) {
     var covered = floors.some(function(f){ return f.left <= x + i && x + i <= f.right; });
     if (!covered && gapStart === null) gapStart = i;
-    if (covered && gapStart !== null) { gaps.push({dx: tiles(gapStart), width: tiles(i - gapStart)}); gapStart = null; }
+    if (covered && gapStart !== null) { if (i - gapStart >= T / 2) gaps.push({dx: tiles(gapStart), width: tiles(i - gapStart)}); gapStart = null; }
   }
   if (gapStart !== null && 12 * T - gapStart >= T / 2) gaps.push({dx: tiles(gapStart), width: tiles(12 * T - gapStart)});
   (window.solids || []).forEach(function(s){
@@ -165,6 +165,8 @@ class Game:
         self.frames = 0
         self._stopped = 0          # consecutive runs that moved nothing
         self._stopped_short = None # the enemy a run stopped short of, for the result text
+        self._walked_off = False   # a jump asked for on a pipe's top that became a step off it
+        self._waited = False       # a jump asked for beside an enemy walking away that became a wait
         self._lives = None
         self._restarting_until = 0.0
         self._held: set[int] = set()
@@ -247,12 +249,24 @@ class Game:
                 en = self._approaching(st)
                 w = (st.get("walls") or [None])[0]
                 gap = (st.get("gaps") or [None])[0]
-                if en and en["dx"] <= 5.0 and en["dy"] > -1:
+                if en and en.get("side") == "behind":
+                    # one at his back is outrun; one already on him, with a wall ahead, is let under
+                    if en["dx"] <= 1.2 and w and w["dx"] <= 1.0:
+                        await self._up(R, S)
+                        await self._let_pass(2.0)
+                        self._stopped_short = {"kind": en["kind"] + " at his back, let under a jump"}
+                        break
+                    en = None
+                if en and en["dx"] <= 5.0 and abs(en["dy"]) < 1:
                     # a run into an enemy walking at him ended in it every time (measured, nine
                     # lives in one run); the run stops five tiles short, where the standing jump
-                    # that lets it under is taken from
+                    # that lets it under is taken from. One already within two tiles is let under
+                    # here and now: a decision later is a decision too late (measured at x 106)
                     await self._up(R, S)
                     self._stopped_short = {"kind": en["kind"] + " walking at him"}
+                    if en["dx"] <= 2.5:
+                        await self._let_pass(2.5)
+                        self._stopped_short = {"kind": en["kind"] + " walking at him, let under a jump"}
                     break
                 if w and w["height"] >= TALL and w["dx"] <= 3.0:
                     # pressed against a tall pipe, a jump with the run key held rode up its side
@@ -352,6 +366,23 @@ class Game:
             return hold_for(walls[0]["height"])
         return None
 
+    async def _wait_enemy(self) -> bool:
+        R, S = KEY["right"], KEY["sprint"]
+        await self._up(R, S)
+        for _ in range(60):                                      # up to 6 s
+            st = await self._eval(STATE_JS)
+            if not isinstance(st, dict) or not st.get("ready") or st.get("dying") or st.get("dead"):
+                break
+            near = self._approaching(st)
+            if near:
+                return await self._let_pass(5.0)
+            if not any(e["dx"] <= 9 and e["dy"] < 1 for e in st.get("enemies") or []):
+                break                                            # gone: the next decision runs on
+            await asyncio.sleep(0.1)
+        await self._down(R, S)
+        self._waited = True
+        return True
+
     async def _let_pass(self, seconds: float = 3.5) -> bool:
         """An enemy walking toward Mario is let under a standing jump: stop, wait until it is a
         tile away, jump straight up, land, run on. Measured six times out of six between 0.8 and
@@ -403,21 +434,72 @@ class Game:
         st = await self._eval(STATE_JS)
         if not isinstance(st, dict) or not st.get("ready"):
             return False
+        if await self._eval("!!(player.resting && player.resting.title === 'Pipe')") and any(
+                e["dy"] < -1 and e["dx"] <= 9 for e in st.get("enemies") or []):
+            # from a pipe's top a jump lands nine tiles on, among the enemies below, and a step
+            # off the edge at a run dropped him onto them (both seen on the recording). Up here
+            # nothing reaches him: wait for the pair to be walking away and four tiles off, then
+            # step off slowly, and meet them at his height on the way
+            R, S = KEY["right"], KEY["sprint"]
+            await self._up(R, S)
+            for _ in range(70):                                  # up to 7 s
+                below = [e for e in st.get("enemies") or [] if e["dy"] < -1 and e["dx"] <= 9]
+                if not below or all(e.get("dir") == "away" and e["dx"] >= 4 for e in below):
+                    break
+                await asyncio.sleep(0.1)
+                st = await self._eval(STATE_JS)
+                if not isinstance(st, dict) or not st.get("ready"):
+                    return False
+            await self._down(R)                                  # a walk, not a run: drops a tile past the edge
+            for _ in range(40):
+                await asyncio.sleep(0.03)
+                if not await self._eval("!!(player.resting && player.resting.title === 'Pipe')"):
+                    break
+            await asyncio.sleep(0.5)
+            await self._down(R, S)
+            self._walked_off = True
+            return True
         near = self._approaching(st)
         slow_now = abs(st.get("xvel") or 0) < 3
-        # the standing jump that lets an enemy under is for one about to arrive, or for one under a
-        # block row (where a running jump hits the blocks and drops onto it); a farther one in the
-        # open is jumped at a run from four tiles, which lands well past it
-        if near and near["dx"] <= 6.5 and (near["dx"] <= 3.0 or slow_now or self._blocks_overhead(st)):
-            if await self._let_pass(5.0 if self._blocks_overhead(st) else 3.5):
+        # the standing jump that lets an enemy under is for a block row overhead (a running jump
+        # there hits the blocks and drops onto it) or for one already on a Mario with no speed;
+        # anything else in the open is jumped at a run from four tiles, which lands well past it
+        # (on the recording, waiting beside the pair for seconds ended in them every time)
+        if near and near["dx"] <= 6.5 and (self._blocks_overhead(st) or (near["dx"] <= 2.0 and slow_now)):
+            if await self._let_pass(5.0 if self._blocks_overhead(st) else 2.5):
                 return True
             st = await self._eval(STATE_JS)              # the enemy is gone; what is ahead now
             if not isinstance(st, dict) or not st.get("ready"):
                 return False
         target, want = self._target(st)
+        if target == "enemy" and want == "wait":
+            # without speed a forward jump lands a tile or two on, on the enemy (seen on the
+            # recording, four lives at the third pipe). One walking at him is let under; one
+            # walking away is waited for, since the pair turns at the next pipe and comes back
+            return await self._wait_enemy()
         if target is None or not isinstance(want, (int, float)):
             return False
         R, S, L = KEY["right"], KEY["sprint"], KEY["left"]
+        # a running jump lands about 9 tiles on; an enemy standing where it ends took a life at the
+        # 3-tile gap (twice) and beyond the fourth pipe (three times). One walking at Mario is let
+        # under first (a Goomba walking at a gap falls into it); one walking away is given time to
+        # leave; then the run-up
+        if target in ("gap", "wall"):
+            zone_from = self._distance(st, target) + 1.0
+            for _ in range(int((8.0 if target == "gap" else 3.0) / 0.1)):
+                zone = [e for e in st.get("enemies") or [] if zone_from <= e["dx"] <= zone_from + 9 and e["dy"] < 1]
+                if not zone:
+                    break
+                await self._up(R, S)                         # it comes to him (or into the gap); no jump into it
+                await asyncio.sleep(0.1)
+                st = await self._eval(STATE_JS)
+                if not isinstance(st, dict) or not st.get("ready") or st.get("dying") or st.get("dead"):
+                    return False
+                near = self._approaching(st)
+                if near and near["dx"] <= 1.2:
+                    if await self._let_pass(2.0):
+                        return True
+            await self._down(R, S)
         dx = self._distance(st, target)
         slow = abs(st.get("xvel") or 0) < 3
         if slow and dx < want + 1.5 and st.get("on_ground"):
@@ -463,8 +545,8 @@ class Game:
     def _approaching(st: dict):
         """The nearest enemy walking at Mario from either side, within reach of mattering."""
         en, back = st.get("enemies") or [], st.get("behind") or []
-        near = [e for e in en if e.get("dir") == "toward" and e["dx"] <= 12 and e["dy"] < 1]
-        near += [e for e in back if e.get("dir") == "toward" and e["dx"] <= 6 and e["dy"] < 1]
+        near = [{**e, "side": "ahead"} for e in en if e.get("dir") == "toward" and e["dx"] <= 12 and abs(e["dy"]) < 1]
+        near += [{**e, "side": "behind"} for e in back if e.get("dir") == "toward" and e["dx"] <= 6 and e["dy"] < 1]
         return min(near, key=lambda e: e["dx"]) if near else None
 
     @staticmethod
@@ -473,7 +555,7 @@ class Game:
         None tiles meaning jump now."""
         near = []
         en, walls, gaps, blocks = st.get("enemies") or [], st.get("walls") or [], st.get("gaps") or [], st.get("blocks") or []
-        if en and en[0]["dx"] <= 10:
+        if en and en[0]["dx"] <= 10 and en[0]["dy"] < 1:
             near.append((en[0]["dx"], "enemy"))
         if blocks and blocks[0]["dx"] <= 6:
             near.append((blocks[0]["dx"], "block"))
@@ -488,9 +570,11 @@ class Game:
         if kind == "wall":
             if walls[0]["height"] < TALL:
                 return None, None                       # any distance within a step clears it
-            return "wall", 2.4
+            return "wall", (2.4 if fast else 1.7)
         if kind == "enemy":
-            return ("enemy", 4.0) if fast and dx > 4.0 else (None, None)
+            if fast:
+                return ("enemy", 4.0) if dx > 4.0 else (None, None)
+            return "enemy", "wait"
         if kind == "block":
             # measured: at a run a medium jump started 1 to 1.5 tiles before the block hits it,
             # from 2 tiles or more it peaks short of it
@@ -573,8 +657,15 @@ class Game:
         if name == "walk_left":
             self._stopped = 0
         short = self._stopped_short if name == "run_right" else None
+        off = self._walked_off if name == "jump_right" else False
+        waited = self._waited if name == "jump_right" else False
+        self._walked_off = False
+        self._waited = False
         d["text"] = (f"{name} held {seconds:.2f} s" + (f" ({taken}: what lay ahead needed it)" if taken else "")
-                     + (f", stopped short of the {short['kind']}" if short else "") + ". " + d["text"])
+                     + (f", stopped short of the {short['kind']}" if short else "")
+                     + (" (walked off the pipe instead: the enemies below are where the jump would land)" if off else "")
+                     + (" (waited instead: a jump from a standstill lands on the enemy walking away)" if waited else "")
+                     + ". " + d["text"])
         return d
 
     def wait(self) -> dict:
@@ -684,9 +775,9 @@ def build(game: Game):
     # writes (0.7) the model was refused three times mid-air at 0.40 to 0.59 and the run stopped.
     keys = {"risk": "read"}
 
-    @m.tool(description="Run to the right, and keep running until told otherwise.", meta=keys)
-    def run_right(hold: Hold) -> dict:
-        return game.act("run_right", hold)
+    @m.tool(description="Run to the right for a moment, and keep running until told otherwise.", meta=keys)
+    def run_right() -> dict:
+        return game.act("run_right", "medium")
 
     @m.tool(description="Jump while running right, over an enemy, a gap or a wall ahead; the run continues after the jump.", meta=keys)
     def jump_right(hold: Hold) -> dict:
