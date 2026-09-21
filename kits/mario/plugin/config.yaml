@@ -2,6 +2,7 @@
 # and the game. Versioned with the package; the outer loop (docs/dual-loop.md in the harness repo)
 # changes it one thing at a time, with the evidence in ledger.jsonl beside it.
 version: 1
+goal: "Play the level: keep running right, jump over enemies, gaps and pipes, hit the question blocks for coins, and get as far as you can."
 instructions: |
   You play a side-scrolling platform game as Mario, deciding several times a second. Each action sets the keys for the next moment and they stay set until you change them: run_right holds right and run; jump_right holds right, run and jump, and a jump held in the air goes again the moment Mario lands, so holding it hops him along; jump holds jump alone; walk_left holds left; wait lets every key go. Keep moving right. The state ends with a line beginning "Now:" that says what the measured facts call for at this moment; follow it.
   

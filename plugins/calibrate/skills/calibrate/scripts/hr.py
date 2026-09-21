@@ -72,20 +72,32 @@ def start_run(goal: str, harness: str | None = None, model: str | None = None, s
     return call("POST", "/v1/responses", body)
 
 
-def wait_run(response_id: str, poll: float = 5.0, limit: float = 1800.0) -> dict:
+TERMINAL = ("completed", "failed", "incomplete", "cancelled")
+
+
+def wait_run(response_id: str, poll: float = 5.0, limit: float = 3600.0) -> dict:
+    """Blocks until the run has ended. Only a terminal status ends the wait: a server may say
+    `running` or `queued` for work in progress, and treating anything but `in_progress` as done
+    started three runs at once on one machine (2026-09-21)."""
     t0 = time.time()
     while True:
         r = call("GET", f"/v1/responses/{response_id}")
-        if r.get("status") != "in_progress":
+        if r.get("status") in TERMINAL:
             return r
         if time.time() - t0 > limit:
-            sys.exit(f"run {response_id} still in progress after {limit:.0f}s")
+            sys.exit(f"run {response_id} still not finished after {limit:.0f}s")
         time.sleep(poll)
 
 
 def session_of(response: dict) -> str | None:
+    """The session the response ran in: named on the response, or else the inner harness's newest session."""
     meta = response.get("metadata") or {}
-    return meta.get("session_id") or response.get("session_id") or meta.get("harness_session_id")
+    sid = meta.get("session_id") or response.get("session_id") or meta.get("harness_session_id")
+    if sid:
+        return sid
+    listing = call("GET", f"/v1/sessions?harness={HARNESS}&limit=1")
+    sessions = listing.get("sessions") or []
+    return sessions[0].get("session_id") if sessions else None
 
 
 def fetch_workspace(session_id: str, out_dir: str) -> dict:
