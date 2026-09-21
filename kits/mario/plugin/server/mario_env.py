@@ -17,6 +17,7 @@ every other tool an action whose parameters are enumerable. The browser is Brows
 
 import asyncio
 import base64
+import json
 import glob
 import os
 import pathlib
@@ -38,7 +39,25 @@ INSTRUCTIONS = ("You play a side-scrolling platform game as Mario, deciding seve
                 "so holding it hops him along; jump holds jump alone; walk_left holds left; wait lets every key go. The state says where Mario is, what he is doing, what is ahead and behind with distances in "
                 "tiles, and which keys are held. Keep moving right and jump over what is within one step. Finish when "
                 "the level is cleared. Escalate when Mario has no lives left.")
-TALL = 4                      # a wall this tall is cleared only at a run
+TALL = 4                      # a wall this tall is cleared only at a run (the default; config.yaml tunables override)
+TUNABLES = {"enemy_horizon_tiles": 16, "gap_horizon_tiles": 14, "tall_wall_tiles": TALL, "pipe_takeoff_tiles": [1.8, 3.4],
+            "enemy_takeoff_tiles": [1.5, 6.5], "enemy_takeoff_under_blocks_tiles": [1.5, 4.0], "archive_frames": True}
+
+
+def load_tunables() -> dict:
+    """The package's config.yaml tunables over the defaults: the numbers the rendering reads, which
+    the outer loop changes one at a time (docs/dual-loop.md in the harness repo)."""
+    tun = dict(TUNABLES)
+    for cand in (os.environ.get("SYSTEMONE_CONFIG"), str(pathlib.Path(__file__).resolve().parents[1] / "config.yaml")):
+        if cand and os.path.exists(cand):
+            try:
+                import yaml
+                d = yaml.safe_load(open(cand)) or {}
+                tun.update({k: v for k, v in (d.get("tunables") or {}).items() if k in tun})
+            except Exception:  # noqa: BLE001 - a bad file leaves the defaults
+                pass
+            break
+    return tun
 # The frame the kit's page shows: Chrome's own screencast, a JPEG for every third frame the game
 # draws (about twenty a second), each written whole to frame.jpg. The page reads that file.
 SCREENCAST = {"format": "jpeg", "quality": 45, "maxWidth": 960, "maxHeight": 600, "everyNthFrame": 3}
@@ -63,7 +82,8 @@ STATE_JS = """(function(){
     if (!c.alive || c === player || c.title === undefined) return;
     if (['Coin','Mushroom','FireFlower','Star','Vine','Text','Shell','Fireball'].indexOf(c.title) >= 0) return;
     var dx = (c.left - p.right) / T, dy = (p.bottom - c.bottom) / T, back = (p.left - c.right) / T;
-    if (dx >= 0 && dx <= 16) enemies.push({kind: c.title, dx: Math.round(dx * 10) / 10, dy: Math.round(dy * 10) / 10, dir: (c.xvel || 0) < 0 ? 'toward' : 'away'});
+    var EH = (window.__s1tun && window.__s1tun.enemy_horizon_tiles) || 16;
+    if (dx >= 0 && dx <= EH) enemies.push({kind: c.title, dx: Math.round(dx * 10) / 10, dy: Math.round(dy * 10) / 10, dir: (c.xvel || 0) < 0 ? 'toward' : 'away'});
     else if (back >= 0 && back <= 8) behind.push({kind: c.title, dx: Math.round(back * 10) / 10, dy: Math.round(dy * 10) / 10, dir: (c.xvel || 0) > 0 ? 'toward' : 'away'});
   });
   // the ground ahead as a profile from where Mario stands: each quarter tile, the highest surface
@@ -165,6 +185,9 @@ class Game:
         self._session = None
         self._cdp = None
         self.frame_path = workspace_root() / "frame.jpg"
+        self.tun = load_tunables()
+        self.archive = (workspace_root() / "observations") if self.tun.get("archive_frames") else None
+        self._archived = 0
         self.started_at = time.time()
         self.steps = 0
         self.frames = 0
@@ -210,10 +233,21 @@ class Game:
         (a temp file renamed over it, so a reader never sees half a picture), and the frame is
         acknowledged, without which Chrome stops sending."""
         try:
+            data = base64.b64decode(ev["data"])
             tmp = self.frame_path.with_suffix(".jpg.tmp")
-            tmp.write_bytes(base64.b64decode(ev["data"]))
+            tmp.write_bytes(data)
             os.replace(tmp, self.frame_path)
             self.frames += 1
+            if self.archive is not None and self._archived < 12000:
+                # the observation archive the outer loop reads: every frame the page showed, with
+                # its time, under observations/ (about 7 KB a frame, eighteen a second)
+                if self._archived == 0:
+                    self.archive.mkdir(parents=True, exist_ok=True)
+                name = f"{self._archived:06d}.jpg"
+                (self.archive / name).write_bytes(data)
+                with open(self.archive / "frames.jsonl", "a") as f:
+                    f.write(json.dumps({"t": round(time.time(), 3), "file": name}) + "\n")
+                self._archived += 1
         except Exception:  # noqa: BLE001 - a missed frame is a missed frame, never a failed step
             pass
         self._loop.create_task(self._cdp.cdp_client.send.Page.screencastFrameAck(
@@ -320,7 +354,7 @@ class Game:
                 if isinstance(st, dict) and st.get("ready"):
                     break
                 await asyncio.sleep(0.25)
-            await self._eval("window.unpause && unpause(); 'ok'")
+            await self._eval(f"window.__s1tun = {json.dumps(self.tun)}; window.unpause && unpause(); 'ok'")
             try:
                 await self._screencast()
             except Exception:  # noqa: BLE001 - already running across the navigation
@@ -445,7 +479,7 @@ class Game:
             things.append((walls[0]["dx"], "wall"))
         if drops and drops[0]["dx"] <= 12:
             things.append((drops[0]["dx"], "drop"))
-        if gaps and gaps[0]["dx"] <= 14:
+        if gaps and gaps[0]["dx"] <= self.tun["gap_horizon_tiles"]:
             things.append((gaps[0]["dx"], "gap"))
         if near is not None and near["dx"] <= 9:
             things.append((near["dx"], "enemy"))
@@ -453,7 +487,7 @@ class Game:
         kind = things[0][1] if things else None
         if kind == "wall":
             w = walls[0]; w_next = w["dx"] - lag
-            if w["height"] >= TALL:
+            if w["height"] >= self.tun["tall_wall_tiles"]:
                 # measured: the pipe is cleared at near full speed (4.9 and up) with the jump held
                 # long; at a jog the apex is level with its top and the side stops him (recorded)
                 w = walls[0]; w_next = w["dx"] - lag
@@ -465,9 +499,10 @@ class Game:
                     return "too slow for the pipe from here: walk_left for two decisions, then run_right to full speed and jump_right at 2 to 3 tiles."
                 if not full:
                     return "run_right to full speed; jump_right when the pipe is about 5 tiles ahead and Mario is running flat out."
-                if 1.8 <= w_next <= 3.4:
+                lo_t, hi_t = self.tun["pipe_takeoff_tiles"]
+                if lo_t <= w_next <= hi_t:
                     return "jump_right now, and keep it held for three decisions: the pipe's take-off point is here."
-                if w_next < 1.8:
+                if w_next < lo_t:
                     return "jump_right now and hold it three decisions."
                 return "run_right toward the pipe; jump_right when it is about 5 tiles ahead at this speed."
             if w_next <= 1.5:
@@ -486,7 +521,7 @@ class Game:
                 # when the next state would already be past it; under the blocks a miss is a death,
                 # so there the stop and the standing jump (8 of 8) take over instead
                 under_blocks = any(o["dx"] <= near["dx"] + 1 for o in overhead)
-                lo, hi = (1.5, 4.0) if under_blocks else (1.5, 6.5)
+                lo, hi = self.tun["enemy_takeoff_under_blocks_tiles"] if under_blocks else self.tun["enemy_takeoff_tiles"]
                 if lo <= takeoff <= hi:
                     return "jump_right now over the enemy: this is the take-off."
                 if takeoff > hi:
@@ -582,7 +617,7 @@ class Game:
         if walls:
             w = walls[0]
             need = ("a jump held for three decisions from a run, leaving the ground 2 to 3 tiles before it; from against it or from standing it is never cleared"
-                    if w["height"] >= TALL else "a jump held for two decisions" if w["height"] >= 3 else "a hop (jump_right)" if w["height"] <= 1 else "a jump")
+                    if w["height"] >= self.tun["tall_wall_tiles"] else "a jump held for two decisions" if w["height"] >= 3 else "a hop (jump_right)" if w["height"] <= 1 else "a jump")
             parts.append(f"Wall ahead: {w['kind']} {w['dx']} tiles ahead, {w['height']} tiles tall; it takes {need}.")
         else:
             parts.append("No pipe or wall within 8 tiles.")
