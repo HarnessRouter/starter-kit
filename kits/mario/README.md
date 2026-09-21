@@ -138,6 +138,18 @@ npm run dev        # against a console at the same origin, or set a proxy for /a
 npm run build      # what the image serves at /kits/mario
 ```
 
+### The package's configuration, objective and evidence
+
+`plugin/config.yaml` is the reflex's configuration, versioned with the package: the instructions,
+the gate, the encoder, the tunables the rendering reads (the enemy and gap horizons, the tall-wall
+height, the measured take-off windows) and the objective (pass on `cleared`, a failure per life
+lost, `level_x` as the locus, `observations/` as the evidence). The environment archives every
+frame it shows under `observations/` beside the live `frame.jpg`, and `plugin/tools/evidence.py`
+cuts that archive into a contact sheet around each failure. `plugin/ledger.jsonl` records every
+version with its evidence and verdict. An outer harness (the `plugins/calibrate` package in this
+repository) reads all of it to improve the configuration one version at a time; the design is
+`docs/dual-loop.md` in the System One Harness repository.
+
 ## Credits
 
 - The game is **Full Screen Mario**, played at [supermarioplay.com](https://supermarioplay.com/game/mario.html?v=1.0.1). Mario and its characters belong to Nintendo; this kit plays the page as a person would and ships none of the game's files.
