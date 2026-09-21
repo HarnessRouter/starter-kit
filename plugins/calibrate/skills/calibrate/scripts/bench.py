@@ -40,10 +40,15 @@ def main() -> int:
             sys.exit("the response names no session; cannot fetch its workspace")
         ws = hr.fetch_workspace(sid, os.path.join(a.out, f"run-{i}"))
         if not ws["trace"]:
-            sys.exit(f"run {i}: no trace.json in the session's workspace ({ws['dir']}); the inner harness must write it")
-        t = json.load(open(ws["trace"]))
+            # a run without a record is still a run: it counts as a failure with no locus, and
+            # the bench goes on; the reason is in wait-log.jsonl for the platform
+            print(f"run {i}: no trace.json in the session's workspace ({ws['dir']}); counted as a failed run", flush=True)
+            t = {"status": r.get("status"), "reason": ((r.get("incomplete_details") or {}).get("reason") or (r.get("error") or {}).get("message") if isinstance(r.get("error"), dict) else r.get("error")), "steps": [], "started_at": None, "finished_at": None}
+        else:
+            t = json.load(open(ws["trace"]))
         t["session_id"] = sid
         t["observations"] = ws["observations"]
+        t["response_id"] = rid
         traces.append(t)
         sessions.append(sid)
     rep = metrics.report(traces, objective)

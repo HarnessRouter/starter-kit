@@ -73,17 +73,51 @@ def start_run(goal: str, harness: str | None = None, model: str | None = None, s
 
 
 TERMINAL = ("completed", "failed", "incomplete", "cancelled")
+LOG = os.environ.get("HR_CALIBRATION_LOG", "wait-log.jsonl")
+
+
+def _log(kind: str, payload) -> None:
+    try:
+        with open(LOG, "a") as f:
+            f.write(json.dumps({"at": time.time(), "kind": kind, "payload": payload}, default=str)[:4000] + "\n")
+    except OSError:
+        pass
+
+
+def session_running(session_id: str | None) -> bool:
+    if not session_id:
+        return False
+    try:
+        s = call("GET", f"/v1/sessions/{session_id}")
+    except SystemExit:
+        return False
+    return str(s.get("status") or "") in ("running", "in_progress", "queued")
 
 
 def wait_run(response_id: str, poll: float = 5.0, limit: float = 3600.0) -> dict:
-    """Blocks until the run has ended. Only a terminal status ends the wait: a server may say
-    `running` or `queued` for work in progress, and treating anything but `in_progress` as done
-    started three runs at once on one machine (2026-09-21)."""
+    """Blocks until the run has ended: the response carries a terminal status AND its session is no
+    longer running. A server may say `running` or `queued` for work in progress, and a transient
+    `failed` was seen on a response whose turn was still running (2026-09-21), so a non-completed
+    terminal status is re-read a few times before it is believed. Every status read that is not
+    `completed` is logged to wait-log.jsonl for the platform to chase."""
     t0 = time.time()
+    confirmations = 0
     while True:
         r = call("GET", f"/v1/responses/{response_id}")
-        if r.get("status") in TERMINAL:
-            return r
+        status = r.get("status")
+        if status != "completed":
+            _log("status", {"response_id": response_id, "status": status, "error": r.get("error"),
+                            "incomplete_details": r.get("incomplete_details"), "metadata": r.get("metadata")})
+        if status in TERMINAL:
+            sid = session_of(r)
+            if session_running(sid):
+                confirmations = 0
+            elif status == "completed":
+                return r
+            else:
+                confirmations += 1
+                if confirmations >= 4:     # about twenty seconds of the same terminal status with the session at rest
+                    return r
         if time.time() - t0 > limit:
             sys.exit(f"run {response_id} still not finished after {limit:.0f}s")
         time.sleep(poll)
@@ -103,7 +137,20 @@ def session_of(response: dict) -> str | None:
 def fetch_workspace(session_id: str, out_dir: str) -> dict:
     """The session's files as one archive, unpacked; returns the paths of trace.json and observations/."""
     os.makedirs(out_dir, exist_ok=True)
-    blob = call("GET", f"/v1/sessions/{session_id}/files/archive", raw=True, timeout=600)
+    blob = None
+    for attempt in range(12):
+        # the archive is built from the session's checkpoint, which lands once the turn has ended;
+        # a 404 right after the run means "not yet", so wait and ask again
+        try:
+            blob = call("GET", f"/v1/sessions/{session_id}/files/archive", raw=True, timeout=600)
+            break
+        except SystemExit as e:
+            _log("archive", {"session_id": session_id, "attempt": attempt, "error": str(e)[:300]})
+            if "404" not in str(e) and "409" not in str(e):
+                raise
+            time.sleep(10)
+    if blob is None:
+        return {"trace": None, "observations": None, "dir": out_dir, "missing": True}
     with zipfile.ZipFile(io.BytesIO(blob)) as z:
         z.extractall(out_dir)
     trace = None
