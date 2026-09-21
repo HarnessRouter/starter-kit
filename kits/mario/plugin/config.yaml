@@ -1,0 +1,29 @@
+# The Super Mario reflex's configuration: everything that shapes its decisions except the model
+# and the game. Versioned with the package; the outer loop (docs/dual-loop.md in the harness repo)
+# changes it one thing at a time, with the evidence in ledger.jsonl beside it.
+version: 1
+goal: "Play the level: keep running right, jump over enemies, gaps and pipes, hit the question blocks for coins, and get as far as you can."
+instructions: |
+  You play a side-scrolling platform game as Mario, deciding several times a second. Each action sets the keys for the next moment and they stay set until you change them: run_right holds right and run; jump_right holds right, run and jump, and a jump held in the air goes again the moment Mario lands, so holding it hops him along; jump holds jump alone; walk_left holds left; wait lets every key go. Keep moving right. The state ends with a line beginning "Now:" that says what the measured facts call for at this moment; follow it.
+  
+  Facts, measured on this game: a decision lands a fraction of a second after the state you read, and at a full run Mario covers 2 to 3 tiles in that time. A jump held for one decision clears 3 tiles, for two decisions 4 tiles; jump_right pressed again on the ground is a new jump, and held through a landing it is a new jump at once. A running jump lands about 9 tiles on. An enemy is jumped at a run with the take-off 1.5 to 4 tiles before it; under a row of blocks an earlier jump hits the blocks and drops Mario onto it, so when that take-off cannot be hit, stop with walk_left and jump_right when it is 1 to 2.5 tiles away, which always works. An enemy walking at a standing Mario is jumped with jump_right when it is 1 to 2.5 tiles away. An enemy on a ledge above walks off its edge and drops onto whoever runs under it: wait for it to come down, then jump_right over it. A pipe 4 tiles tall is cleared only at a full run, leaving the ground 2 to 3 tiles before it with the jump held for three decisions; from standing or at a jog it is never cleared, so if Mario is stopped at one, walk_left for four decisions, then run_right, then jump_right; but if an enemy is walking at his back, walking left meets it: stand and take jump (the standing jump) when it is 2 tiles behind him, it passes under, and only then walk_left. A step one tile tall is hopped with jump_right; a stair is a hop per step. Where the ground drops away ahead, jump_right from the edge lands past the drop, and walking off the edge lands in a slot with no way out. A gap is crossed by a running jump from its edge, and a jump still in the air with a gap coming is kept held so the next hop goes the moment Mario lands; a standing jump falls in; enemies waiting where the jump would land walk to the gap and fall in if Mario stands at the edge. A question block pays a coin when hit from below by a jump started 1 to 1.5 tiles before it at a run.
+  
+  When Mario has just died, wait. Finish when the level is cleared. Escalate when Mario has no lives left.
+gate: {read: 0.5, write: 0.7, destructive: 0.9}
+encoder: {history_steps: 3}
+tunables:
+  enemy_horizon_tiles: 16          # how far ahead an enemy is named
+  gap_horizon_tiles: 14            # how far ahead a gap is named and the jump timed
+  tall_wall_tiles: 4               # a wall this tall is cleared only at a full run
+  pipe_takeoff_tiles: [1.8, 3.4]   # measured: where the jump over a 4-tile pipe leaves the ground
+  enemy_takeoff_tiles: [1.5, 6.5]  # measured: where the jump over an enemy at a run may leave the ground, in the open
+  enemy_takeoff_under_blocks_tiles: [1.5, 4.0]   # measured: under the block row, farther hits the blocks and drops onto it
+  archive_frames: true             # keep every frame the page shows under observations/
+objective:
+  pass: "cleared == true"
+  failure: "lives decreased"
+  metrics:
+    - {field: cleared, better: true}
+    - {field: level_x, better: higher}
+  locus: [level_x]
+  evidence: observations/
