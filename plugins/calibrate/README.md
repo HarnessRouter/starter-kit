@@ -12,6 +12,7 @@ harness: `HR_API_URL`, `HR_CALIBRATION_TOKEN` (a per-turn credential scoped to t
 | Script | What it does |
 |---|---|
 | `bench.py --runs 3 --package <dir>` | K runs, one at a time; fetches each run's workspace; the objective's scoreboard and failure groups |
+| `fetch.py --out package` | the inner harness's package (the one carrying the environment), never the harness's export |
 | `probe.py "a,b,c"` | one run driven by a fixed action sequence, to measure the environment |
 | `publish.py --package <dir>` | uploads the package as the inner harness's plugin; its instructions follow `config.yaml` |
 | `report.py --package <dir> traces...` | the report over traces already on disk |

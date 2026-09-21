@@ -40,11 +40,17 @@ def package_files(root: str) -> list[dict]:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--package", required=True)
+    ap.add_argument("--new", action="store_true", help="add a package the harness does not carry yet")
     a = ap.parse_args()
     cfg = yaml.safe_load(open(os.path.join(a.package, "config.yaml"))) or {}
     manifest = json.load(open(os.path.join(a.package, "plugin.json")))
     h = hr.get_harness()
     files = package_files(a.package)
+    names = [p.get("name") for p in (h.get("plugins") or [])]
+    if not manifest.get("version"):
+        sys.exit(f"{a.package}/plugin.json has no version; fetch the real package with fetch.py, never the harness's export")
+    if manifest["name"] not in names and not a.new:
+        sys.exit(f"the harness carries {names}, not {manifest['name']!r}; a publish replaces the same-named package (use --new to add one)")
     others = [p for p in (h.get("plugins") or []) if p.get("name") != manifest["name"]]
     body = {"name": h["name"], "base": h["base"], "defaultModel": h.get("defaultModel"),
             "mcpServers": h.get("mcpServers", []), "skills": h.get("skills", []),

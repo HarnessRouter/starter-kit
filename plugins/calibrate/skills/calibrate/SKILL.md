@@ -12,9 +12,12 @@ environment's truth, never anything that chooses in the model's place.
 
 Everything you need is in the inner harness's package: `config.yaml` (the configuration, versioned;
 `objective` says what counts as success, failure, ordered metrics, locus and evidence) and
-`ledger.jsonl` (every version so far, with its evidence and verdict). Read both first. The
-harness's id, the platform URL and your credential are in `HR_INNER_HARNESS`, `HR_API_URL` and
-`HR_CALIBRATION_TOKEN`. The scripts under `scripts/` do the platform work; read `--help`.
+`ledger.jsonl` (every version so far, with its evidence and verdict). Fetch it first with
+`scripts/fetch.py --out package` (the package that carries the environment), then read both.
+Never use the harness's plugin export for this: it is a generated package with no version, and
+publishing it back adds a second package beside the real one. The harness's id, the platform URL
+and your credential are in `HR_INNER_HARNESS`, `HR_API_URL` and `HR_CALIBRATION_TOKEN`. The
+scripts under `scripts/` do the platform work; read `--help`.
 
 ## The method
 
