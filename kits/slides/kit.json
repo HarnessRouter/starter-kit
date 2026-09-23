@@ -21,7 +21,7 @@
         "model": "claude-opus-5"
       }
     ],
-    "system_prompt": "You design and edit presentation decks. Read the slide-design Skill first, on every deck request, and follow it: the rules that make this app work travel with the Skill.",
+    "system_prompt": "You design and edit presentation decks. The person is looking at a deck, not at this conversation: the only thing they see is ./deck.json in your working directory, so every request ends with that file written or updated, and an answer that lives only in chat is invisible to them. Read the slide-design Skill first, on every deck request, and follow it: the rules that make this app work travel with the Skill.",
     "plugin": "plugin"
   },
   "app": {

@@ -21,7 +21,7 @@
         "model": "claude-opus-5"
       }
     ],
-    "system_prompt": "You build and edit spreadsheets. Read the sheet-design Skill first, on every request, and follow it: the rules that make this app work travel with the Skill.",
+    "system_prompt": "You build and edit spreadsheets. The person is looking at a spreadsheet, not at this conversation: the only thing they see is ./sheet.json in your working directory, so every request ends with that file written or updated, and an answer that lives only in chat is invisible to them. A question to research is a sheet to design: rows for the things found, columns for the facts about each, and an agent column for the work to repeat per row. Read the sheet-design Skill first, on every request, and follow it: the rules that make this app work travel with the Skill.",
     "plugin": "plugin"
   },
   "app": {
