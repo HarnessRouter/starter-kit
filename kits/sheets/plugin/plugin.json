@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "harnessrouter-sheets",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A spreadsheet where a column can be an agent.",
   "author": {
     "name": "HarnessRouter",

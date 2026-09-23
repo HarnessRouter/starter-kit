@@ -321,12 +321,18 @@ export function validate(sheet) {
       if (cell.status !== undefined && !CELL_STATUS.includes(cell.status)) {
         err(`cells["${k}"].status`, `is ${JSON.stringify(cell.status)}`, `Use one of: ${CELL_STATUS.join(' ')}.`);
       }
-      // A cell that was never dispatched belongs to a run without having a session — that is
-      // what `skipped` means, and it is written by the app itself. Only a cell that claims to
-      // have RUN needs both halves of the reference.
-      const ran = ['running', 'done', 'failed'].includes(cell.status);
-      if (ran && Boolean(cell.run_id) !== Boolean(cell.session_id)) {
-        err(`cells["${k}"]`, 'claims to have run but has only one of run_id / session_id',
+      // The reference has two halves and the app writes them at different moments: run_id the
+      // instant a cell is dispatched, session_id when the service accepts the turn and names its
+      // session. So a `running` cell without a session is a cell whose turn is being started, a
+      // `failed` one without a session is a dispatch that never reached one, and a `skipped` one
+      // never had one. What is invented is a session with no run behind it, or a `done` cell
+      // missing either half. The old rule ("ran ⇒ both") flagged the app's own dispatch marker
+      // for a second or two at every batch start, as a red banner over a healthy run.
+      if (cell.session_id && !cell.run_id) {
+        err(`cells["${k}"]`, 'names a session_id without the run_id that produced it',
+            'Both come from a real run. Delete them, or leave the cell out entirely.');
+      } else if (cell.status === 'done' && (!cell.run_id || !cell.session_id)) {
+        err(`cells["${k}"]`, 'is done but has only one of run_id / session_id',
             'Both come from a real run. Delete them, or leave the cell out entirely.');
       }
     }

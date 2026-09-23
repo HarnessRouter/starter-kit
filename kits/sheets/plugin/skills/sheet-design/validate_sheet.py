@@ -186,11 +186,16 @@ def check_cells(sheet: dict, columns: list, row_ids: set) -> None:
             st = cell.get("status")
             if st is not None and st not in STATUSES:
                 err(f"{at}.status", f"is {json.dumps(st)}", f"use one of: {' '.join(sorted(STATUSES))}")
-            # A `skipped` cell belongs to a run without ever having had a session; that is what
-            # skipped means, and the app writes it. Only a cell claiming to have RUN needs both.
-            if st in ("running", "done", "failed") \
-                    and bool(cell.get("run_id")) != bool(cell.get("session_id")):
-                err(at, "claims to have run but has only one of run_id / session_id",
+            # The reference has two halves the app writes at different moments: run_id at
+            # dispatch, session_id when the service accepts the turn. A running cell without a
+            # session is being started, a failed one without a session never reached one, a
+            # skipped one never had one. Invented is a session with no run, or a done cell
+            # missing either half. (Mirrors the app's own validator, lib/model.js.)
+            if cell.get("session_id") and not cell.get("run_id"):
+                err(at, "names a session_id without the run_id that produced it",
+                    "both come from a real run — delete them, or leave the cell out entirely")
+            elif st == "done" and not (cell.get("run_id") and cell.get("session_id")):
+                err(at, "is done but has only one of run_id / session_id",
                     "both come from a real run — delete them, or leave the cell out entirely")
 
         if col.get("type") == "checkbox" and "value" in cell and not isinstance(cell["value"], bool):

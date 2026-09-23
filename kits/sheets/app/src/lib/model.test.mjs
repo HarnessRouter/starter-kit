@@ -111,10 +111,22 @@ test('run state in a plain cell is refused — it claims a run that never happen
   assert.match(e.what, /session_id/);
 });
 
-test('an agent cell that RAN needs both run_id and session_id; a skipped one does not', () => {
+test('a done cell needs both run_id and session_id; a session without a run is invented', () => {
   const cols = [col('c1', 'A'), agent('c2', 'B', 'do {{A}}')];
   const half = sheet(cols, [{ id: 'row_1' }], { 'row_1:c2': { run_id: 'run_1', status: 'done' } });
   assert.ok(validate(half).errors.some((e) => e.what.includes('only one of run_id')));
+  const orphan = sheet(cols, [{ id: 'row_1' }], { 'row_1:c2': { session_id: 'hsess_1', status: 'done' } });
+  assert.ok(validate(orphan).errors.some((e) => e.what.includes('without the run_id')));
+
+  // The app's own lifecycle: run_id lands at dispatch, session_id when the turn is accepted, so
+  // a running cell is briefly a run with no session; a dispatch refused before any session
+  // leaves a failed cell the same way. Neither is invented, and neither may show as an error
+  // over a healthy run (the red banner at every batch start, 2026-09-22).
+  const starting = sheet(cols, [{ id: 'row_1' }], { 'row_1:c2': { run_id: 'run_1', status: 'running' } });
+  assert.equal(validate(starting).errors.length, 0);
+  const refused = sheet(cols, [{ id: 'row_1' }],
+                        { 'row_1:c2': { run_id: 'run_1', status: 'failed', error: 'The turn could not be started.' } });
+  assert.equal(validate(refused).errors.length, 0);
 
   // The app writes exactly this for a cell it never dispatched. Flagging it made the sheet page
   // show the person an error about its own correct output.
