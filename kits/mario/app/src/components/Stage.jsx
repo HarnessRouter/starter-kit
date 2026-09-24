@@ -49,6 +49,22 @@ function Stat({ label, value }) {
   return <span className="mk-stat"><b>{value}</b><span>{label}</span></span>;
 }
 
+/** Who made the System One model playing this run, from the harness's model id. The credit follows the
+ *  model: a run on Laya must not thank TypeSafe. An id this map does not know is shown as itself. */
+const MODEL_CREDITS = {
+  'jev': { name: 'Jev', by: 'TypeSafe', href: 'https://typesafe.ai', via: 'through OpenRouter' },
+  'laya': { name: 'Laya', by: 'Convai Innovations', href: 'https://huggingface.co/convaiinnovations/laya', via: 'open weights, served by HarnessRouter' },
+  'openthai-systemone': { name: 'OpenThai-SystemOne', by: 'iApp Technology', href: 'https://huggingface.co/iapp/OpenThai-SystemOne', via: 'open weights, served by HarnessRouter' },
+  'system-one-phase2': { name: 'System One (phase2 student)', by: 'Mateo Lafalce', href: 'https://huggingface.co/lafalce/system-one-model', via: 'open weights, served by HarnessRouter' },
+};
+function ModelCredit({ model }) {
+  const id = String(model || '');
+  const key = id.startsWith('jev') ? 'jev' : id;
+  const c = MODEL_CREDITS[key];
+  if (!c) return <>{id ? <code>{id}</code> : 'a System One model'}, a System One model</>;
+  return <><a href={c.href} target="_blank" rel="noopener noreferrer">{c.name}</a> by {c.by}, a System One model, {c.via}</>;
+}
+
 export function Stage({ frame, fps, harness, status, running, stats, onPlay, onStop }) {
   const elapsed = stats.startedAt ? Math.round(((stats.endedAt || Date.now()) - stats.startedAt) / 1000) : 0;
   const rate = stats.actions > 1 && stats.firstAt && stats.lastAt > stats.firstAt
@@ -80,7 +96,7 @@ export function Stage({ frame, fps, harness, status, running, stats, onPlay, onS
       <p className="mk-credits">
         The game is <a href="https://supermarioplay.com/game/mario.html?v=1.0.1" target="_blank" rel="noopener noreferrer">Full Screen Mario at supermarioplay.com</a>;
         Mario belongs to Nintendo and none of the game's files ship here. The browser is driven with <a href="https://github.com/browser-use/browser-use" target="_blank" rel="noopener noreferrer">Browser Use</a> (MIT).
-        The model is <a href="https://typesafe.ai" target="_blank" rel="noopener noreferrer">Jev</a> by TypeSafe, a System One model, through OpenRouter.
+        The model is <ModelCredit model={harness?.defaultModel} />.
         The harness is the open-source <a href="https://github.com/HarnessRouter/SystemOneHarness" target="_blank" rel="noopener noreferrer">System One Harness</a>.
       </p>
       <div className="mk-facts" aria-label="How it works">

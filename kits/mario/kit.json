@@ -2,7 +2,7 @@
   "id": "mario",
   "title": "Super Mario",
   "tagline": "A System One model plays a platform game several times a second, and you watch its browser.",
-  "description": "Full Screen Mario runs in a headless browser inside this deployment. The System One base reads the game's own state each step as a few literal sentences (where Mario is, what is ahead and how far) and chooses one control to hold, a few hundred milliseconds a decision, with no screenshot and no text generation. The left pane streams the browser the model is playing in; the right pane is the run's conversation, every decision with the game's reply. Credits: the game is Full Screen Mario, played at supermarioplay.com; the browser is driven with Browser Use (MIT); the model is TypeSafe's Jev through OpenRouter.",
+  "description": "Full Screen Mario runs in a headless browser inside this deployment. The System One base reads the game's own state each step as a few literal sentences (where Mario is, what is ahead and how far) and chooses one control to hold, a few hundred milliseconds a decision, with no screenshot and no text generation. The left pane streams the browser the model is playing in; the right pane is the run's conversation, every decision with the game's reply. Credits: the game is Full Screen Mario, played at supermarioplay.com; the browser is driven with Browser Use (MIT); the model is whichever System One model the harness runs, Jev by TypeSafe through OpenRouter or an open-weight model HarnessRouter serves.",
   "icon": "tabler:device-gamepad-2",
   "accent": "#E4572E",
   "harness": {
