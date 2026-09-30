@@ -8,17 +8,42 @@ import { Avatar } from '../lib/avatars.jsx';
 import { sessionFiles } from '../lib/api.js';
 import { BrowserCard } from './BrowserCard.jsx';
 import { FileChips } from './Files.jsx';
+import { ErrorBoundary } from './ErrorBoundary.jsx';
 
 /** The files of several sessions, refreshed when `key` changes. */
+const WIDE = 1200;     // the rail is a third column from here up
+const NARROW = 1024;   // below this it is a sheet over the conversation, so it starts closed
+
+/** Whether the rail is open: open by default on a wide window, and closed again when the window
+ *  becomes narrow, where an open rail would cover the conversation. */
+export function useRail() {
+  const [open, setOpen] = useState(() => window.innerWidth >= WIDE);
+  useEffect(() => {
+    let last = window.innerWidth;
+    const on = () => { const w = window.innerWidth; if (w < NARROW && last >= NARROW) setOpen(false); last = w; };
+    window.addEventListener('resize', on);
+    return () => window.removeEventListener('resize', on);
+  }, []);
+  return [open, setOpen];
+}
+
+const ARTIFACTS_MS = 20000;
+const SETTLE_MS = 6000;   // a turn's files reach the workspace listing a few seconds after the turn ends
+
 export function useArtifacts(sessions, key) {
   const [files, setFiles] = useState([]);
   const ids = sessions.filter(Boolean).join(',');
   useEffect(() => {
     let alive = true;
     if (!ids) { setFiles([]); return undefined; }
-    Promise.all(ids.split(',').map((sid) => sessionFiles(sid).then((fs) => fs.map((f) => ({ ...f, session: sid }))).catch(() => [])))
+    const read = () => Promise.all(ids.split(',').map((sid) => sessionFiles(sid).then((fs) => fs.map((f) => ({ ...f, session: sid }))).catch(() => [])))
       .then((all) => { if (alive) setFiles(all.flat()); });
-    return () => { alive = false; };
+    read();
+    // Once more shortly after (the listing settles after the turn), then on a slow timer while
+    // the rail is open, so files made by a turn this tab did not run still appear.
+    const t = window.setTimeout(read, SETTLE_MS);
+    const id = window.setInterval(() => { if (!document.hidden) read(); }, ARTIFACTS_MS);
+    return () => { alive = false; window.clearTimeout(t); window.clearInterval(id); };
   }, [ids, key]);
   return files;
 }
@@ -41,6 +66,7 @@ export default function Rail({ open, onClose, teammate, members = [], sessions =
         <button type="button" className="wp-iconbtn" onClick={onClose} aria-label="Close details"><X size={18} /></button>
       </div>
       <div className="wp-rail-scroll">
+        <ErrorBoundary label="The details">
         {browsers.map((b) => <BrowserCard key={b.sid} sid={b.sid} busy={b.busy} name={b.name} />)}
 
         {liveList.length ? (
@@ -93,6 +119,7 @@ export default function Rail({ open, onClose, teammate, members = [], sessions =
           {files.length ? <FileChips files={files} onOpen={onOpenFile} /> : <p className="wp-rail-empty">Files a teammate makes in this conversation appear here.</p>}
           <button type="button" className="wp-linkbtn" onClick={() => navigate('artifacts')}>All artifacts</button>
         </section>
+        </ErrorBoundary>
       </div>
     </aside>
   );

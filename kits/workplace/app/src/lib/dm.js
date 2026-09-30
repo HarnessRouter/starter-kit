@@ -23,16 +23,24 @@ export async function loadDm(sid) {
   return { messages: turnsToMessages(turns), turns };
 }
 
-/** One turn. `handlers` are the stream's; onSession fires with the new id on the first message. */
-export function sendDm({ sid, bot, me, text, files = [], handlers = {} }) {
-  return streamTurn({
+/** One turn. `handlers` are the stream's; onSession fires with the new id on the first message.
+ *
+ *  A new session is named twice: when it appears, and again once the turn has ended. The turn's
+ *  own finish derives a title from the first message and writes the card the list renders from,
+ *  so a name given only at the start is gone by the time the sidebar looks (measured: two
+ *  sessions titled after the message, none found as the direct message, 2026-09-30). */
+export async function sendDm({ sid, bot, me, text, files = [], handlers = {} }) {
+  let started = '';
+  const r = await streamTurn({
     sessionId: sid, harnessId: bot.id, input: turnInput(text, files), instructions: dmInstructions(bot, me),
     handlers: {
       ...handlers,
       onSession: (id) => {
-        if (!sid && id) patchSession(id, { title: dmTitle(me) }).catch(() => {});
+        if (!sid && id) { started = id; patchSession(id, { title: dmTitle(me) }).catch(() => {}); }
         handlers.onSession?.(id);
       },
     },
   });
+  if (started) await patchSession(started, { title: dmTitle(me) }).catch(() => {});
+  return r;
 }

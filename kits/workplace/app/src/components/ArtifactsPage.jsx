@@ -28,20 +28,23 @@ export default function ArtifactsPage() {
     return out;
   }, [teammates, cards, me, groupCards, docs]);
 
+  // Re-read when the SET of conversations changes, not when the session list is polled again
+  // (that gave the page a fresh "Looking…" every five seconds). What is on screen stays until
+  // the new read has something to say.
+  const convKey = convs.map((c) => `${c.key}:${c.sessions.join('+')}`).join('|');
   useEffect(() => {
     let alive = true;
-    setGroups(null);
+    const list = convs;
     (async () => {
       const out = [];
-      for (const c of convs) {
+      for (const c of list) {
         const fs = (await Promise.all(c.sessions.map((sid) => sessionFiles(sid).catch(() => [])))).flat();
         if (fs.length) out.push({ ...c, files: fs });
-        if (alive) setGroups([...out]);
       }
       if (alive) setGroups(out);
     })();
     return () => { alive = false; };
-  }, [convs]);
+  }, [convKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const total = (groups || []).reduce((n, g) => n + g.files.length, 0);
   return (

@@ -65,5 +65,7 @@ or the profile:
   use the browser, if the person wanted one. Do NOT describe chat mechanics, groups, mentions,
   files or artifacts — the workplace explains those to every teammate itself.
 
+Plain punctuation everywhere: commas, full stops, colons; never an em dash or an en dash.
+
 Never run more than two rounds in all. When in doubt, produce the profile: the person can edit
 the name and the face before the teammate joins, and can talk to the teammate afterwards.

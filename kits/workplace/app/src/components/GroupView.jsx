@@ -12,7 +12,7 @@ import { readGroup, writeGroup } from '../lib/groups.js';
 import { runRound } from '../lib/engine.js';
 import { mentionItems } from '../lib/mentions.js';
 import Composer from './Composer.jsx';
-import Rail from './Rail.jsx';
+import Rail, { useRail } from './Rail.jsx';
 import { DayDivider, MessageRow, SystemLine, TypingRow } from './Message.jsx';
 import { useFileOverlay } from './Files.jsx';
 
@@ -27,7 +27,7 @@ export default function GroupView({ sid }) {
   docRef.current = doc;
   const [live, setLive] = useState({});        // teammate id -> { text, steps, status, session }
   const [err, setErr] = useState('');
-  const [railOpen, setRailOpen] = useState(() => window.innerWidth >= 1200);
+  const [railOpen, setRailOpen] = useRail();
   const [menuOpen, setMenuOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
   const [tick, setTick] = useState(0);

@@ -11,11 +11,19 @@ import { isLive } from '../lib/api.js';
 import { findDm, sendDm } from '../lib/dm.js';
 import { removeTeammate } from '../lib/teammates.js';
 import Composer from './Composer.jsx';
-import Rail from './Rail.jsx';
+import Rail, { useRail } from './Rail.jsx';
 import { DayDivider, MessageRow } from './Message.jsx';
 import { useFileOverlay } from './Files.jsx';
 
 const POLL_MS = 3000;
+
+/** When a turn happened. The record carries it in one of a few shapes; an in-flight turn may carry none, and then it is now. */
+function turnTime(t) {
+  const raw = t?.created_at ?? t?.created ?? t?.started_at ?? t?.at;
+  if (raw == null || raw === '') return Date.now();
+  const n = typeof raw === 'number' ? (raw < 1e12 ? raw * 1000 : raw) : Number(new Date(raw));
+  return Number.isFinite(n) && n > 0 ? n : Date.now();
+}
 
 function turnFiles(t, sid) {
   return (t?.files || []).filter((f) => f && f.file_id).map((f) => ({
@@ -33,7 +41,7 @@ export default function DmView({ teammate }) {
   const [turns, setTurns] = useState(null);           // null = loading
   const [live, setLive] = useState(null);             // { blocks, status } while this tab's turn runs
   const [pendingText, setPendingText] = useState(''); // the message just sent, until history has it
-  const [railOpen, setRailOpen] = useState(() => window.innerWidth >= 1200);
+  const [railOpen, setRailOpen] = useRail();
   const [menuOpen, setMenuOpen] = useState(false);
   const [err, setErr] = useState('');
   const [tick, setTick] = useState(0);
@@ -111,7 +119,7 @@ export default function DmView({ teammate }) {
       out.push(node);
     };
     for (const [i, t] of (turns || []).entries()) {
-      const at = t.created_at ? Number(new Date(t.created_at)) : 0;
+      const at = turnTime(t);
       if (t.user) push(at, <MessageRow key={`u${i}`} from={{ kind: 'member', name: me?.name }} at={at} text={t.user} attachments={(t.user_files || []).map((f) => ({ name: f.name }))} teammates={teammates} />);
       const msgs = turnsToMessages([t]).filter((m) => m.role === 'assistant');
       for (const m of msgs) {
@@ -121,7 +129,9 @@ export default function DmView({ teammate }) {
                              teammates={teammates} onMention={(id) => navigate(`dm/${id}`)} onOpenFile={files.open} />);
       }
     }
-    if (pendingText && !(turns || []).some((t) => t.user === pendingText && false)) {
+    // The message just sent, until history carries it (the session's in-flight turn appears there
+    // the moment the session exists, so the row must not show twice).
+    if (pendingText && !(turns || []).some((t) => String(t.user || '') === pendingText)) {
       push(Date.now(), <MessageRow key="pending-u" from={{ kind: 'member', name: me?.name }} at={Date.now()} text={pendingText} teammates={teammates} />);
     }
     if (live) push(Date.now(), <MessageRow key="live" from={{ kind: 'teammate', name: teammate.name, avatar: teammate.avatar }} turn={live} teammates={teammates} />);

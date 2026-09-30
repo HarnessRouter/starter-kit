@@ -22,6 +22,7 @@ import NewTeammate from './components/NewTeammate.jsx';
 import ArtifactsPage from './components/ArtifactsPage.jsx';
 import NewGroup from './components/NewGroup.jsx';
 import { Splash } from './components/Splash.jsx';
+import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 
 configureKit({ kitId: KIT_ID });
 
@@ -177,7 +178,7 @@ function Workplace() {
       <div className={`wp-root${drawer ? ' is-drawer' : ''}`}>
         <Sidebar open={drawer} />
         {drawer && <button className="wp-backdrop" aria-label="Close the room list" onClick={() => setDrawer(false)} />}
-        <main className="wp-main">{view}</main>
+        <main className="wp-main"><ErrorBoundary key={`${route.kind}/${route.id}`} label="This room">{view}</ErrorBoundary></main>
         <NewGroup />
       </div>
     </Ctx.Provider>
