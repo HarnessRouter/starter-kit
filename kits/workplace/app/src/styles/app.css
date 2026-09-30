@@ -185,6 +185,7 @@
 .wp-bob-1 { animation-delay: 0.2s !important; } .wp-bob-2 { animation-delay: 0.4s !important; }
 @keyframes wp-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
 .wp-hire-thinking { color: var(--ink-2); margin: 0; }
+.wp-hire-slow { color: var(--ink-3); font-size: 12.5px; margin: 0; max-width: 46ch; }
 .wp-hire-label { font-size: 13px; font-weight: 600; }
 .wp-hire-label span { font-weight: 400; color: var(--ink-3); }
 .wp-hire-input { width: 100%; font-size: 14px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-input); background: var(--surface); color: var(--ink); resize: vertical; }
@@ -224,7 +225,11 @@
 .wp-progress .is-now::after { content: "…"; }
 
 /* ── New group form ────────────────────────────────────────────────────── */
+/* The shared Modal pads its header and leaves the body to its content (it is a flex row with no
+   padding), so the form is the body: it fills the width and carries the inset itself. */
+.uic-modal-b > .wp-form { flex: 1; min-width: 0; padding: 18px 24px 22px; }
 .wp-form { display: flex; flex-direction: column; gap: 12px; }
+.wp-form .uic-input { width: 100%; }
 .wp-form-hint { font-size: 12px; color: var(--ink-3); margin-top: -8px; }
 .wp-form-busy { font-size: 13px; color: var(--brand-ink); font-weight: 600; }
 .wp-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }

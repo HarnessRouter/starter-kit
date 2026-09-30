@@ -9,6 +9,15 @@ import { Avatar, AVATARS } from '../lib/avatars.jsx';
 import { AVATAR_CHOICES, NAME_MAX, OTHER, answersToText, cleanName, parseBuilderReply } from '../lib/builder.js';
 import { createTeammate } from '../lib/teammates.js';
 
+/** After a while on the thinking screen, say so; a turn that is still running is not a page that broke. */
+function Slow({ since }) {
+  const [now, setNow] = useState(Date.now());
+  React.useEffect(() => { const id = window.setInterval(() => setNow(Date.now()), 1000); return () => window.clearInterval(id); }, []);
+  const s = since ? Math.floor((now - since) / 1000) : 0;
+  if (s < 40) return null;
+  return <p className="wp-hire-slow">Still working after {s} s. The recruiter reads its instructions on every turn; a first answer usually takes under half a minute.</p>;
+}
+
 const EXAMPLES = ['A research analyst who reads everything first', 'Someone who writes release notes from my bullet points', 'A spreadsheet wrangler for messy CSVs', 'A calm planner who keeps my week straight'];
 const MAX_ROUNDS = 3;
 
@@ -25,8 +34,9 @@ export default function NewTeammate({ first = false }) {
   const [err, setErr] = useState('');
   const textRef = useRef('');
 
+  const [thinkingSince, setThinkingSince] = useState(0);
   const ask = useCallback(async (input) => {
-    setStep('thinking'); setErr('');
+    setStep('thinking'); setErr(''); setThinkingSince(Date.now());
     textRef.current = '';
     let started = sid;
     let r;
@@ -43,7 +53,8 @@ export default function NewTeammate({ first = false }) {
     setQset(parsed); setAnswers({}); setRounds((n) => n + 1); setStep('asking');
   }, [sid, rec]);
 
-  const start = () => ask(need.trim() ? `I need a teammate: ${need.trim()}` : 'start');
+  const startWith = (text) => ask(text.trim() ? `I need a teammate: ${text.trim()}` : 'start');
+  const start = () => startWith(need);
   const submitAnswers = () => {
     const text = answersToText(qset.questions, answers);
     ask(rounds >= MAX_ROUNDS - 1 ? `${text}\n\nThat is enough; write the profile now.` : text);
@@ -84,8 +95,9 @@ export default function NewTeammate({ first = false }) {
               {first ? <div className="wp-hire-hello"><div className="wp-hire-faces">{['fox', 'owl', 'robot', 'whale'].map((a) => <Avatar key={a} id={a} size={44} />)}</div><h2>Welcome to your workplace</h2><p>Nobody works here yet. Hire your first teammate: say what you need, answer a few questions, and they will be at their desk in a minute.</p></div>
                    : <h2>Who do you need?</h2>}
               <label className="wp-hire-label" htmlFor="need">In a sentence, what should they do for you? <span>(optional)</span></label>
-              <textarea id="need" className="wp-hire-input" rows={2} value={need} onChange={(e) => setNeed(e.target.value)} placeholder="e.g. keep an eye on competitor pricing and tell me what changed" />
-              <div className="wp-hire-examples">{EXAMPLES.map((x) => <button key={x} type="button" className="wp-pill" onClick={() => setNeed(x)}>{x}</button>)}</div>
+              <textarea id="need" className="wp-hire-input" rows={2} value={need} onChange={(e) => setNeed(e.target.value)} placeholder="e.g. keep an eye on competitor pricing and tell me what changed"
+                        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); start(); } }} />
+              <div className="wp-hire-examples">{EXAMPLES.map((x) => <button key={x} type="button" className="wp-pill" onClick={() => { setNeed(x); startWith(x); }}>{x}</button>)}</div>
               <div className="wp-hire-acts"><button type="button" className="uic-btn is-primary is-md" onClick={start}>Start</button></div>
             </section>
           )}
@@ -94,6 +106,7 @@ export default function NewTeammate({ first = false }) {
             <section className="wp-hire-card is-center">
               <div className="wp-hire-faces is-think">{AVATAR_CHOICES.slice(0, 6).map((a, i) => <Avatar key={a} id={a} size={36} className={`wp-bob-${i % 3}`} />)}</div>
               <p className="wp-hire-thinking">The recruiter is thinking{rounds ? ' about your answers' : ''}…</p>
+              <Slow since={thinkingSince} />
             </section>
           )}
 
