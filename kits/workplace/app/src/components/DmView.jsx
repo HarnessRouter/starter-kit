@@ -1,8 +1,8 @@
 // A direct message: one person, one teammate, one session that is the whole history. The first
 // message opens the session; everything after is a turn on it. While a turn runs the teammate's
-// tools show inside its message, and its browser, if it opens one, in the rail.
+// tools show inside its bubble, and its screen, if it opens one, in the panel.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MoreHorizontal, PanelRight, Menu } from 'lucide-react';
+import { Menu, MoreHorizontal, PanelRight } from 'lucide-react';
 import { Popover, useDialog, withReasoning, withResult, withStep, withText } from 'reifyui';
 import { sessionTurns, turnsToMessages, containerFileUrl } from 'reifyui/harness';
 import { useWorkplace } from '../App.jsx';
@@ -12,20 +12,17 @@ import { findDm, sendDm } from '../lib/dm.js';
 import { removeTeammate } from '../lib/teammates.js';
 import Composer from './Composer.jsx';
 import Rail, { useRail } from './Rail.jsx';
-import { DayDivider, MessageRow } from './Message.jsx';
+import { Bubble, withTimeLabels } from './Message.jsx';
 import { useFileOverlay } from './Files.jsx';
 
 const POLL_MS = 3000;
 
-/** When a turn happened, or 0 when the record does not say (the turns route carries no time on
- *  this instance): a row without a time shows none, rather than the moment the page loaded. */
 function turnTime(t) {
   const raw = t?.created_at ?? t?._created_at ?? t?.created ?? t?.started_at ?? t?.at;
   if (raw == null || raw === '' || raw === 0) return 0;
   const n = typeof raw === 'number' ? (raw < 1e12 ? raw * 1000 : raw) : Number(new Date(raw));
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
-
 function turnFiles(t, sid) {
   return (t?.files || []).filter((f) => f && f.file_id).map((f) => ({
     path: f.filename || '', filename: f.filename || 'file', file_id: f.file_id, container_id: f.container_id || sid,
@@ -39,9 +36,9 @@ export default function DmView({ teammate }) {
   const dialog = useDialog();
   const card = findDm(cards, teammate.id, me);
   const [sid, setSid] = useState(card?.id || '');
-  const [turns, setTurns] = useState(null);           // null = loading
-  const [live, setLive] = useState(null);             // { blocks, status } while this tab's turn runs
-  const [pendingText, setPendingText] = useState(''); // the message just sent, until history has it
+  const [turns, setTurns] = useState(null);
+  const [live, setLive] = useState(null);
+  const [pendingText, setPendingText] = useState('');
   const [railOpen, setRailOpen] = useRail();
   const [menuOpen, setMenuOpen] = useState(false);
   const [err, setErr] = useState('');
@@ -67,7 +64,6 @@ export default function DmView({ teammate }) {
   const wasBusy = useRef(false);
   useEffect(() => { if (wasBusy.current && !busy) { load(); setTick((n) => n + 1); } wasBusy.current = busy; }, [busy, load]);
 
-  // What is on screen is what has been seen.
   const marker = card ? (card.last_response_id || card.finished_at || card.id) : '';
   useEffect(() => { markSeen(`dm:${teammate.id}`, marker); }, [marker, teammate.id, markSeen]);
 
@@ -96,7 +92,7 @@ export default function DmView({ teammate }) {
       markLive(teammate.id, false);
       setLive(null);
       setPendingText('');
-      if (started) { await load(); }
+      if (started) await load();
       refreshCards();
       setTick((n) => n + 1);
     }
@@ -110,34 +106,24 @@ export default function DmView({ teammate }) {
     catch (e) { dialog.alert({ title: 'Could not remove', message: e?.message || 'Try again.' }); }
   };
 
-  // Rows: history (user + teammate per turn), then the message in flight.
+  const them = { kind: 'teammate', id: teammate.id, name: teammate.name, avatar: teammate.avatar };
+  const mine = { kind: 'me', name: me?.name };
   const rows = useMemo(() => {
-    const out = [];
-    let lastDay = '';
-    const push = (at, node) => {
-      const d = at ? new Date(at).toDateString() : '';
-      if (d && d !== lastDay) { out.push(<DayDivider key={`d${d}`} at={at} />); lastDay = d; }
-      out.push(node);
-    };
+    const items = [];
+    let prev = '';
+    const add = (at, key, from, props) => { const first = prev !== from.kind; prev = from.kind; items.push({ at, node: <Bubble key={key} from={from} first={first} teammates={teammates} onMention={(id) => navigate(`dm/${id}`)} onOpenFile={files.open} {...props} /> }); };
     for (const [i, t] of (turns || []).entries()) {
       const at = turnTime(t);
-      if (t.user) push(at, <MessageRow key={`u${i}`} from={{ kind: 'member', name: me?.name }} at={at} text={t.user} attachments={(t.user_files || []).map((f) => ({ name: f.name }))} teammates={teammates} />);
-      const msgs = turnsToMessages([t]).filter((m) => m.role === 'assistant');
-      for (const m of msgs) {
+      if (t.user) add(at, `u${i}`, mine, { text: t.user, attachments: (t.user_files || []).map((f) => ({ name: f.name })) });
+      for (const m of turnsToMessages([t]).filter((x) => x.role === 'assistant')) {
         const running = m.status === 'running' && !(live && i === turns.length - 1);
-        push(at, <MessageRow key={`a${i}`} from={{ kind: 'teammate', name: teammate.name, avatar: teammate.avatar }} at={at}
-                             turn={running ? m : { ...m, status: m.status === 'running' ? 'done' : m.status }} files={turnFiles(t, sid)}
-                             teammates={teammates} onMention={(id) => navigate(`dm/${id}`)} onOpenFile={files.open} />);
+        add(at, `a${i}`, them, { turn: running ? m : { ...m, status: m.status === 'running' ? 'done' : m.status }, files: turnFiles(t, sid) });
       }
     }
-    // The message just sent, until history carries it (the session's in-flight turn appears there
-    // the moment the session exists, so the row must not show twice).
-    if (pendingText && !(turns || []).some((t) => String(t.user || '') === pendingText)) {
-      push(Date.now(), <MessageRow key="pending-u" from={{ kind: 'member', name: me?.name }} at={Date.now()} text={pendingText} teammates={teammates} />);
-    }
-    if (live) push(Date.now(), <MessageRow key="live" from={{ kind: 'teammate', name: teammate.name, avatar: teammate.avatar }} turn={live} teammates={teammates} />);
-    return out;
-  }, [turns, live, pendingText, me, teammate, teammates, sid, navigate, files.open]);
+    if (pendingText && !(turns || []).some((t) => String(t.user || '') === pendingText)) add(Date.now(), 'pending', mine, { text: pendingText });
+    if (live) add(Date.now(), 'live', them, { turn: live });
+    return withTimeLabels(items, (it) => it.node.key);
+  }, [turns, live, pendingText, me, teammate, teammates, sid, navigate, files.open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { const el = bodyRef.current; if (el) el.scrollTop = el.scrollHeight; }, [rows.length, live?.blocks?.length]);
 
@@ -146,14 +132,14 @@ export default function DmView({ teammate }) {
       <div className="wp-conv">
         <header className="wp-head">
           <button type="button" className="wp-iconbtn wp-menubtn" onClick={openDrawer} aria-label="Rooms"><Menu size={20} /></button>
-          <Avatar id={teammate.avatar} size={34} working={busy} />
+          <Avatar avatar={teammate.avatar} id={teammate.id} size={24} working={busy} />
           <div className="wp-head-titles">
             <h1 className="wp-head-title">{teammate.name}</h1>
             <div className="wp-head-sub">{busy ? 'working…' : teammate.tagline || 'Teammate'}</div>
           </div>
           <div className="wp-head-acts">
-            <button type="button" ref={menuRef} className="wp-iconbtn" onClick={() => setMenuOpen((o) => !o)} aria-label="More" aria-expanded={menuOpen}><MoreHorizontal size={20} /></button>
-            <button type="button" className={`wp-iconbtn${railOpen ? ' is-on' : ''}`} onClick={() => setRailOpen((o) => !o)} aria-label={railOpen ? 'Hide details' : 'Show details'}><PanelRight size={20} /></button>
+            <button type="button" ref={menuRef} className="wp-iconbtn" onClick={() => setMenuOpen((o) => !o)} aria-label="More" aria-expanded={menuOpen}><MoreHorizontal size={18} /></button>
+            <button type="button" className={`wp-iconbtn${railOpen ? ' is-on' : ''}`} onClick={() => setRailOpen((o) => !o)} aria-label={railOpen ? 'Hide details' : 'Show details'}><PanelRight size={18} /></button>
           </div>
           <Popover open={menuOpen} anchorRef={menuRef} onClose={() => setMenuOpen(false)} width={220} label="Teammate">
             <div className="wp-menu">
@@ -167,8 +153,8 @@ export default function DmView({ teammate }) {
           {turns === null ? <div className="wp-loading">Loading…</div> : null}
           {turns && !turns.length && !live && !pendingText ? (
             <div className="wp-greeting">
-              <MessageRow from={{ kind: 'teammate', name: teammate.name, avatar: teammate.avatar }} text={teammate.greeting || `Hi, I'm ${teammate.name}. What can I do for you?`} teammates={teammates} />
-              <p className="wp-greeting-hint">This is the start of your conversation with {teammate.name}. They will remember it.</p>
+              <Bubble from={them} text={teammate.greeting || `Hi, I'm ${teammate.name}. What can I do for you?`} teammates={teammates} />
+              <p className="wp-greeting-hint">The start of your conversation with {teammate.name}. They will remember it.</p>
             </div>
           ) : null}
           {rows}
@@ -178,7 +164,7 @@ export default function DmView({ teammate }) {
         <Composer placeholder={`Message ${teammate.name}`} disabled={busy} onSend={send} autoFocus
                   hint={busy ? `${teammate.name} is working on your last message.` : ''} />
       </div>
-      <Rail open={railOpen} onClose={() => setRailOpen(false)} teammate={teammate} sessions={sid ? [sid] : []}
+      <Rail open={railOpen} onClose={() => setRailOpen(false)} teammate={teammate} sessions={sid ? [sid] : []} title={teammate.name}
             busySessions={busy && sid ? [{ sid, busy: true, name: teammate.name }] : []} refreshKey={tick} onOpenFile={files.open} />
       {files.overlay}
     </div>

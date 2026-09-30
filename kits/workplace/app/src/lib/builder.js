@@ -4,7 +4,7 @@
 // profile. What arrives is model output, so nothing here trusts its shape: every field is
 // checked, clipped or replaced, and a reply that is not one of the two shapes is null — the
 // screen then says the recruiter did not answer in a form it can draw, instead of drawing garbage.
-import { AVATAR_IDS, avatarOf } from './faces.js';
+import { avatarOf } from './faces.js';
 
 export const NAME_MAX = 20;
 export const TAGLINE_MAX = 60;
@@ -60,7 +60,6 @@ export function parseBuilderReply(text) {
       type: 'teammate',
       name,
       tagline: clip(v.tagline, TAGLINE_MAX),
-      avatar: avatarOf(typeof v.avatar === 'string' ? v.avatar.toLowerCase() : '', name),
       expertise: (Array.isArray(v.expertise) ? v.expertise : []).map((e) => clip(e, 24)).filter(Boolean).slice(0, 6),
       greeting: clip(v.greeting, GREETING_MAX),
       system_prompt: String(v.system_prompt).trim().slice(0, 6000),
@@ -80,7 +79,9 @@ export function answersToText(questions, answers) {
     const parts = [...picked, ...(other ? [`(in their words) ${other}`] : [])];
     if (parts.length) lines.push(`- ${q.id}: ${parts.join('; ')}`);
   }
-  return lines.length ? `Answers:\n${lines.join('\n')}` : 'Answers: (none; use your best judgement)';
+  const open = questions.filter((q) => !lines.some((l) => l.startsWith(`- ${q.id}:`))).map((q) => q.id);
+  const tail = open.length ? `\nLeft open (decide yourself): ${open.join(', ')}` : '';
+  return lines.length ? `Answers:\n${lines.join('\n')}${tail}` : 'Answers: (none; use your best judgement)';
 }
 
 /** What the teammate's Harness is told, in one piece: the recruiter's prompt, then who it is. */
@@ -89,5 +90,5 @@ export function composeSystemPrompt(profile) {
   return `${head}\n\n${profile.system_prompt.trim()}`;
 }
 
-/** Every avatar the person can switch to at the reveal. */
-export const AVATAR_CHOICES = AVATAR_IDS;
+/** The face the person chose, or a stable one for a name (the recruiter never picks faces). */
+export const faceFor = (chosen, name) => avatarOf(chosen, name);

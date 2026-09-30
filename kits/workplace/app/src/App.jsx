@@ -8,11 +8,11 @@
 // derive from; the teammates every half minute; a group's document when its row needs a name.
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { DialogHost } from 'reifyui';
-import { configureKit, kitHarness } from 'reifyui/harness';
+import { configureKit } from 'reifyui/harness';
 import { KIT_BASE, KIT_ID } from './lib/kit.js';
 import { whoami } from './lib/auth.js';
 import { isLive, listCards } from './lib/api.js';
-import { listTeammates } from './lib/teammates.js';
+import { listTeammates, recruiter } from './lib/teammates.js';
 import { findGroups, readGroup } from './lib/groups.js';
 import { newId } from './lib/groupdoc.js';
 import Sidebar from './components/Sidebar.jsx';
@@ -26,7 +26,7 @@ import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 
 configureKit({ kitId: KIT_ID });
 
-const CARDS_MS = 5000;
+const CARDS_MS = 6000;
 const TEAMMATES_MS = 30000;
 const DOCS_MS = 20000;
 export const TAB_ID = newId('tab');
@@ -94,7 +94,7 @@ function Workplace() {
 
   useEffect(() => {
     let alive = true;
-    Promise.all([kitHarness(), whoami()]).then(([h, who]) => {
+    Promise.all([recruiter(), whoami()]).then(([h, who]) => {
       if (!alive) return;
       setRec(h); setMe(who); setSeen(readSeen(who));
     }).catch((e) => { if (alive) setBootErr(e?.message || 'The workplace could not load.'); });
@@ -102,16 +102,18 @@ function Workplace() {
   }, []);
 
   const refreshTeammates = useCallback(async () => {
-    try { setTeammates(await listTeammates()); } catch { setTeammates((t) => t || []); }
-  }, []);
+    if (!rec) return;
+    try { setTeammates(await listTeammates(rec)); } catch { setTeammates((t) => t || []); }
+  }, [rec]);
+  const harnessIds = useMemo(() => [rec?.id, ...(teammates || []).map((t) => t.id)].filter(Boolean), [rec, teammates]);
   const refreshCards = useCallback(async () => {
-    if (!me) return;
-    try { setCards(await listCards(me)); } catch { /* keep the last list */ }
-  }, [me]);
+    if (!me || !harnessIds.length) return;
+    try { setCards(await listCards(me, harnessIds)); } catch { /* keep the last list */ }
+  }, [me, harnessIds]);
 
   const ready = !!rec && !!me;
-  useVisibleInterval(() => { if (ready) refreshCards(); }, CARDS_MS, [ready, refreshCards]);
   useVisibleInterval(() => { if (ready) refreshTeammates(); }, TEAMMATES_MS, [ready, refreshTeammates]);
+  useVisibleInterval(() => { if (ready && teammates) refreshCards(); }, CARDS_MS, [ready, teammates !== null, refreshCards]);
 
   // A group's name and members come from its document; the sidebar needs them for every group.
   const groupCards = useMemo(() => (rec ? findGroups(cards, rec.id) : []), [cards, rec]);

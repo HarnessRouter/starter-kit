@@ -1,26 +1,36 @@
-// One message in a room, the way a team chat draws it: face, name, time, then the text and the
-// files. A teammate's turn in progress uses the shared assistant turn, so the tools it is using
-// show inside its own message rather than in a panel somewhere else.
+// Messages as bubbles: the person in black on the right, a teammate in grey on the left with its
+// face on the first bubble of a run, a small centred time label where the conversation paused.
+// A teammate's turn in progress uses the shared assistant turn inside its bubble, so the tools it
+// is using show where its words will appear.
 import React from 'react';
 import { AssistantTurn } from 'reifyui';
 import { Avatar, MemberAvatar } from '../lib/avatars.jsx';
 import { Markdown } from './Markdown.jsx';
 import { FileChips } from './Files.jsx';
 
+export const PAUSE_MS = 15 * 60 * 1000;
+
+const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
 export function fmtTime(at) {
+  try { return new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); } catch { return ''; }
+}
+
+/** "9:41 AM" today, "Yesterday 9:41 AM", "Mon 9:41 AM", or the date for older. */
+export function whenLabel(at, withTime = true) {
   if (!at) return '';
-  try { return new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); } catch { return ''; }
-}
-export function dayLabel(at) {
   const d = new Date(at), now = new Date();
-  const same = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-  if (same(d, now)) return 'Today';
+  const time = fmtTime(at);
+  if (sameDay(d, now)) return time;
   const y = new Date(now); y.setDate(now.getDate() - 1);
-  if (same(d, y)) return 'Yesterday';
-  return d.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' });
+  if (sameDay(d, y)) return withTime ? `Yesterday ${time}` : 'Yesterday';
+  if (now - d < 6 * 86400000) { const w = d.toLocaleDateString([], { weekday: 'short' }); return withTime ? `${w} ${time}` : w; }
+  const ds = d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  return withTime ? `${ds} ${time}` : ds;
 }
-export function DayDivider({ at }) {
-  return <div className="wp-day" role="separator"><span>{dayLabel(at)}</span></div>;
+
+export function TimeLabel({ at }) {
+  return <div className="wp-when" role="separator"><span>{whenLabel(at)}</span></div>;
 }
 
 export function SystemLine({ text }) {
@@ -30,42 +40,59 @@ export function SystemLine({ text }) {
 const md = (teammates, onMention) => (t) => <Markdown text={t} teammates={teammates} onMention={onMention} />;
 
 /**
- * from: { kind: 'teammate' | 'member', name, avatar }
- * body: text (markdown) — or `turn` ({ blocks, status }) for a teammate's turn with its tools.
+ * from: { kind: 'me' | 'teammate' | 'member', name, avatar, id }
+ * first: the first bubble of a run from this sender (face and name shown)
+ * text (markdown) or turn ({ blocks, status }) for a teammate's turn with its tools.
  */
-export function MessageRow({ from, at, text, turn, files, teammates, onMention, onOpenFile, onName, workingLabel, footer, attachments }) {
-  const isBot = from.kind === 'teammate';
+export function Bubble({ from, first = true, text, turn, files, attachments, teammates, onMention, onOpenFile, onName, workingLabel }) {
+  const me = from.kind === 'me';
+  const live = turn?.status === 'running';
   return (
-    <div className={`wp-msg${turn?.status === 'running' ? ' is-live' : ''}`}>
-      <div className="wp-msg-ava">{isBot ? <Avatar id={from.avatar} size={36} /> : <MemberAvatar name={from.name} size={36} />}</div>
-      <div className="wp-msg-body">
-        <div className="wp-msg-head">
-          <button type="button" className="wp-msg-name" onClick={onName} disabled={!onName}>{from.name}</button>
-          {at ? <time className="wp-msg-time" dateTime={new Date(at).toISOString()}>{fmtTime(at)}</time> : null}
+    <div className={`wp-b${me ? ' is-me' : ' is-them'}${first ? ' is-first' : ''}${live ? ' is-live' : ''}`}>
+      {!me ? (
+        <span className="wp-b-ava">
+          {first ? (from.kind === 'teammate' ? <Avatar avatar={from.avatar} id={from.id} size={28} /> : <MemberAvatar name={from.name} size={28} />) : null}
+        </span>
+      ) : null}
+      <div className="wp-b-col">
+        {!me && first ? <button type="button" className="wp-b-name" onClick={onName} disabled={!onName}>{from.name}</button> : null}
+        <div className="wp-b-bubble">
+          {turn ? (
+            <AssistantTurn msg={turn} renderMarkdown={md(teammates, onMention)} workingLabel={workingLabel || `${from.name} is working…`} />
+          ) : (
+            <div className="wbx-md wp-b-text"><Markdown text={text} teammates={teammates} onMention={onMention} /></div>
+          )}
+          {attachments && attachments.length ? (
+            <div className="wp-attached">{attachments.map((a, i) => <span key={i} className="wp-attached-chip">{a.name}</span>)}</div>
+          ) : null}
         </div>
-        {turn ? (
-          <AssistantTurn msg={turn} renderMarkdown={md(teammates, onMention)} workingLabel={workingLabel || `${from.name} is working…`} />
-        ) : (
-          <div className="wbx-md wp-msg-text"><Markdown text={text} teammates={teammates} onMention={onMention} /></div>
-        )}
-        {attachments && attachments.length ? (
-          <div className="wp-attached">{attachments.map((a, i) => <span key={i} className="wp-attached-chip">{a.name}</span>)}</div>
-        ) : null}
         <FileChips files={files} onOpen={onOpenFile} />
-        {footer}
       </div>
     </div>
   );
 }
 
-export function TypingRow({ from, label }) {
+export function TypingBubble({ from, label }) {
   return (
-    <div className="wp-msg is-typing" aria-live="polite">
-      <div className="wp-msg-ava"><Avatar id={from.avatar} size={36} working /></div>
-      <div className="wp-msg-body">
-        <div className="wp-msg-head"><span className="wp-msg-name">{from.name}</span></div>
-        <div className="wbx-working"><span className="wbx-working-dots"><span /><span /><span /></span><span className="wbx-working-txt">{label || 'is writing…'}</span></div>
+    <div className="wp-b is-them is-first is-typing" aria-live="polite">
+      <span className="wp-b-ava"><Avatar avatar={from.avatar} id={from.id} size={28} working /></span>
+      <div className="wp-b-col">
+        <span className="wp-b-name">{from.name}</span>
+        <div className="wp-b-bubble"><span className="wp-typing" aria-label={label || `${from.name} is writing`}><span /><span /><span /></span></div>
       </div>
     </div>
   );
+}
+
+/** Lay a list of {at, ...} items out with time labels at every pause. */
+export function withTimeLabels(items, keyOf) {
+  const out = [];
+  let last = 0;
+  for (const it of items) {
+    const at = Number(it.at) || 0;
+    if (at && (!last || at - last > PAUSE_MS)) { out.push(<TimeLabel key={`t${keyOf(it)}`} at={at} />); }
+    if (at) last = at;
+    out.push(it.node);
+  }
+  return out;
 }

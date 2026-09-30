@@ -4,12 +4,15 @@ import { hr, containerFileUrl, sessionDetail, sessionTurns } from 'reifyui/harne
 export const jsonInit = (method, body) => ({ method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-/** Every session card this person can see, newest first, in ONE request. The sidebar, the
- *  presence dots, the direct-message lookup and the group list all read this list. */
-export async function listCards(me) {
+/** The session cards the sidebar, the presence dots, the direct-message lookup and the group
+ *  list read: the newest cards of each Harness that matters (the recruiter and every teammate),
+ *  one request per Harness. One org-wide list looked cheaper but is capped at its newest 200
+ *  cards, and on an instance that runs other things a group's card fell out of it. */
+export async function listCards(me, harnessIds = []) {
   const q = me && me.id !== '*' ? `&member=${encodeURIComponent(me.id)}` : '';
-  const b = await hr(`/sessions?limit=200${q}`);
-  return (b?.sessions ?? b?.data ?? []).map((c) => ({ ...c, id: c.session_id || c.id }));
+  const lists = await Promise.all([...new Set(harnessIds.filter(Boolean))].map((hid) =>
+    hr(`/sessions?harness=${encodeURIComponent(hid)}&limit=30${q}`).then((b) => b?.sessions ?? b?.data ?? []).catch(() => [])));
+  return lists.flat().map((c) => ({ ...c, id: c.session_id || c.id }));
 }
 
 const LIVE = new Set(['running', 'starting', 'in_progress']);

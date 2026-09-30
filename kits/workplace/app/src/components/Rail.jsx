@@ -1,6 +1,5 @@
-// The right side of a room: the teammate's browser when one is open, who is at work, who is in
-// the room, and what has been made here. Everything in it is derived from the sessions of this
-// conversation; nothing is stored for it.
+// The panel beside a room: the teammate's screen when it has one, who is at work, who is in the
+// room, and what has been made here. Everything is derived from this conversation's sessions.
 import React, { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { useWorkplace } from '../App.jsx';
@@ -10,12 +9,8 @@ import { BrowserCard } from './BrowserCard.jsx';
 import { FileChips } from './Files.jsx';
 import { ErrorBoundary } from './ErrorBoundary.jsx';
 
-/** The files of several sessions, refreshed when `key` changes. */
-const WIDE = 1200;     // the rail is a third column from here up
-const NARROW = 1024;   // below this it is a sheet over the conversation, so it starts closed
-
-/** Whether the rail is open: open by default on a wide window, and closed again when the window
- *  becomes narrow, where an open rail would cover the conversation. */
+const WIDE = 1200;
+const NARROW = 1024;
 export function useRail() {
   const [open, setOpen] = useState(() => window.innerWidth >= WIDE);
   useEffect(() => {
@@ -28,8 +23,7 @@ export function useRail() {
 }
 
 const ARTIFACTS_MS = 20000;
-const SETTLE_MS = 6000;   // a turn's files reach the workspace listing a few seconds after the turn ends
-
+const SETTLE_MS = 6000;
 export function useArtifacts(sessions, key) {
   const [files, setFiles] = useState([]);
   const ids = sessions.filter(Boolean).join(',');
@@ -39,8 +33,6 @@ export function useArtifacts(sessions, key) {
     const read = () => Promise.all(ids.split(',').map((sid) => sessionFiles(sid).then((fs) => fs.map((f) => ({ ...f, session: sid }))).catch(() => [])))
       .then((all) => { if (alive) setFiles(all.flat()); });
     read();
-    // Once more shortly after (the listing settles after the turn), then on a slow timer while
-    // the rail is open, so files made by a turn this tab did not run still appear.
     const t = window.setTimeout(read, SETTLE_MS);
     const id = window.setInterval(() => { if (!document.hidden) read(); }, ARTIFACTS_MS);
     return () => { alive = false; window.clearTimeout(t); window.clearInterval(id); };
@@ -48,7 +40,7 @@ export function useArtifacts(sessions, key) {
   return files;
 }
 
-export default function Rail({ open, onClose, teammate, members = [], sessions = [], live = {}, busySessions = [], refreshKey = 0, onOpenFile }) {
+export default function Rail({ open, onClose, teammate, members = [], sessions = [], live = {}, busySessions = [], refreshKey = 0, onOpenFile, title = 'Details' }) {
   const { teammates, navigate } = useWorkplace();
   const files = useArtifacts(sessions, refreshKey);
   const liveList = useMemo(() => Object.entries(live || {}).filter(([, v]) => v), [live]);
@@ -62,7 +54,7 @@ export default function Rail({ open, onClose, teammate, members = [], sessions =
   return (
     <aside className={`wp-rail${open ? ' is-open' : ''}`} aria-label="Details">
       <div className="wp-rail-head">
-        <span>Details</span>
+        <span>{title}</span>
         <button type="button" className="wp-iconbtn" onClick={onClose} aria-label="Close details"><X size={18} /></button>
       </div>
       <div className="wp-rail-scroll">
@@ -72,25 +64,28 @@ export default function Rail({ open, onClose, teammate, members = [], sessions =
         {liveList.length ? (
           <section className="wp-rail-sec">
             <h3>Working now</h3>
-            {liveList.map(([id, v]) => {
-              const t = (teammates || []).find((x) => x.id === id);
-              const last = v.steps && v.steps.length ? v.steps[v.steps.length - 1].name : '';
-              return t ? (
-                <div key={id} className="wp-rail-row">
-                  <Avatar id={t.avatar} size={22} working />
-                  <span className="wp-rail-row-name">{t.name}</span>
-                  <span className="wp-rail-row-sub">{last || 'thinking'}</span>
-                </div>
-              ) : null;
-            })}
+            <div className="wp-card">
+              {liveList.map(([id, v]) => {
+                const t = (teammates || []).find((x) => x.id === id);
+                const last = v.steps && v.steps.length ? v.steps[v.steps.length - 1].name : '';
+                return t ? (
+                  <div key={id} className="wp-rail-row">
+                    <Avatar avatar={t.avatar} id={t.id} size={24} working />
+                    <span className="wp-rail-row-name">{t.name}</span>
+                    <span className="wp-rail-row-sub">{last || 'thinking'}</span>
+                  </div>
+                ) : null;
+              })}
+            </div>
           </section>
         ) : null}
 
         {teammate ? (
           <section className="wp-rail-sec">
-            <h3>About {teammate.name}</h3>
-            <div className="wp-about">
-              <Avatar id={teammate.avatar} size={56} />
+            <h3>About</h3>
+            <div className="wp-card wp-about">
+              <Avatar avatar={teammate.avatar} id={teammate.id} size={64} />
+              <div className="wp-about-name">{teammate.name}</div>
               <div className="wp-about-tag">{teammate.tagline}</div>
               {teammate.expertise.length ? <div className="wp-tags">{teammate.expertise.map((e) => <span key={e} className="wp-tag">{e}</span>)}</div> : null}
               <div className="wp-about-meta">
@@ -104,18 +99,20 @@ export default function Rail({ open, onClose, teammate, members = [], sessions =
         {members.length ? (
           <section className="wp-rail-sec">
             <h3>In this group</h3>
-            {members.map((t) => (
-              <button key={t.id} type="button" className="wp-rail-row is-link" onClick={() => navigate(`dm/${t.id}`)}>
-                <Avatar id={t.avatar} size={22} working={!!live?.[t.id]} />
-                <span className="wp-rail-row-name">{t.name}</span>
-                <span className="wp-rail-row-sub">{t.tagline}</span>
-              </button>
-            ))}
+            <div className="wp-card">
+              {members.map((t) => (
+                <button key={t.id} type="button" className="wp-rail-row is-link" onClick={() => navigate(`dm/${t.id}`)}>
+                  <Avatar avatar={t.avatar} id={t.id} size={24} working={!!live?.[t.id]} />
+                  <span className="wp-rail-row-name">{t.name}</span>
+                  <span className="wp-rail-row-sub">{t.tagline}</span>
+                </button>
+              ))}
+            </div>
           </section>
         ) : null}
 
         <section className="wp-rail-sec">
-          <h3>Artifacts here <span className="wp-count">{files.length}</span></h3>
+          <h3>Artifacts <span className="wp-count">{files.length}</span></h3>
           {files.length ? <FileChips files={files} onOpen={onOpenFile} /> : <p className="wp-rail-empty">Files a teammate makes in this conversation appear here.</p>}
           <button type="button" className="wp-linkbtn" onClick={() => navigate('artifacts')}>All artifacts</button>
         </section>

@@ -12,11 +12,11 @@ test('a fenced questions reply is read and the free-text option is never duplica
 });
 
 test('a teammate reply is clipped and its face validated', () => {
-  const r = parseBuilderReply(JSON.stringify({ type: 'teammate', name: 'Nova <script>', tagline: 'x'.repeat(100), avatar: 'DRAGON', expertise: ['a', '', 'b'], greeting: 'hi', system_prompt: 'You are Nova.' }));
+  const r = parseBuilderReply(JSON.stringify({ type: 'teammate', name: 'Nova <script>', tagline: 'x'.repeat(100), expertise: ['a', '', 'b'], greeting: 'hi', system_prompt: 'You are Nova.' }));
   assert.equal(r.type, 'teammate');
   assert.equal(r.name, 'Nova script');
   assert.equal(r.tagline.length, 60);
-  assert.ok(['fox', 'owl', 'cat', 'bear', 'panda', 'robot', 'koala', 'penguin', 'bunny', 'frog', 'whale', 'sloth'].includes(r.avatar));
+  assert.equal(r.avatar, undefined);   // the person picks the face; the recruiter never does
   assert.deepEqual(r.expertise, ['a', 'b']);
 });
 
@@ -30,7 +30,7 @@ test('prose, an array, or a profile without a prompt is not a reply', () => {
 test('answers read back one line per question, with free text marked', () => {
   const qs = [{ id: 'job' }, { id: 'tone' }, { id: 'never' }];
   const t = answersToText(qs, { job: { picked: ['Research'] }, tone: { picked: [], other: 'like a pirate' }, never: { picked: [] } });
-  assert.equal(t, 'Answers:\n- job: Research\n- tone: (in their words) like a pirate');
+  assert.equal(t, 'Answers:\n- job: Research\n- tone: (in their words) like a pirate\nLeft open (decide yourself): never');
 });
 
 test('handles drop spaces and names keep letters only', () => {

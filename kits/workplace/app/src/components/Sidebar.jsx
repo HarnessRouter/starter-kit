@@ -1,92 +1,105 @@
-// The room list: every teammate as a direct message, then the groups, then the library. Like a
-// team chat's rail: dark, dense, a dot for something new and a pulse for someone at work.
-import React, { useMemo } from 'react';
-import { Hash, Images, Plus, UserPlus, X } from 'lucide-react';
+// The room list, the way a desktop chat draws it: soft grey, a search box, one row per teammate
+// with the last thing said and when, a blue dot for something new, groups as clusters of faces,
+// the library and the person at the bottom.
+import React, { useMemo, useRef, useState } from 'react';
+import { Images, Plus, Search, X } from 'lucide-react';
+import { Popover } from 'reifyui';
 import { useWorkplace } from '../App.jsx';
-import { Avatar, MemberAvatar } from '../lib/avatars.jsx';
+import { Avatar, ClusterAvatar, MemberAvatar } from '../lib/avatars.jsx';
 import { findDm } from '../lib/dm.js';
 import { liveTyping } from '../lib/groupdoc.js';
+import { whenLabel } from './Message.jsx';
+
+const firstLine = (s) => String(s || '').split('\n').map((l) => l.trim()).find(Boolean) || '';
 
 export default function Sidebar({ open }) {
   const wp = useWorkplace();
   const { teammates, cards, groupCards, docs, working, route, me, navigate, unread, closeDrawer } = wp;
+  const [q, setQ] = useState('');
+  const [plusOpen, setPlusOpen] = useState(false);
+  const plusRef = useRef(null);
+  const needle = q.trim().toLowerCase();
+
+  const dms = useMemo(() => (teammates || []).map((t) => {
+    const card = findDm(cards, t.id, me);
+    const preview = card ? firstLine(card.result) || firstLine(card.user_prompt) : (t.greeting || t.tagline);
+    return { t, card, preview, at: card && card.finished_at ? Number(card.finished_at) * 1000 : 0,
+             marker: card ? (card.last_response_id || card.finished_at || card.id) : '' };
+  }).filter((r) => !needle || r.t.name.toLowerCase().includes(needle) || r.t.tagline.toLowerCase().includes(needle)), [teammates, cards, me, needle]);
 
   const groups = useMemo(() => groupCards.map((c) => {
     const d = docs[c.id];
-    return { id: c.id, name: d?.name || String(c.title || '').replace(/^#/, ''), doc: d, members: d?.members || [] };
-  }), [groupCards, docs]);
+    const last = d ? [...d.messages].reverse().find((m) => m.from.kind !== 'system') : null;
+    const who = last?.from.kind === 'teammate' ? (teammates || []).find((t) => t.id === last.from.id)?.name : last?.from.name;
+    return { id: c.id, name: d?.name || String(c.title || '').replace(/^#/, ''), doc: d,
+             members: (d?.members || []).map((id) => (teammates || []).find((t) => t.id === id)).filter(Boolean),
+             preview: last ? `${who ? who + ': ' : ''}${firstLine(last.text)}` : (d?.topic || ''), at: last?.at || d?.createdAt || 0,
+             typing: d ? liveTyping(d) : [], marker: d ? String(d.messages.length) : '' };
+  }).filter((g) => !needle || g.name.toLowerCase().includes(needle)), [groupCards, docs, teammates, needle]);
 
   const isDm = (id) => route.kind === 'dm' && route.id === id;
   const isGroup = (id) => route.kind === 'group' && route.id === id;
+  const go = (path) => { navigate(path); closeDrawer(); };
 
   return (
     <aside className={`wp-side${open ? ' is-open' : ''}`} aria-label="Rooms">
-      <div className="wp-side-head">
-        <span className="wp-side-title">My Workplace</span>
-        <button className="wp-side-close" onClick={closeDrawer} aria-label="Close the room list"><X size={18} /></button>
+      <div className="wp-side-top">
+        <label className="wp-search">
+          <Search size={14} />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" aria-label="Search rooms" />
+          {q ? <button type="button" className="wp-search-x" onClick={() => setQ('')} aria-label="Clear"><X size={12} /></button> : null}
+        </label>
+        <button type="button" ref={plusRef} className="wp-plus" onClick={() => setPlusOpen((o) => !o)} aria-label="New" aria-expanded={plusOpen}><Plus size={18} /></button>
+        <button type="button" className="wp-side-close" onClick={closeDrawer} aria-label="Close the room list"><X size={18} /></button>
+        <Popover open={plusOpen} anchorRef={plusRef} onClose={() => setPlusOpen(false)} width={220} label="New">
+          <div className="wp-menu">
+            <button type="button" className="wp-menu-item" onClick={() => { setPlusOpen(false); go('new'); }}>New teammate</button>
+            <button type="button" className="wp-menu-item" disabled={!teammates || !teammates.length} onClick={() => { setPlusOpen(false); window.dispatchEvent(new CustomEvent('wp:new-group')); }}>New group</button>
+          </div>
+        </Popover>
       </div>
 
       <nav className="wp-side-scroll">
-        <div className="wp-side-sec">
-          <div className="wp-side-sec-h">Direct messages</div>
-          {(teammates || []).map((t) => {
-            const card = findDm(cards, t.id, me);
-            const marker = card ? (card.last_response_id || card.finished_at || card.id) : '';
-            return (
-              <button key={t.id} className={`wp-side-row${isDm(t.id) ? ' is-active' : ''}`} onClick={() => navigate(`dm/${t.id}`)}>
-                <span className="wp-side-ava"><Avatar id={t.avatar} size={24} working={working.has(t.id)} /></span>
-                <span className="wp-side-name">{t.name}</span>
-                {t.tagline ? <span className="wp-side-sub">{t.tagline}</span> : null}
-                {!isDm(t.id) && unread(`dm:${t.id}`, marker) ? <span className="wp-side-dot" aria-label="New messages" /> : null}
-              </button>
-            );
-          })}
-          {teammates && !teammates.length ? <div className="wp-side-empty">No teammates yet.</div> : null}
-          <button className={`wp-side-row is-action${route.kind === 'new' ? ' is-active' : ''}`} onClick={() => navigate('new')}>
-            <span className="wp-side-ava is-ic"><UserPlus size={16} /></span>
-            <span className="wp-side-name">New teammate</span>
+        {teammates && !teammates.length && !groups.length ? (
+          <button type="button" className="wp-row is-first" onClick={() => go('new')}>
+            <Avatar avatar={{ shape: 'round', color: 'blue' }} size={34} />
+            <span className="wp-row-main"><span className="wp-row-name">Create your first teammate</span></span>
           </button>
-        </div>
-
-        <div className="wp-side-sec">
-          <div className="wp-side-sec-h">Groups</div>
-          {groups.map((g) => {
-            const typing = g.doc ? liveTyping(g.doc) : [];
-            const marker = g.doc ? String(g.doc.messages.length) : '';
-            return (
-              <button key={g.id} className={`wp-side-row${isGroup(g.id) ? ' is-active' : ''}`} onClick={() => navigate(`group/${g.id}`)}>
-                <span className="wp-side-ava is-ic"><Hash size={16} /></span>
-                <span className="wp-side-name">{g.name}</span>
-                <span className="wp-side-stack" aria-hidden="true">
-                  {g.members.slice(0, 3).map((id) => {
-                    const t = (teammates || []).find((x) => x.id === id);
-                    return t ? <Avatar key={id} id={t.avatar} size={18} working={typing.includes(id) || working.has(id)} /> : null;
-                  })}
-                </span>
-                {!isGroup(g.id) && unread(`g:${g.id}`, marker) ? <span className="wp-side-dot" aria-label="New messages" /> : null}
-              </button>
-            );
-          })}
-          {!groups.length ? <div className="wp-side-empty">No groups yet.</div> : null}
-          <button className="wp-side-row is-action" onClick={() => window.dispatchEvent(new CustomEvent('wp:new-group'))} disabled={!teammates || !teammates.length}
-                  title={!teammates || !teammates.length ? 'Add a teammate first' : undefined}>
-            <span className="wp-side-ava is-ic"><Plus size={16} /></span>
-            <span className="wp-side-name">New group</span>
+        ) : null}
+        {dms.length ? <div className="wp-side-h">Teammates</div> : null}
+        {dms.map(({ t, preview, at, marker }) => (
+          <button key={t.id} type="button" className={`wp-row${isDm(t.id) ? ' is-active' : ''}`} onClick={() => go(`dm/${t.id}`)}>
+            <Avatar avatar={t.avatar} id={t.id} size={34} working={working.has(t.id)} />
+            <span className="wp-row-main">
+              <span className="wp-row-line"><span className="wp-row-name">{t.name}</span>{at ? <span className="wp-row-time">{whenLabel(at)}</span> : null}</span>
+              <span className="wp-row-prev">{preview}</span>
+            </span>
+            {!isDm(t.id) && unread(`dm:${t.id}`, marker) ? <span className="wp-row-dot" aria-label="New messages" /> : null}
           </button>
-        </div>
-
-        <div className="wp-side-sec">
-          <div className="wp-side-sec-h">Library</div>
-          <button className={`wp-side-row${route.kind === 'artifacts' ? ' is-active' : ''}`} onClick={() => navigate('artifacts')}>
-            <span className="wp-side-ava is-ic"><Images size={16} /></span>
-            <span className="wp-side-name">Artifacts</span>
+        ))}
+        {groups.length ? <div className="wp-side-h">Groups</div> : null}
+        {groups.map((g) => (
+          <button key={g.id} type="button" className={`wp-row${isGroup(g.id) ? ' is-active' : ''}`} onClick={() => go(`group/${g.id}`)}>
+            <ClusterAvatar members={g.members} size={34} />
+            <span className="wp-row-main">
+              <span className="wp-row-line"><span className="wp-row-name">{g.name}</span>{g.at ? <span className="wp-row-time">{whenLabel(g.at)}</span> : null}</span>
+              <span className="wp-row-prev">{g.typing.length ? `${g.members.find((t) => t.id === g.typing[0])?.name || 'Someone'} is writing…` : g.preview}</span>
+            </span>
+            {!isGroup(g.id) && unread(`g:${g.id}`, g.marker) ? <span className="wp-row-dot" aria-label="New messages" /> : null}
           </button>
-        </div>
+        ))}
+        {teammates && teammates.length && !dms.length && !groups.length ? <div className="wp-side-empty">Nothing matches.</div> : null}
       </nav>
 
       <div className="wp-side-foot">
-        <MemberAvatar name={me?.name} size={26} />
-        <span className="wp-side-me">{me?.name}</span>
+        <button type="button" className={`wp-row is-tool${route.kind === 'artifacts' ? ' is-active' : ''}`} onClick={() => go('artifacts')}>
+          <span className="wp-row-ic"><Images size={16} /></span>
+          <span className="wp-row-main"><span className="wp-row-name">Artifacts</span></span>
+        </button>
+        <div className="wp-me">
+          <MemberAvatar name={me?.name} size={28} />
+          <span className="wp-me-name">{me?.name}</span>
+        </div>
       </div>
     </aside>
   );

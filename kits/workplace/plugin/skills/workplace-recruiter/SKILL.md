@@ -1,6 +1,6 @@
 ---
 name: workplace-recruiter
-description: How to interview someone about the teammate they want and hand back the profile the workplace installs — the two JSON shapes, the rules for every field, and the avatar set.
+description: How to interview someone about the teammate they want and hand back the profile the workplace installs, the two JSON shapes and the rules for every field.
 ---
 
 # Recruiting a teammate
@@ -44,7 +44,6 @@ or the profile:
 {"type": "teammate",
  "name": "Nova",
  "tagline": "Research analyst who reads everything first",
- "avatar": "fox",
  "expertise": ["market research", "summaries", "citations"],
  "greeting": "Hi, I'm Nova. Give me a topic and I'll come back with what actually matters.",
  "system_prompt": "You are Nova, ..."}
@@ -53,10 +52,6 @@ or the profile:
 - `name`: one word, 20 characters or fewer — a first name that fits the role. Never a real
   product, company or person.
 - `tagline`: 60 characters or fewer, the role first.
-- `avatar`: exactly one of `fox`, `owl`, `cat`, `bear`, `panda`, `robot`, `koala`, `penguin`,
-  `bunny`, `frog`, `whale`, `sloth`. Pick the character that fits the personality: an owl for a
-  careful reader, a fox for a quick researcher, a robot for data and code, a whale for anything
-  big and calm, a penguin for someone formal, a sloth for someone deliberately unhurried.
 - `expertise`: 3 to 6 tags, one to three words each.
 - `greeting`: 200 characters or fewer, in the teammate's own voice, the first thing they say.
 - `system_prompt`: 150 to 350 words, written to the teammate in the second person ("You are
@@ -67,5 +62,5 @@ or the profile:
 
 Plain punctuation everywhere: commas, full stops, colons; never an em dash or an en dash.
 
-Never run more than two rounds in all. When in doubt, produce the profile: the person can edit
-the name and the face before the teammate joins, and can talk to the teammate afterwards.
+Never run more than two rounds in all. When in doubt, produce the profile: the person picks the face and can edit
+the name before the teammate joins, and can talk to the teammate afterwards.

@@ -1,57 +1,50 @@
-/* My Workplace design tokens — the token contract the other kits use, re-keyed to this kit's
-   accent (kit.json: #6E55FF), plus the one thing only this kit has: a dark rail on the left, the
-   way a team chat has, so the room list reads as furniture and the conversation reads as paper. */
+/* My Workplace design tokens. The room is white paper; the furniture around it (the room list,
+   the details panel) is the soft grey of a desktop app; the person speaks in black bubbles and a
+   teammate in grey ones; one blue is the accent for links, focus and "new". Flat colours, no
+   gradients, the system typeface. */
 :root {
-  --brand: #6E55FF;
-  --brand-ink: #5A42E8;
-  --brand-soft: #CFC6FF;
-  --brand-50: #F3F0FF;
+  --accent: #2F7BF6;
+  --accent-ink: #1E63D6;
+  --accent-soft: #DCE9FF;
 
-  --hot: #EF4444;
-  --hot-soft: #FEE4E4;
-  --warm: #F59E0B;
-  --warm-soft: #FEF1D6;
-  --ok: #10B981;
-  --ok-soft: #DFF6EC;
+  --hot: #E23D3A;
+  --hot-soft: #FDE8E7;
+  --ok: #38C25D;
 
-  --bg: #F7F8FB;
-  --surface: #FFFFFF;
-  --surface-2: #F3F4F8;
-  --line: #E5E7EB;
-  --line-soft: #EFF1F4;
+  --paper: #FFFFFF;
+  --soft: #F5F5F7;
+  --soft-2: #E8E8ED;
+  --line: #E5E5EA;
+  --line-soft: #EFEFF3;
 
-  --ink: #1F1B2E;
-  --ink-2: #4B4766;
-  --ink-3: #7B7794;
-  --ink-4: #A8A5BB;
+  --ink: #1D1D1F;
+  --ink-2: #515154;
+  --ink-3: #86868B;
+  --ink-4: #AEAEB2;
 
-  --side-bg: #1F1B2E;
-  --side-bg-2: #2A2540;
-  --side-ink: #ECE9F7;
-  --side-muted: #A9A3C2;
-  --side-line: rgba(255, 255, 255, 0.08);
-  --side-hover: rgba(255, 255, 255, 0.06);
-  --side-active: rgba(110, 85, 255, 0.42);
+  --bubble-me: #1D1D1F;
+  --bubble-me-ink: #FFFFFF;
+  --bubble-them: #F2F2F7;
 
-  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Helvetica, Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   --r-sm: 8px;
   --r-md: 12px;
-  --r-lg: 16px;
-  --r-input: 10px;
-  --shadow-1: 0 1px 2px rgba(31, 27, 46, 0.06);
-  --shadow-2: 0 8px 24px rgba(31, 27, 46, 0.12);
-  --shadow-3: 0 18px 48px rgba(31, 27, 46, 0.18);
+  --r-lg: 18px;
+  --r-pill: 999px;
+  --shadow-1: 0 1px 2px rgba(29, 29, 31, 0.06);
+  --shadow-2: 0 8px 24px rgba(29, 29, 31, 0.10);
+  --shadow-3: 0 18px 48px rgba(29, 29, 31, 0.18);
 
   /* The shared surface reads its palette through these. */
-  --uic-brand: var(--brand);
-  --uic-brand-ink: var(--brand-ink);
-  --uic-brand-soft: var(--brand-soft);
-  --uic-brand-50: var(--brand-50);
-  --uic-bg: var(--bg);
-  --uic-surface: var(--surface);
-  --uic-surface-2: var(--surface-2);
+  --uic-brand: var(--accent);
+  --uic-brand-ink: var(--accent-ink);
+  --uic-brand-soft: var(--accent-soft);
+  --uic-brand-50: #EEF4FF;
+  --uic-bg: var(--soft);
+  --uic-surface: var(--paper);
+  --uic-surface-2: var(--soft);
   --uic-line: var(--line);
   --uic-line-soft: var(--line-soft);
   --uic-ink: var(--ink);
@@ -60,25 +53,22 @@
   --uic-ink-4: var(--ink-4);
   --uic-hot: var(--hot);
   --uic-hot-soft: var(--hot-soft);
-  --uic-warm: var(--warm);
-  --uic-warm-soft: var(--warm-soft);
   --uic-ok: var(--ok);
-  --uic-ok-soft: var(--ok-soft);
   --uic-font: var(--font);
   --uic-mono: var(--mono);
   --uic-r-sm: var(--r-sm);
   --uic-r-md: var(--r-md);
   --uic-r-lg: var(--r-lg);
-  --uic-r-input: var(--r-input);
+  --uic-r-input: 10px;
   --uic-shadow-1: var(--shadow-1);
   --uic-shadow-2: var(--shadow-2);
   --uic-shadow-3: var(--shadow-3);
   --uic-skel: var(--line);
-  --uic-mention-color: var(--brand);
+  --uic-mention-color: var(--accent);
 }
 
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
-body { font-family: var(--font); color: var(--ink); background: var(--bg); -webkit-font-smoothing: antialiased; font-size: 14px; line-height: 1.45; }
+body { font-family: var(--font); color: var(--ink); background: var(--paper); -webkit-font-smoothing: antialiased; font-size: 14px; line-height: 1.45; }
 button, input, textarea { font-family: inherit; }
-a { color: var(--brand-ink); }
+a { color: var(--accent-ink); }

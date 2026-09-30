@@ -1,19 +1,19 @@
 // A group: the document is the room. This tab reads it every few seconds, appends what the person
-// says, and — when nobody else is driving — runs the teammates' turns (engine.js), showing each
-// one's work live in its own message while it runs.
+// says, and, when nobody else is driving, runs the teammates' turns (engine.js), showing each one's
+// work live in its own bubble while it runs.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Hash, Menu, MoreHorizontal, PanelRight, Users } from 'lucide-react';
+import { Menu, MoreHorizontal, PanelRight, Users } from 'lucide-react';
 import { Popover, useDialog } from 'reifyui';
 import { deleteSession, patchSession } from 'reifyui/harness';
 import { useWorkplace } from '../App.jsx';
-import { Avatar } from '../lib/avatars.jsx';
+import { Avatar, ClusterAvatar } from '../lib/avatars.jsx';
 import { appendMessage, cleanGroupName, groupTitle, humanMessage, liveTyping, mergeDoc, roundHeldByOther, systemMessage } from '../lib/groupdoc.js';
 import { readGroup, writeGroup } from '../lib/groups.js';
 import { runRound } from '../lib/engine.js';
 import { mentionItems } from '../lib/mentions.js';
 import Composer from './Composer.jsx';
 import Rail, { useRail } from './Rail.jsx';
-import { DayDivider, MessageRow, SystemLine, TypingRow } from './Message.jsx';
+import { Bubble, SystemLine, TypingBubble, withTimeLabels } from './Message.jsx';
 import { useFileOverlay } from './Files.jsx';
 
 const POLL_MS = 3000;
@@ -25,7 +25,7 @@ export default function GroupView({ sid }) {
   const [doc, setDocState] = useState(docs[sid] || null);
   const docRef = useRef(doc);
   docRef.current = doc;
-  const [live, setLive] = useState({});        // teammate id -> { text, steps, status, session }
+  const [live, setLive] = useState({});
   const [err, setErr] = useState('');
   const [railOpen, setRailOpen] = useRail();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -34,14 +34,13 @@ export default function GroupView({ sid }) {
   const menuRef = useRef(null);
   const membersRef = useRef(null);
   const bodyRef = useRef(null);
-  const attachments = useRef({});              // human message id -> prepared file blocks, this tab only
+  const attachments = useRef({});
   const files = useFileOverlay();
 
   const adopt = useCallback((next) => { docRef.current = next; setDocState(next); setDoc(sid, next); }, [sid, setDoc]);
   const getDoc = useCallback(() => docRef.current, []);
   const putDoc = useCallback(async (next) => { const stored = await writeGroup(sid, next); adopt(stored); return stored; }, [sid, adopt]);
 
-  // Read the room every few seconds: other tabs' messages, and the driver's replies when it is not us.
   useEffect(() => {
     let alive = true;
     const tick_ = async () => {
@@ -75,14 +74,11 @@ export default function GroupView({ sid }) {
     setErr('');
     const msg = humanMessage({ me, text, mentions, attachments: att });
     if (blocks.length) attachments.current[msg.id] = blocks;
-    try {
-      await putDoc(appendMessage(getDoc(), msg));
-    } catch (e) { setErr(e?.message || 'The message could not be posted.'); return; }
-    runRound({
-      sid, tabId, me, roster, getDoc, putDoc, onLive,
-      attachmentsFor: (id) => attachments.current[id] || [],
-      onError: (bot, why) => setErr(`${bot.name}: ${why}`),
-    }, msg).catch((e) => setErr(e?.message || 'The round stopped.')).finally(() => { delete attachments.current[msg.id]; setTick((n) => n + 1); refreshCards(); });
+    try { await putDoc(appendMessage(getDoc(), msg)); }
+    catch (e) { setErr(e?.message || 'The message could not be posted.'); return; }
+    runRound({ sid, tabId, me, roster, getDoc, putDoc, onLive, attachmentsFor: (id) => attachments.current[id] || [], onError: (bot, why) => setErr(`${bot.name}: ${why}`) }, msg)
+      .catch((e) => setErr(e?.message || 'The round stopped.'))
+      .finally(() => { delete attachments.current[msg.id]; setTick((n) => n + 1); refreshCards(); });
   }, [doc, me, roster, sid, tabId, getDoc, putDoc, onLive, refreshCards]);
 
   const setMembers = async (ids) => {
@@ -105,7 +101,7 @@ export default function GroupView({ sid }) {
   };
   const remove = async () => {
     setMenuOpen(false);
-    const ok = await dialog.confirm({ title: `Delete #${doc.name}?`, message: 'The conversation and the files made in it are deleted. The teammates stay.', destructive: true, confirmLabel: 'Delete' });
+    const ok = await dialog.confirm({ title: `Delete ${doc.name}?`, message: 'The conversation and the files made in it are deleted. The teammates stay.', destructive: true, confirmLabel: 'Delete' });
     if (!ok) return;
     try { await deleteSession(sid); await refreshCards(); navigate('', true); }
     catch (e) { dialog.alert({ title: 'Could not delete', message: e?.message || 'Try again.' }); }
@@ -113,64 +109,66 @@ export default function GroupView({ sid }) {
 
   const rows = useMemo(() => {
     if (!doc) return [];
-    const out = [];
-    let lastDay = '';
+    const items_ = [];
+    let prev = '';
     for (const m of doc.messages) {
-      const d = new Date(m.at).toDateString();
-      if (d !== lastDay) { out.push(<DayDivider key={`d${d}`} at={m.at} />); lastDay = d; }
-      if (m.from.kind === 'system') { out.push(<SystemLine key={m.id} text={m.text} />); continue; }
+      if (m.from.kind === 'system') { items_.push({ at: m.at, node: <SystemLine key={m.id} text={m.text} /> }); prev = 'system'; continue; }
       const t = m.from.kind === 'teammate' ? roster.find((x) => x.id === m.from.id) : null;
-      const from = t ? { kind: 'teammate', name: t.name, avatar: t.avatar } : m.from.kind === 'teammate' ? { kind: 'teammate', name: 'Former teammate', avatar: 'robot' } : { kind: 'member', name: m.from.name || 'Someone' };
-      out.push(<MessageRow key={m.id} from={from} at={m.at} text={m.text} files={m.files} attachments={m.attachments} teammates={roster}
-                           onMention={(id) => navigate(`dm/${id}`)} onOpenFile={files.open} onName={t ? () => navigate(`dm/${t.id}`) : undefined} />);
+      const isMe = m.from.kind === 'member' && (me?.id === '*' || m.from.id === me?.id);
+      const from = t ? { kind: 'teammate', id: t.id, name: t.name, avatar: t.avatar }
+        : m.from.kind === 'teammate' ? { kind: 'teammate', id: m.from.id, name: 'Former teammate' }
+        : isMe ? { kind: 'me', name: me?.name } : { kind: 'member', name: m.from.name || 'Someone' };
+      const key = `${from.kind}:${from.id || from.name}`;
+      const first = prev !== key;
+      prev = key;
+      items_.push({ at: m.at, node: <Bubble key={m.id} from={from} first={first} text={m.text} files={m.files} attachments={m.attachments} teammates={roster}
+                                            onMention={(id) => navigate(`dm/${id}`)} onOpenFile={files.open} onName={t ? () => navigate(`dm/${t.id}`) : undefined} /> });
     }
+    const out = withTimeLabels(items_, (it) => it.node.key);
     for (const [id, v] of Object.entries(live)) {
       const t = roster.find((x) => x.id === id);
       if (!t || !v) continue;
       const blocks = [];
       if (v.steps.length) blocks.push({ kind: 'tools', reasoning: '', steps: v.steps });
       if (v.text) blocks.push({ kind: 'text', text: v.text });
-      out.push(<MessageRow key={`live-${id}`} from={{ kind: 'teammate', name: t.name, avatar: t.avatar }} turn={{ blocks, status: 'running' }} teammates={roster} workingLabel={`${t.name} is thinking…`} />);
+      out.push(<Bubble key={`live-${id}`} from={{ kind: 'teammate', id: t.id, name: t.name, avatar: t.avatar }} turn={{ blocks, status: 'running' }} teammates={roster} workingLabel={`${t.name} is thinking…`} />);
     }
     for (const id of typing) {
       if (live[id]) continue;
       const t = roster.find((x) => x.id === id);
-      if (t) out.push(<TypingRow key={`typing-${id}`} from={{ name: t.name, avatar: t.avatar }} />);
+      if (t) out.push(<TypingBubble key={`typing-${id}`} from={{ id: t.id, name: t.name, avatar: t.avatar }} />);
     }
     return out;
-  }, [doc, live, typing.join(','), roster, navigate, files.open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [doc, live, typing.join(','), roster, navigate, files.open, me]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { const el = bodyRef.current; if (el) el.scrollTop = el.scrollHeight; }, [rows.length, JSON.stringify(Object.values(live).map((v) => v && [v.text.length, v.steps.length]))]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!doc) return <div className="wp-room"><div className="wp-conv"><div className="wp-loading">Opening #…</div></div></div>;
+  if (!doc) return <div className="wp-room"><div className="wp-conv"><div className="wp-loading">Opening the group…</div></div></div>;
 
   return (
     <div className="wp-room">
       <div className="wp-conv">
         <header className="wp-head">
           <button type="button" className="wp-iconbtn wp-menubtn" onClick={openDrawer} aria-label="Rooms"><Menu size={20} /></button>
-          <span className="wp-head-hash"><Hash size={18} /></span>
+          <ClusterAvatar members={members} size={26} />
           <div className="wp-head-titles">
             <h1 className="wp-head-title">{doc.name}</h1>
             <div className="wp-head-sub">{doc.topic || `${members.length} teammate${members.length === 1 ? '' : 's'}`}</div>
           </div>
           <div className="wp-head-acts">
-            <button type="button" ref={membersRef} className="wp-members-btn" onClick={() => setMembersOpen((o) => !o)} aria-label="Members" aria-expanded={membersOpen}>
-              <span className="wp-stack">{members.slice(0, 4).map((t) => <Avatar key={t.id} id={t.avatar} size={22} working={!!live[t.id] || typing.includes(t.id)} />)}</span>
-              <span className="wp-members-n"><Users size={14} />{members.length}</span>
-            </button>
-            <button type="button" ref={menuRef} className="wp-iconbtn" onClick={() => setMenuOpen((o) => !o)} aria-label="More" aria-expanded={menuOpen}><MoreHorizontal size={20} /></button>
-            <button type="button" className={`wp-iconbtn${railOpen ? ' is-on' : ''}`} onClick={() => setRailOpen((o) => !o)} aria-label={railOpen ? 'Hide details' : 'Show details'}><PanelRight size={20} /></button>
+            <button type="button" ref={membersRef} className="wp-iconbtn" onClick={() => setMembersOpen((o) => !o)} aria-label="Members" aria-expanded={membersOpen}><Users size={18} /></button>
+            <button type="button" ref={menuRef} className="wp-iconbtn" onClick={() => setMenuOpen((o) => !o)} aria-label="More" aria-expanded={menuOpen}><MoreHorizontal size={18} /></button>
+            <button type="button" className={`wp-iconbtn${railOpen ? ' is-on' : ''}`} onClick={() => setRailOpen((o) => !o)} aria-label={railOpen ? 'Hide details' : 'Show details'}><PanelRight size={18} /></button>
           </div>
           <Popover open={membersOpen} anchorRef={membersRef} onClose={() => setMembersOpen(false)} width={300} label="Members">
             <div className="wp-menu">
-              <div className="wp-menu-h">Teammates in #{doc.name}</div>
+              <div className="wp-menu-h">Teammates in {doc.name}</div>
               {roster.map((t) => {
                 const on = doc.members.includes(t.id);
                 return (
                   <label key={t.id} className="wp-menu-check">
                     <input type="checkbox" checked={on} onChange={() => setMembers(on ? doc.members.filter((id) => id !== t.id) : [...doc.members, t.id])} />
-                    <Avatar id={t.avatar} size={22} /><span>{t.name}</span><span className="wp-menu-sub">{t.tagline}</span>
+                    <Avatar avatar={t.avatar} id={t.id} size={22} /><span>{t.name}</span><span className="wp-menu-sub">{t.tagline}</span>
                   </label>
                 );
               })}
@@ -186,19 +184,15 @@ export default function GroupView({ sid }) {
         </header>
 
         <div className="wp-body" ref={bodyRef}>
-          {doc.messages.length <= 1 ? (
-            <div className="wp-greeting">
-              <p className="wp-greeting-hint">This is the start of #{doc.name}. Say something; the teammates who should answer will, and you can @mention one to be sure.</p>
-            </div>
-          ) : null}
+          {doc.messages.length <= 1 ? <p className="wp-greeting-hint is-center">The start of {doc.name}. Say something; the teammates who should answer will, and you can @mention one to be sure.</p> : null}
           {rows}
           {err ? <div className="wp-err" role="alert">{err}</div> : null}
         </div>
 
-        <Composer items={items} placeholder={`Message #${doc.name}`} onSend={send} autoFocus
+        <Composer items={items} placeholder={`Message ${doc.name}`} onSend={send} autoFocus
                   hint={heldElsewhere && !busyLocal ? 'Another window is running the replies.' : members.length ? 'Type @ to call a teammate.' : 'Add a teammate to this group to get answers.'} />
       </div>
-      <Rail open={railOpen} onClose={() => setRailOpen(false)} members={members} live={live}
+      <Rail open={railOpen} onClose={() => setRailOpen(false)} members={members} live={live} title={doc.name}
             sessions={Object.values(doc.bots || {}).map((b) => b.session).filter(Boolean)} refreshKey={tick} onOpenFile={files.open} />
       {files.overlay}
     </div>

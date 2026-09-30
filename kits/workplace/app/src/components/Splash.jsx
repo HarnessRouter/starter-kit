@@ -20,7 +20,7 @@ export function Splash({ kind, text, inline }) {
         <h1>{c.title}</h1>
         {(text || c.text) ? <p>{text || c.text}</p> : null}
         {kind === 'loading' && <div className="wp-dots" aria-hidden="true"><span /><span /><span /></div>}
-        {kind === 'unlaunched' && <a className="uic-btn is-primary is-md" href="/kits">Open Starter Kits</a>}
+        {kind === 'unlaunched' && <a className="wp-btn is-primary" href="/kits">Open Starter Kits</a>}
       </div>
     </div>
   );

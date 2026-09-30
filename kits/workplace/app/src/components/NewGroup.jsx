@@ -52,7 +52,7 @@ export default function NewGroup() {
               return (
                 <button key={t.id} type="button" role="checkbox" aria-checked={on} className={`wp-pick-item${on ? ' is-on' : ''}`} disabled={!!busy}
                         onClick={() => setPicked((p) => (on ? p.filter((x) => x !== t.id) : [...p, t.id]))}>
-                  <Avatar id={t.avatar} size={28} /><span className="wp-pick-name">{t.name}</span><span className="wp-pick-sub">{t.tagline}</span>
+                  <Avatar avatar={t.avatar} id={t.id} size={28} /><span className="wp-pick-name">{t.name}</span><span className="wp-pick-sub">{t.tagline}</span>
                 </button>
               );
             })}

@@ -4,7 +4,7 @@
 // added, and connects every plugin the workspace has connected (the package itself asks for the
 // browser). Nothing about a teammate is stored anywhere else.
 import { hr, listHarnesses, kitHarness } from 'reifyui/harness';
-import { KIT_BASE, TEAMMATE_PACKAGE, TEAMMATE_FILE } from './kit.js';
+import { KIT_BASE, KIT_ID, TEAMMATE_PACKAGE, TEAMMATE_FILE } from './kit.js';
 import { cleanName, composeSystemPrompt } from './builder.js';
 import { avatarOf } from './faces.js';
 import { jsonInit } from './api.js';
@@ -13,6 +13,28 @@ const profiles = new Map();   // harness id -> Promise<profile>
 
 export function isTeammate(h) {
   return (h?.plugins || []).some((p) => p && p.name === TEAMMATE_PACKAGE && p.enabled !== false);
+}
+
+/** The recruiter of the workspace this page is open in. A kit is launched per workspace, so an
+ *  instance can hold several recruiters; the kit catalog names the caller's own, and the shared
+ *  "first harness with kit = workplace" answered another workspace's (measured 2026-09-30). */
+export async function recruiter() {
+  try {
+    const d = await hr('/kits');
+    const k = (d?.kits || []).find((x) => x.id === KIT_ID);
+    if (k?.launched && k.harnessId) {
+      const h = (await listHarnesses()).find((x) => x.id === k.harnessId);
+      if (h) return h;
+    }
+    if (k && !k.launched) return null;
+  } catch { /* fall through to the shared lookup */ }
+  return kitHarness();
+}
+
+/** Whether a harness belongs to the recruiter's workspace (an unstamped harness is the default's). */
+export function sameWorkspace(h, rec) {
+  const a = String(h?.workspace || ''), b = String(rec?.workspace || '');
+  return a === b || (!a && (b === 'default' || b === '')) || (!b && a === 'default');
 }
 
 async function profileOf(hid) {
@@ -39,8 +61,8 @@ function toTeammate(h, p) {
 }
 
 /** Every teammate of this workspace, oldest first. */
-export async function listTeammates() {
-  const hs = (await listHarnesses()).filter(isTeammate);
+export async function listTeammates(rec = null) {
+  const hs = (await listHarnesses()).filter((h) => isTeammate(h) && (!rec || sameWorkspace(h, rec)));
   const out = await Promise.all(hs.map(async (h) => toTeammate(h, await profileOf(h.id))));
   return out.sort((a, b) => a.createdAt - b.createdAt || a.name.localeCompare(b.name));
 }
@@ -63,7 +85,7 @@ export async function connectedPlugs() {
 
 /** Create the teammate. `onStep` narrates for the person; each step is a real call. */
 export async function createTeammate(profile, me, onStep) {
-  const rec = await kitHarness();
+  const rec = await recruiter();
   if (!rec) throw new Error('The workplace has not been launched.');
   onStep?.('Writing the profile');
   const record = { v: 1, avatar: profile.avatar, tagline: profile.tagline, expertise: profile.expertise,

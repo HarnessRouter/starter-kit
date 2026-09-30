@@ -59,7 +59,7 @@ export default function ArtifactsPage() {
           {(groups || []).map((g) => (
             <section key={g.key} className="wp-lib-sec">
               <button type="button" className="wp-lib-h" onClick={() => navigate(g.route)}>
-                {g.kind === 'dm' ? <Avatar id={g.teammate.avatar} size={24} /> : <span className="wp-lib-hash"><Hash size={16} /></span>}
+                {g.kind === 'dm' ? <Avatar avatar={g.teammate.avatar} id={g.teammate.id} size={24} /> : <span className="wp-lib-hash"><Hash size={16} /></span>}
                 <span>{g.kind === 'dm' ? g.label : `#${g.label}`}</span>
                 <span className="wp-count">{g.files.length}</span>
               </button>

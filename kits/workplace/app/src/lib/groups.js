@@ -2,7 +2,8 @@
 // is the whole group (see groupdoc.js). The session exists because a turn opened it: opening a
 // group asks the recruiter for one word, which is the only turn that session ever runs, so its
 // workspace is never busy when the app writes to it.
-import { kitHarness, patchSession, readJsonFile, streamTurn, writeFile } from 'reifyui/harness';
+import { patchSession, readJsonFile, streamTurn, writeFile } from 'reifyui/harness';
+import { recruiter } from './teammates.js';
 import { GROUP_FILE } from './kit.js';
 import { cleanGroupName, coerceDoc, groupTitle, isGroupTitle, mergeDoc, newGroupDoc, systemMessage } from './groupdoc.js';
 import { settled, sleep } from './api.js';
@@ -42,7 +43,7 @@ const SETUP = 'This is a setup step of the workplace app, not a person talking t
 /** Open a group: one setup turn on the recruiter opens the session, then the app names it and
  *  writes the first document. `onStep` narrates. */
 export async function createGroup({ name, topic = '', members = [], me, onStep }) {
-  const rec = await kitHarness();
+  const rec = await recruiter();
   if (!rec) throw new Error('The workplace has not been launched.');
   const clean = cleanGroupName(name);
   let sid = '';

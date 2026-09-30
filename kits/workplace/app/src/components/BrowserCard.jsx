@@ -36,9 +36,9 @@ export function BrowserCard({ sid, busy, name }) {
   const takeOver = async () => { if (pending || control === 'user') return; setPending(true); await setBrowserControl(sid, 'user'); setPending(false); window.setTimeout(() => frameRef.current?.focus(), 50); };
   const handBack = async () => { if (pending) return; setPending(true); await setBrowserControl(sid, 'agent'); setPending(false); };
   return (
-    <section className={`wp-browser${full ? ' is-full' : ''}${control === 'agent' && busy ? ' is-acting' : ''}`} aria-label="Browser">
+    <section className={`wp-browser wp-card${full ? ' is-full' : ''}${control === 'agent' && busy ? ' is-acting' : ''}`} aria-label="Browser">
       <div className="wp-browser-head">
-        <span className="wp-browser-who">{control === 'user' ? 'You have the browser' : `${name || 'Teammate'} is browsing`}{info.last_tool && control === 'agent' ? ` · ${info.last_tool}` : ''}</span>
+        <span className="wp-browser-who">{control === 'user' ? 'You have the screen' : `${name || 'Teammate'}'s screen`}{info.last_tool && control === 'agent' ? ` · ${info.last_tool}` : ''}</span>
         {control === 'user'
           ? <button type="button" className="uic-btn is-default is-sm" onClick={handBack} disabled={pending}>Hand back</button>
           : <button type="button" className="uic-btn is-primary is-sm" onClick={takeOver} disabled={pending}>Take over</button>}
