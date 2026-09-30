@@ -17,12 +17,13 @@ import { useFileOverlay } from './Files.jsx';
 
 const POLL_MS = 3000;
 
-/** When a turn happened. The record carries it in one of a few shapes; an in-flight turn may carry none, and then it is now. */
+/** When a turn happened, or 0 when the record does not say (the turns route carries no time on
+ *  this instance): a row without a time shows none, rather than the moment the page loaded. */
 function turnTime(t) {
-  const raw = t?.created_at ?? t?.created ?? t?.started_at ?? t?.at;
-  if (raw == null || raw === '') return Date.now();
+  const raw = t?.created_at ?? t?._created_at ?? t?.created ?? t?.started_at ?? t?.at;
+  if (raw == null || raw === '' || raw === 0) return 0;
   const n = typeof raw === 'number' ? (raw < 1e12 ? raw * 1000 : raw) : Number(new Date(raw));
-  return Number.isFinite(n) && n > 0 ? n : Date.now();
+  return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
 function turnFiles(t, sid) {
@@ -114,7 +115,7 @@ export default function DmView({ teammate }) {
     const out = [];
     let lastDay = '';
     const push = (at, node) => {
-      const d = at ? new Date(at).toDateString() : lastDay;
+      const d = at ? new Date(at).toDateString() : '';
       if (d && d !== lastDay) { out.push(<DayDivider key={`d${d}`} at={at} />); lastDay = d; }
       out.push(node);
     };
