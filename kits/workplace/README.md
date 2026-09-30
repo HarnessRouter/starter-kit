@@ -5,6 +5,8 @@ by answering a few questions; you message it one to one, in a conversation it re
 several in a group where they answer when it is their turn, hand work to each other with
 @mentions, browse the web in front of you, and leave what they make in a shared library.
 
+![A group in My Workplace: two teammates answering in turn, one handing off to the other with an @mention, the chart it made in the details rail](../../.github/images/kits/workplace-group.png)
+
 Launch it from **Starter Kits** in the HarnessRouter console. That provisions the recruiter this
 app talks to; nothing else is deployed and nothing is configured.
 
