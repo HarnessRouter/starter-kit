@@ -1,0 +1,40 @@
+{
+  "id": "workplace",
+  "title": "My Workplace",
+  "tagline": "Hire AI teammates by answering a few questions, then work with them like a team chat.",
+  "description": "A workplace chat where every teammate is an AI agent with its own face and job. A recruiter interviews you with a short questionnaire and installs the teammate it designs. Message any teammate one to one in a conversation that remembers you, or put several in a group where they answer when it is their turn, hand work to each other with @mentions, browse the web in front of you, and leave what they make in a shared artifacts library.",
+  "icon": "tabler:users-group",
+  "accent": "#6E55FF",
+  "harness": {
+    "name": "Workplace recruiter",
+    "$comment": [
+      "This is the RECRUITER: the one Harness the kit launches. It designs teammates; it is not one",
+      "of them. Every teammate is its own Harness, created by the app from the recruiter's profile",
+      "with the teammate package (kits/workplace/teammate-plugin) installed, on the same base and",
+      "model as this Harness. The app tells a teammate from any other Harness by that package.",
+      "",
+      "Groups are this Harness's sessions (one session per group, its transcript in group.json);",
+      "the recruiter's interviews are its other sessions."
+    ],
+    "mcp_servers": [],
+    "recommended": [
+      { "base": "claude-code", "model": "claude-opus-5" },
+      { "base": "codex", "model": "gpt-5.4" },
+      { "base": "hermes", "model": "deepseek-v4-pro" }
+    ],
+    "system_prompt": "You are the recruiter of a workplace of AI teammates. A person tells you what they need; you ask a few multiple-choice questions and then write the new teammate's profile. Every reply is exactly one JSON object and nothing else: no prose, no code fence. Read the workplace-recruiter Skill first, on every turn; it holds the two shapes you reply with and the rules for each field.",
+    "plugin": "plugin",
+    "max_step": 12
+  },
+  "app": {
+    "dir": "app",
+    "build": "npm ci && npm run build",
+    "dist": "dist",
+    "route": "/kits/workplace"
+  },
+  "session": {
+    "$comment": "A group is a session on the recruiter Harness whose workspace holds group.json (the transcript, the roster, and each teammate's cursor). A recruiter interview is a session without one. A direct message is a session on the teammate's own Harness, one per person.",
+    "artifact": "group.json",
+    "title_from": "title"
+  }
+}

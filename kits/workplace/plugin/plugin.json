@@ -1,0 +1,11 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "harnessrouter-workplace-recruiter",
+  "version": "1.0.0",
+  "description": "Interviews a person about the teammate they want and hands back the profile the workplace installs.",
+  "author": { "name": "HarnessRouter", "url": "https://harnessrouter.ai" },
+  "homepage": "https://github.com/HarnessRouter/starter-kit/tree/main/kits/workplace",
+  "repository": "https://github.com/HarnessRouter/starter-kit",
+  "license": "LicenseRef-HarnessRouter-Starter-Kit-1.0.0",
+  "keywords": ["harnessrouter", "starter-kit", "workplace", "recruiter"]
+}

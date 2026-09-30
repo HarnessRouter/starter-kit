@@ -1,0 +1,84 @@
+/* My Workplace design tokens — the token contract the other kits use, re-keyed to this kit's
+   accent (kit.json: #6E55FF), plus the one thing only this kit has: a dark rail on the left, the
+   way a team chat has, so the room list reads as furniture and the conversation reads as paper. */
+:root {
+  --brand: #6E55FF;
+  --brand-ink: #5A42E8;
+  --brand-soft: #CFC6FF;
+  --brand-50: #F3F0FF;
+
+  --hot: #EF4444;
+  --hot-soft: #FEE4E4;
+  --warm: #F59E0B;
+  --warm-soft: #FEF1D6;
+  --ok: #10B981;
+  --ok-soft: #DFF6EC;
+
+  --bg: #F7F8FB;
+  --surface: #FFFFFF;
+  --surface-2: #F3F4F8;
+  --line: #E5E7EB;
+  --line-soft: #EFF1F4;
+
+  --ink: #1F1B2E;
+  --ink-2: #4B4766;
+  --ink-3: #7B7794;
+  --ink-4: #A8A5BB;
+
+  --side-bg: #1F1B2E;
+  --side-bg-2: #2A2540;
+  --side-ink: #ECE9F7;
+  --side-muted: #A9A3C2;
+  --side-line: rgba(255, 255, 255, 0.08);
+  --side-hover: rgba(255, 255, 255, 0.06);
+  --side-active: rgba(110, 85, 255, 0.42);
+
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 16px;
+  --r-input: 10px;
+  --shadow-1: 0 1px 2px rgba(31, 27, 46, 0.06);
+  --shadow-2: 0 8px 24px rgba(31, 27, 46, 0.12);
+  --shadow-3: 0 18px 48px rgba(31, 27, 46, 0.18);
+
+  /* The shared surface reads its palette through these. */
+  --uic-brand: var(--brand);
+  --uic-brand-ink: var(--brand-ink);
+  --uic-brand-soft: var(--brand-soft);
+  --uic-brand-50: var(--brand-50);
+  --uic-bg: var(--bg);
+  --uic-surface: var(--surface);
+  --uic-surface-2: var(--surface-2);
+  --uic-line: var(--line);
+  --uic-line-soft: var(--line-soft);
+  --uic-ink: var(--ink);
+  --uic-ink-2: var(--ink-2);
+  --uic-ink-3: var(--ink-3);
+  --uic-ink-4: var(--ink-4);
+  --uic-hot: var(--hot);
+  --uic-hot-soft: var(--hot-soft);
+  --uic-warm: var(--warm);
+  --uic-warm-soft: var(--warm-soft);
+  --uic-ok: var(--ok);
+  --uic-ok-soft: var(--ok-soft);
+  --uic-font: var(--font);
+  --uic-mono: var(--mono);
+  --uic-r-sm: var(--r-sm);
+  --uic-r-md: var(--r-md);
+  --uic-r-lg: var(--r-lg);
+  --uic-r-input: var(--r-input);
+  --uic-shadow-1: var(--shadow-1);
+  --uic-shadow-2: var(--shadow-2);
+  --uic-shadow-3: var(--shadow-3);
+  --uic-skel: var(--line);
+  --uic-mention-color: var(--brand);
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body { font-family: var(--font); color: var(--ink); background: var(--bg); -webkit-font-smoothing: antialiased; font-size: 14px; line-height: 1.45; }
+button, input, textarea { font-family: inherit; }
+a { color: var(--brand-ink); }
