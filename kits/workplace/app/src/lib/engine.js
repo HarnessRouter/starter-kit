@@ -74,7 +74,9 @@ async function runTurn(ctx, job) {
     const t = await lastText(sid).catch(() => ({ text: '', status: '' }));
     text = t.text; status = t.status || status;
   }
-  if (!sid0 && sid) await patchSession(sid, { title: `#${doc.name} · ${bot.name}` }).catch(() => {});   // after the turn: its finish rewrites the card
+  // After every turn, not only the first: the turn's finish names the card after the message it
+  // answered, and the name is what tells this session apart in the console's list.
+  if (sid) await patchSession(sid, { title: `#${doc.name} · ${bot.name}` }).catch(() => {});
   const files = sid ? await changedFiles(sid) : [];
   ctx.onLive?.(bot.id, null);
 
