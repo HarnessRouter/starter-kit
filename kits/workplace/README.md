@@ -17,12 +17,14 @@ multiple-choice questions, one more round at most) and writes the new teammate's
 a face from the kit's own set of twelve, a tagline, a greeting and the instructions the teammate
 works by. You can change the name and the face before the teammate joins.
 
-**A teammate** is a Harness of its own, on the same base and model as the recruiter, with the
-`harnessrouter-workplace-teammate` package installed. The package carries the teammate's profile
-and the one Skill every teammate shares: how direct messages and groups work here, when to stay
-quiet, how to @mention a colleague, and that files saved in its working directory are shared.
-Every plugin your workspace has connected (the browser, GitHub, Microsoft 365, and so on) is
-connected to the teammate when it is hired; the package itself asks for the browser.
+**A teammate** is a Harness of its own, on the same base and model as the recruiter (the kit
+recommends the DeepSeek Harness with Claude Sonnet 5.5), with the `harnessrouter-workplace-teammate`
+package installed. The package carries the teammate's profile and the one Skill every teammate
+shares: how direct messages and groups work here, when to stay quiet, how to @mention a colleague,
+and that files saved in its working directory are shared. Every plugin your workspace has
+connected (the browser, GitHub, Microsoft 365, and so on) is connected to the teammate when it is
+hired; the package itself asks for the browser, and a workspace that has not connected the
+browser yet gets it connected at the first hire.
 
 **A direct message** is one session on the teammate's Harness, per person, forever. The first
 message opens it; every message after is a turn on it, so the teammate's memory of you is the
@@ -34,19 +36,28 @@ group and is handed only the messages it has not seen.
 
 ## How a group answers
 
-When you post in a group, the tab you posted from runs the replies:
+The group document says who still owes the room a turn, and whichever window has the group open
+runs those turns, one at a time:
 
 1. The teammates you @mentioned answer first, in the order you mentioned them.
 2. Every other teammate in the group looks at what is new and either answers or replies `[skip]`,
-   which the room never shows. Silence is the normal outcome for most messages.
+   which the room never shows. A plan or a request that puts work in a teammate's role is that
+   teammate's to do, mentioned or not; silence is the normal outcome for everything else.
 3. A reply that @mentions a teammate pulls that teammate in for another turn, up to three hops
    from your message. Nobody answers themselves and nobody answers the same message twice.
-4. Anything you post while that runs is answered in the next round; if a second window posts
-   meanwhile, it leaves the answering to the one already running.
+4. Anything you post while that runs is answered next; a second window that posts meanwhile
+   leaves the answering to the one already running.
 
-Teammates answer one at a time, so each one sees what the others said before it. While one is
-working, its message shows the tools it is using; if it opens the browser, the live view appears
-in the details rail, where you can take the browser over and hand it back.
+Every teammate is handed the roster with each colleague's role and expertise, so work is handed
+to the teammate whose job it is, and the files colleagues shared since it last looked are in the
+`shared/` folder of its working directory. Teammates answer one at a time, so each one sees what
+the others said before it. While one is working, its message shows the tools it is using in
+every window that has the group open, not only the one that posted; if it opens the browser, the
+live view appears in the details rail, where you can take the browser over and hand it back.
+
+Closing or reloading the window that was running the replies loses nothing: the turn goes on in
+the teammate's session, and the next window to open the group takes over after a minute, writes
+that reply into the room and continues with whoever still owes an answer.
 
 ## Artifacts
 

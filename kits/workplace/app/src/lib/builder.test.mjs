@@ -38,3 +38,10 @@ test('handles drop spaces and names keep letters only', () => {
   assert.equal(cleanName(''), 'Teammate');
   assert.equal(cleanName('  Ada   Lovelace!!  '), 'Ada Lovelace');
 });
+
+test('a reply that slips at its very end is repaired', () => {
+  const slip = '{"type":"teammate","name":"Marlowe","tagline":"Account strategist","expertise":["briefs"],"greeting":"Hi.","system_prompt":"You are Marlowe. If something is missing, say so.","}';
+  assert.equal(parseBuilderReply(slip)?.name, 'Marlowe');
+  assert.equal(parseBuilderReply('{"type":"questions","questions":[{"id":"job","prompt":"?","options":["a","b",],},]}')?.type, 'questions');
+  assert.equal(parseBuilderReply('not json at all'), null);
+});

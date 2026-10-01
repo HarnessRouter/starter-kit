@@ -42,6 +42,7 @@ export default function NewTeammate({ first = false }) {
   const [thinkingSince, setThinkingSince] = useState(0);
   const textRef = useRef('');
 
+  const RESEND = 'Your last reply was not one valid JSON object. Send the same answer again as exactly one JSON object and nothing else. It ended with:';
   const ask = useCallback(async (input) => {
     setStep('thinking'); setErr(''); setThinkingSince(Date.now());
     textRef.current = '';
@@ -51,7 +52,12 @@ export default function NewTeammate({ first = false }) {
         handlers: { onSession: (id) => setSid(id), onTextDelta: (d) => { textRef.current += d; }, onError: (m) => setErr(String(m || '')) } });
     } catch (e) { setErr(e?.message || 'The recruiter did not answer.'); setStep('error'); return; }
     if (r?.connecting) { setErr('Still connecting. Try again in a moment.'); setStep('error'); return; }
-    const parsed = parseBuilderReply(textRef.current);
+    let parsed = parseBuilderReply(textRef.current);
+    if (!parsed && !input.startsWith(RESEND)) {
+      // One silent retry: the recruiter is asked for the same object again before the person
+      // sees an error. The reply is usually a slip a model makes once.
+      return ask(`${RESEND} ${textRef.current.slice(-80)}`);
+    }
     if (!parsed) { setErr('The recruiter answered in a form this page cannot draw. Ask again.'); setStep('error'); return; }
     if (parsed.type === 'teammate') { setProfile({ ...parsed, name: cleanName(givenName) !== 'Teammate' ? cleanName(givenName) : parsed.name }); setStep('reveal'); return; }
     setQset(parsed); setAnswers({}); setRounds((n) => n + 1); setStep('asking');

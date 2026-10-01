@@ -23,6 +23,10 @@ export function extractJson(text) {
   if (fence) tries.push(fence[1].trim());
   const a = t.indexOf('{'), b = t.lastIndexOf('}');
   if (a >= 0 && b > a) tries.push(t.slice(a, b + 1));
+  // A model's slip at the very end of an object (`..., "}` or a trailing comma) is the one
+  // malformation seen in practice (Sonnet 5.5 on the DeepSeek harness, 2026-10-01); it is
+  // repaired here rather than shown to the person as an answer the page cannot draw.
+  for (const s of tries.slice()) tries.push(s.replace(/,\s*"?\s*([}\]])/g, '$1'));
   for (const s of tries) {
     try { const v = JSON.parse(s); if (v && typeof v === 'object' && !Array.isArray(v)) return v; } catch { /* next */ }
   }
