@@ -56,11 +56,19 @@ export default function DmView({ teammate }) {
     try { setTurns(await sessionTurns(sid)); } catch { setTurns((t) => t || []); }
   }, [sid]);
   useEffect(() => { setTurns(null); load(); }, [load]);
+  // The conversation is read from the server while this room is open, not only while this tab
+  // believes a turn is running: a message sent from another window (another machine, the same
+  // login) is a turn on the same session, listed with its text and its tool rows while it runs,
+  // and this window showed it only after its own six-second card poll noticed the teammate was
+  // busy (2026-10-01). While this tab streams the turn itself the stream is the source.
   useEffect(() => {
-    if (!externalBusy) return undefined;
-    const id = window.setInterval(load, POLL_MS);
-    return () => window.clearInterval(id);
-  }, [externalBusy, load]);
+    if (live) return undefined;
+    const poll = () => { if (!document.hidden) load(); };
+    const id = window.setInterval(poll, POLL_MS);
+    const onVis = () => { if (!document.hidden) load(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => { window.clearInterval(id); document.removeEventListener('visibilitychange', onVis); };
+  }, [live, load]);
   const wasBusy = useRef(false);
   useEffect(() => { if (wasBusy.current && !busy) { load(); setTick((n) => n + 1); } wasBusy.current = busy; }, [busy, load]);
 

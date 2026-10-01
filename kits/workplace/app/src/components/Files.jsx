@@ -1,8 +1,7 @@
 // Files a teammate made, as they appear under a bubble and in the panel: an image shows itself,
 // anything else is a small white card with its type, name and size; both open the preview.
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Download, X } from 'lucide-react';
 import { FilePreview, FileTypeIcon, bytesLabel } from 'reifyui';
 import { isImage } from '../lib/api.js';
 
@@ -30,15 +29,22 @@ export function FileChips({ files, onOpen }) {
 }
 
 export function FileOverlay({ file, onClose }) {
+  // Escape closes, as every sheet in the console does.
+  useEffect(() => {
+    if (!file) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [file, onClose]);
   if (!file) return null;
+  // The console's own viewer for a task's artifact (the shared FilePreview: its header carries the
+  // type, the name, Download and Close; its body renders the file itself), in a centred sheet
+  // over the room. The dark full-screen frame with a second header of its own is gone.
   return createPortal(
-    <div className="wp-overlay" role="dialog" aria-label={file.filename}>
-      <div className="wp-overlay-head">
-        <span className="wp-overlay-title">{file.path || file.filename}</span>
-        <a className="wp-iconbtn is-light" href={file.url} download={file.filename} aria-label="Download"><Download size={18} /></a>
-        <button type="button" className="wp-iconbtn is-light" onClick={onClose} aria-label="Close"><X size={18} /></button>
+    <div className="wp-viewer-back" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose?.(); }}>
+      <div className="wp-viewer" role="dialog" aria-modal="true" aria-label={file.filename}>
+        <FilePreview file={{ url: file.url, name: file.filename }} onClose={onClose} />
       </div>
-      <div className="wp-overlay-body"><FilePreview file={{ url: file.url, name: file.filename }} onClose={onClose} /></div>
     </div>,
     document.body,
   );

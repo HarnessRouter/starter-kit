@@ -149,7 +149,9 @@
 .wp-pill-btn:hover { background: #DEDEE3; }
 .wp-pill-btn:disabled { opacity: 0.5; cursor: default; }
 .wp-pill-input { flex: 1; min-width: 0; }
-.wp-pill-input .uic-mention-editor { min-height: 22px; max-height: 40vh; overflow: auto; padding: 6px 4px; font-size: 14px; line-height: 1.45; border: 0; background: transparent; outline: none; }
+.wp-pill-input .uic-mention-editor { min-height: 20px; max-height: 40vh; overflow: auto; padding: 6px 4px; font-size: 14px; line-height: 20px; border: 0; background: none; caret-color: var(--ink); }
+/* the shared editor draws its placeholder at the field's corner; here the text starts 6px down and 4px in, so the placeholder does too */
+.wp-pill-input .uic-mention-editor.is-empty::before { top: 6px; left: 4px; line-height: 20px; }
 .wp-pill-send { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; border: 0; background: var(--soft-2); color: var(--ink-4); cursor: default; flex: none; transition: background 0.15s, color 0.15s; }
 .wp-pill-send.is-on { background: var(--ink); color: #fff; cursor: pointer; }
 .wp-composer-hint, .wp-composer-err { font-size: 11.5px; color: var(--ink-4); padding: 6px 12px 0; }
@@ -195,11 +197,10 @@
 .wp-browser .uic-btn { border-radius: 999px; }
 
 /* ── Preview overlay ───────────────────────────────────────────────────── */
-.wp-overlay { position: fixed; inset: 0; z-index: 80; background: rgba(20, 20, 22, 0.92); display: flex; flex-direction: column; }
-.wp-overlay-head { display: flex; align-items: center; gap: 6px; padding: 10px 12px 10px 16px; color: #fff; }
-.wp-overlay-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
-.wp-overlay-body { flex: 1; min-height: 0; overflow: auto; padding: 0 16px 16px; }
-.wp-overlay-body img { max-width: 100%; max-height: 100%; }
+.wp-viewer-back { position: fixed; inset: 0; z-index: 80; background: rgba(20, 20, 22, 0.55); display: flex; align-items: center; justify-content: center; padding: 24px; }
+.wp-viewer { width: min(1040px, 100%); height: min(86vh, 920px); background: var(--paper); border-radius: 16px; overflow: hidden; box-shadow: 0 24px 64px rgba(0, 0, 0, 0.3); display: flex; }
+.wp-viewer .uic-fp { flex: 1; min-width: 0; }
+.wp-viewer .uic-fp-head { padding: 10px 12px 10px 16px; }
 
 /* ── Hiring ────────────────────────────────────────────────────────────── */
 .wp-hire { max-width: 640px; margin: 0 auto; padding: 28px 16px 56px; display: flex; flex-direction: column; align-items: center; gap: 18px; }
@@ -231,18 +232,23 @@
 @keyframes wp-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
 .wp-hire-thinking { color: var(--ink-2); margin: 0; }
 .wp-hire-slow { color: var(--ink-3); font-size: 12.5px; margin: 0; max-width: 46ch; }
-.wp-hire-card { width: 100%; background: var(--paper); border: 1px solid var(--line); border-radius: 18px; padding: 22px; box-shadow: var(--shadow-1); display: flex; flex-direction: column; gap: 16px; }
-.wp-hire-intro { margin: 0; font-size: 15px; color: var(--ink-2); }
-.wp-q { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
-.wp-q-prompt { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; padding: 0; }
-.wp-q-n { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: var(--soft-2); color: var(--ink-2); font-size: 11px; font-weight: 700; flex: none; }
+.wp-hire-card { width: 100%; background: var(--paper); border: 1px solid var(--line); border-radius: 18px; padding: 24px 24px 18px; box-shadow: var(--shadow-1); display: flex; flex-direction: column; gap: 16px; }
+.wp-hire-card.is-ask { gap: 0; }
+.wp-hire-intro { margin: 0 0 22px; font-size: 14.5px; line-height: 1.5; color: var(--ink-2); }
+.wp-qs { display: flex; flex-direction: column; gap: 24px; }
+.wp-q { display: flex; flex-direction: column; gap: 10px; }
+.wp-q-prompt { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; line-height: 20px; margin: 0; }
+.wp-q-n { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--soft-2); color: var(--ink-2); font-size: 11px; font-weight: 600; }
 .wp-q-multi { font-size: 11px; font-weight: 500; color: var(--ink-3); }
 .wp-q-opts { display: flex; flex-wrap: wrap; gap: 8px; }
-.wp-opt { font-size: 13.5px; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); cursor: pointer; }
+.wp-opt { display: inline-flex; align-items: center; height: 34px; font-size: 13.5px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); cursor: pointer; font-family: inherit; }
 .wp-opt:hover { background: var(--soft); }
 .wp-opt.is-on { background: var(--ink); border-color: var(--ink); color: #fff; }
 .wp-opt.is-other { border-style: dashed; color: var(--ink-2); }
+.wp-opt.is-other.is-on { border-style: solid; color: #fff; }
+.wp-q .wp-hire-input.is-sm { margin-top: 0; max-width: 440px; }
 .wp-hire-acts { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex-wrap: wrap; }
+.wp-hire-card.is-ask .wp-hire-acts { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--line-soft); }
 .wp-hire-acts.is-center { justify-content: center; }
 .wp-hire-step { margin-right: auto; font-size: 12px; color: var(--ink-3); }
 .wp-hire-card.is-reveal { align-items: stretch; }
@@ -276,10 +282,23 @@
 
 /* ── Library ───────────────────────────────────────────────────────────── */
 .wp-page.is-soft, .wp-lib-page { background: var(--soft); }
-.wp-lib { max-width: 1100px; margin: 0 auto; padding: 20px 16px 48px; display: flex; flex-direction: column; gap: 22px; }
-.wp-lib-empty { color: var(--ink-3); }
-.wp-lib-h { display: inline-flex; align-items: center; gap: 8px; border: 0; background: none; padding: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--ink); cursor: pointer; }
-.wp-lib-hash { display: inline-flex; color: var(--ink-3); }
+.wp-lib { max-width: 1180px; margin: 0 auto; padding: 20px 20px 48px; }
+.wp-lib-empty { color: var(--ink-3); margin: 0; }
+.wp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(224px, 1fr)); gap: 14px; }
+.wp-art { display: flex; flex-direction: column; text-align: left; padding: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); overflow: hidden; cursor: pointer; color: var(--ink); font: inherit; transition: box-shadow 120ms, border-color 120ms; }
+.wp-art:hover { border-color: var(--ink-4); box-shadow: 0 6px 20px rgba(29, 29, 31, 0.08); }
+.wp-art:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.wp-art-prev { position: relative; aspect-ratio: 4 / 3; background: var(--soft); border-bottom: 1px solid var(--line-soft); display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.wp-art-prev img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.wp-art-snip { position: absolute; inset: 0; margin: 0; padding: 12px 14px; font-family: var(--mono, ui-monospace, Menlo, monospace); font-size: 11px; line-height: 1.5; color: var(--ink-2); white-space: pre-wrap; overflow-wrap: anywhere; overflow: hidden; text-align: left; -webkit-mask-image: linear-gradient(#000 72%, transparent); mask-image: linear-gradient(#000 72%, transparent); }
+.wp-art-snip.is-doc { font-family: inherit; font-size: 12px; }
+.wp-art-ic { display: inline-flex; opacity: 0.9; }
+.wp-art-body { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px 11px; }
+.wp-art-name { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wp-art-sub { font-size: 11.5px; color: var(--ink-3); }
+.wp-art-by { display: flex; align-items: center; gap: 6px; margin-top: 5px; font-size: 12px; color: var(--ink-2); min-width: 0; }
+.wp-art-by-name { font-weight: 600; white-space: nowrap; }
+.wp-art-by-room { color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ── Splash and crash ──────────────────────────────────────────────────── */
 .wp-splash { flex: 1; display: flex; align-items: center; justify-content: center; padding: 24px; min-height: 100vh; background: var(--paper); }
@@ -318,10 +337,19 @@
   .wp-file-img img { max-width: 100%; }
   .wp-hire { padding: 16px 12px 40px; }
   .wp-sugg { grid-template-columns: 1fr; }
-  .wp-hire-card { padding: 16px; border-radius: 14px; }
+  .wp-hire-card { padding: 16px 16px 14px; border-radius: 14px; }
+  .wp-hire-intro { margin-bottom: 18px; }
+  .wp-qs { gap: 20px; }
+  .wp-opt { font-size: 13px; padding: 0 12px; height: 32px; }
+  .wp-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+  .wp-art-snip { font-size: 10px; padding: 10px; }
+  .wp-viewer-back { padding: 0; }
+  .wp-viewer { width: 100%; height: 100%; border-radius: 0; }
   .wp-reveal-top { flex-direction: column; align-items: flex-start; gap: 12px; }
   .wp-reveal-name { font-size: 20px; }
   .wp-lib { padding: 12px 12px 40px; }
+  .wp-viewer-back { padding: 0; }
+  .wp-viewer { width: 100%; height: 100%; border-radius: 0; }
   .wp-rail.is-open { width: 100vw; }
   .wp-browser.is-full { inset: 8px; }
 }

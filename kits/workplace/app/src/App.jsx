@@ -27,7 +27,7 @@ import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 configureKit({ kitId: KIT_ID });
 
 const CARDS_MS = 6000;
-const TEAMMATES_MS = 30000;
+const TEAMMATES_MS = 10000;   // a teammate hired in another window shows here within ten seconds
 const DOCS_MS = 20000;
 export const TAB_ID = newId('tab');
 

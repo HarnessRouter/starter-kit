@@ -153,13 +153,14 @@ export default function NewTeammate({ first = false }) {
           )}
 
           {step === 'asking' && qset && (
-            <div className="wp-hire-card">
+            <div className="wp-hire-card is-ask">
               {qset.intro ? <p className="wp-hire-intro">{qset.intro}</p> : null}
+              <div className="wp-qs">
               {qset.questions.map((q, qi) => {
                 const a = answers[q.id] || { picked: [], other: '', otherOn: false };
                 return (
-                  <fieldset key={q.id} className="wp-q">
-                    <legend className="wp-q-prompt"><span className="wp-q-n">{qi + 1}</span>{q.prompt}{q.multiple ? <span className="wp-q-multi">pick any</span> : null}</legend>
+                  <div key={q.id} className="wp-q" role="group" aria-labelledby={`q-${q.id}`}>
+                    <div className="wp-q-prompt" id={`q-${q.id}`}><span className="wp-q-n">{qi + 1}</span>{q.prompt}{q.multiple ? <span className="wp-q-multi">pick any</span> : null}</div>
                     <div className="wp-q-opts" role={q.multiple ? 'group' : 'radiogroup'}>
                       {q.options.map((o) => (
                         <button key={o} type="button" role={q.multiple ? 'checkbox' : 'radio'} aria-checked={a.picked.includes(o)} className={`wp-opt${a.picked.includes(o) ? ' is-on' : ''}`} onClick={() => toggle(q, o)}>{o}</button>
@@ -167,9 +168,10 @@ export default function NewTeammate({ first = false }) {
                       <button type="button" role={q.multiple ? 'checkbox' : 'radio'} aria-checked={!!a.otherOn} className={`wp-opt is-other${a.otherOn ? ' is-on' : ''}`} onClick={() => toggleOther(q)}>{OTHER}…</button>
                     </div>
                     {a.otherOn ? <input className="wp-hire-input is-sm" value={a.other} autoFocus placeholder="Say it in your words" onChange={(e) => setAnswers((x) => ({ ...x, [q.id]: { ...a, other: e.target.value } }))} /> : null}
-                  </fieldset>
+                  </div>
                 );
               })}
+              </div>
               <div className="wp-hire-acts">
                 <span className="wp-hire-step">{answered ? `${answeredN} of ${qset.questions.length} answered` : 'Pick at least one answer'} · round {rounds} of {MAX_ROUNDS}</span>
                 <button type="button" className="wp-btn is-primary" onClick={submitAnswers} disabled={!answered}>Continue</button>
