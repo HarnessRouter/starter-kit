@@ -6,7 +6,7 @@ import { useWorkplace } from '../App.jsx';
 import { Avatar } from '../lib/avatars.jsx';
 import { sessionFiles } from '../lib/api.js';
 import { BrowserCard } from './BrowserCard.jsx';
-import { FileChips } from './Files.jsx';
+import { ArtifactCard } from './Files.jsx';
 import { ErrorBoundary } from './ErrorBoundary.jsx';
 
 const WIDE = 1200;
@@ -40,7 +40,7 @@ export function useArtifacts(sessions, key) {
   return files;
 }
 
-export default function Rail({ open, onClose, teammate, members = [], sessions = [], live = {}, busySessions = [], refreshKey = 0, onOpenFile, title = 'Details' }) {
+export default function Rail({ open, onClose, teammate, members = [], sessions = [], live = {}, busySessions = [], refreshKey = 0, onOpenFile, title = 'Details', makers = null }) {
   const { teammates, navigate } = useWorkplace();
   const files = useArtifacts(sessions, refreshKey);
   const liveList = useMemo(() => Object.entries(live || {}).filter(([, v]) => v), [live]);
@@ -113,7 +113,11 @@ export default function Rail({ open, onClose, teammate, members = [], sessions =
 
         <section className="wp-rail-sec">
           <h3>Artifacts <span className="wp-count">{files.length}</span></h3>
-          {files.length ? <FileChips files={files} onOpen={onOpenFile} /> : <p className="wp-rail-empty">Files a teammate makes in this conversation appear here.</p>}
+          {files.length ? (
+            <div className="wp-rail-arts">
+              {files.map((f) => <ArtifactCard key={`${f.container_id}:${f.file_id}`} file={f} teammate={makers?.[f.session] || teammate || null} compact onOpen={onOpenFile} />)}
+            </div>
+          ) : <p className="wp-rail-empty">Files a teammate makes in this conversation appear here.</p>}
           <button type="button" className="wp-linkbtn" onClick={() => navigate('artifacts')}>All artifacts</button>
         </section>
         </ErrorBoundary>

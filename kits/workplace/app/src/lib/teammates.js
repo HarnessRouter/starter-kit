@@ -78,9 +78,21 @@ function packageFiles() {
   return _pkg;
 }
 
-/** The plugins this workspace has connected, by type. */
+/** The plugins this workspace has connected, by type. The browser is what every teammate needs
+ *  (the teammate package requires it) and the platform provides it without a credential from the
+ *  workspace, so a workspace that has not connected it yet gets it connected here: in a fresh
+ *  workspace the whole team was "blocked, no browser" on its first campaign (2026-10-01). */
 export async function connectedPlugs() {
-  try { const d = await hr('/plugs'); return (d?.plugs || []).filter((p) => p.status === 'connected').map((p) => p.type); } catch { return []; }
+  try {
+    const d = await hr('/plugs');
+    const plugs = d?.plugs || [];
+    const browser = plugs.find((p) => p.type === 'browser');
+    if (browser && browser.status !== 'connected' && !(browser.secrets_needed || []).length) {
+      try { const r = await hr('/plugs/browser', jsonInit('PUT', { enabled: true, config: {} })); if (r?.status === 'connected') browser.status = 'connected'; }
+      catch { /* stays as listed; the teammate is created without it */ }
+    }
+    return plugs.filter((p) => p.status === 'connected').map((p) => p.type);
+  } catch { return []; }
 }
 
 /** Create the teammate. `onStep` narrates for the person; each step is a real call. */

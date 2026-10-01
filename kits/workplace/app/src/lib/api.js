@@ -35,11 +35,11 @@ export async function settled(sid, { timeoutMs = 15 * 60 * 1000, every = 3000 } 
   }
 }
 
-/** The last assistant text of a session once its turn is over. */
+/** A session's last turn once it is over: what was asked, what was answered, its response id. */
 export async function lastText(sid) {
   const turns = await sessionTurns(sid, { limit: 1 });
   const t = turns[turns.length - 1];
-  return { text: String(t?.assistant || ''), status: String(t?.status || ''), files: t?.files || [] };
+  return { id: String(t?.id || ''), user: String(t?.user || ''), text: String(t?.assistant || ''), status: String(t?.status || ''), files: t?.files || [] };
 }
 
 // ── files ──────────────────────────────────────────────────────────────────
@@ -51,10 +51,11 @@ function normFile(f, sid) {
            url: containerFileUrl(container, file_id) };
 }
 
-/** Everything in a session's workspace, from its last checkpoint. */
+/** Everything in a session's workspace, from its last checkpoint, except the copies handed in from
+ *  the room (`shared/`, see engine.js): those are another teammate's artifacts, listed once there. */
 export async function sessionFiles(sid) {
   const d = await hr(`/sessions/${encodeURIComponent(sid)}/files`);
-  return (d?.files || []).filter((f) => f && (f.file_id || f.id)).map((f) => normFile(f, sid));
+  return (d?.files || []).filter((f) => f && (f.file_id || f.id)).map((f) => normFile(f, sid)).filter((f) => !/^shared\//.test(f.path));
 }
 
 /** What the most recent turn created or changed. */

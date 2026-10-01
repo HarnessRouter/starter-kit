@@ -1,9 +1,9 @@
-// A teammate's face is a blob: one of eight shapes in one of ten colours, with two white eye
+// A teammate's face is a blob: one of nine shapes in one of ten colours, with two white eye
 // slits. Plain data here, so the recruiter protocol and the tests never pull React in; the
 // drawing is in avatars.jsx. Eighty faces, all of one family, so a room full of teammates reads
 // as one team and each one is still its own.
-export const SHAPES = ['round', 'tilt', 'square', 'wide', 'triangle', 'hex', 'cloud', 'drop'];
-export const SHAPE_LABELS = { round: 'Round', tilt: 'Tilted', square: 'Square', wide: 'Wide', triangle: 'Triangle', hex: 'Hexagon', cloud: 'Cloud', drop: 'Drop' };
+export const SHAPES = ['round', 'drop', 'star', 'tilt', 'square', 'wide', 'triangle', 'hex', 'cloud'];
+export const SHAPE_LABELS = { round: 'Round', drop: 'Drop', star: 'Star', tilt: 'Tilted', square: 'Square', wide: 'Wide', triangle: 'Triangle', hex: 'Hexagon', cloud: 'Cloud' };
 
 export const COLORS = {
   brown: '#8E5B3C', red: '#E23D3A', orange: '#F0661A', amber: '#F5A21B', green: '#38C25D',

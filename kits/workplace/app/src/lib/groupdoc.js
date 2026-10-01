@@ -124,29 +124,39 @@ export function renderDelta(messages, roster, me) {
   }).join('\n\n');
 }
 
-/** Who answers a human message, in what order: the mentioned, in the order mentioned, then the rest of the room. */
-export function planRound(doc, msg, roster) {
+/** Who still owes the room a turn, in the order they take it. A teammate owes one when a
+ *  person wrote something it has not seen (everyone looks; the mentioned answer first, in the
+ *  order mentioned, then the rest of the room judge), or when another teammate's reply mentioned
+ *  it (a follow-up, one hop further from the person's message, up to MAX_HOPS). Read from the
+ *  document alone: a teammate's `seen` cursor is its memory of the room, so whichever tab holds
+ *  the room continues exactly where the last one stopped, with nothing kept in a tab. */
+export function planPending(doc, roster) {
   const members = doc.members.filter((id) => roster.some((t) => t.id === id));
-  const all = mentionsAll(msg.text);
-  const mentioned = (msg.mentions || []).filter((id) => members.includes(id));
-  const rest = members.filter((id) => !mentioned.includes(id));
-  return [
-    ...mentioned.map((id) => ({ id, hop: 0, mentioned: true, cause: msg.id })),
-    ...rest.map((id) => ({ id, hop: 0, mentioned: all, cause: msg.id })),
-  ];
-}
-
-/** After a teammate's reply: who it pulled in, if the chain may continue. */
-export function planFollowUps(doc, reply, queue, done) {
-  if ((reply.hop ?? 0) >= MAX_HOPS) return [];
-  const out = [];
-  for (const id of reply.mentions || []) {
-    if (id === reply.from.id || !doc.members.includes(id)) continue;
-    const key = `${reply.id}:${id}`;
-    if (done.has(key) || queue.some((q) => q.id === id && q.cause === reply.id)) continue;
-    out.push({ id, hop: (reply.hop ?? 0) + 1, mentioned: true, cause: reply.id });
-  }
-  return out;
+  const jobs = new Map();
+  doc.messages.forEach((m, idx) => {
+    if (!m || !m.from || m.from.kind === 'system') return;
+    const human = m.from.kind === 'member';
+    const all = human && mentionsAll(m.text);
+    for (const id of members) {
+      if (idx < (Number(doc.bots?.[id]?.seen) || 0)) continue;    // already in its past
+      const named = m.from.id !== id && (m.mentions || []).includes(id);
+      let j = jobs.get(id);
+      if (human) {
+        if (!j) j = { id, hop: 0, mentioned: false, cause: m.id, rank: 2, order: Infinity };
+        else { j.hop = 0; j.cause = m.id; }
+        if (named || all) { j.mentioned = true; j.rank = Math.min(j.rank, named ? 0 : 1); }
+        if (named) j.order = Math.min(j.order, idx * 1000 + m.mentions.indexOf(id));
+      } else if (named && (m.hop ?? 0) < MAX_HOPS) {
+        if (!j) j = { id, hop: (m.hop ?? 0) + 1, mentioned: true, cause: m.id, rank: 1, order: idx * 1000 };
+        else if (!j.mentioned) { j.mentioned = true; j.rank = 1; j.cause = m.id; j.order = idx * 1000; }
+      } else continue;
+      jobs.set(id, j);
+    }
+  });
+  const pos = (id) => members.indexOf(id);
+  return [...jobs.values()]
+    .sort((a, b) => a.rank - b.rank || a.order - b.order || pos(a.id) - pos(b.id))
+    .map(({ id, hop, mentioned, cause }) => ({ id, hop, mentioned, cause }));
 }
 
 export function isSkip(text) {
@@ -166,8 +176,15 @@ export function roundHeldByOther(doc, tabId, now = Date.now()) {
   return !!(r && r.by && r.by !== tabId && now - Number(r.at) < ROUND_STALE_MS);
 }
 
-/** Human messages the round should still answer: those after the round began that no teammate has seen. */
-export function pendingHuman(doc, sinceId) {
-  const i = doc.messages.findIndex((m) => m.id === sinceId);
-  return doc.messages.slice(i + 1).filter((m) => m.from.kind === 'member');
+/** Teammates marked as typing: while a tab drives the room that is the one it is running; with
+ *  no live driver it is a turn whose driver vanished, still running (or finished) in the
+ *  teammate's session, and the next driver reads it back from there. */
+export function orphans(doc) {
+  return Object.entries(doc.typing || {}).filter(([, v]) => v && v.on).map(([id]) => ({ id, session: doc.bots?.[id]?.session || '' }));
+}
+
+/** Whether this tab should take the room: nobody alive is driving, and there is work. */
+export function needsDriver(doc, roster, tabId, now = Date.now()) {
+  if (!doc || roundHeldByOther(doc, tabId, now)) return false;
+  return orphans(doc).length > 0 || planPending(doc, roster).length > 0;
 }

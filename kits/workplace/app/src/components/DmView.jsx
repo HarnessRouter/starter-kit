@@ -1,6 +1,7 @@
 // A direct message: one person, one teammate, one session that is the whole history. The first
 // message opens the session; everything after is a turn on it. While a turn runs the teammate's
-// tools show inside its bubble, and its screen, if it opens one, in the panel.
+// tools show inside its bubble, and its screen, if it opens one, in the panel. A turn started from
+// another window (another machine, the same login) shows the same way, from the event stream.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Menu, MoreHorizontal, PanelRight } from 'lucide-react';
 import { Popover, useDialog, withReasoning, withResult, withStep, withText } from 'reifyui';
@@ -10,10 +11,12 @@ import { Avatar } from '../lib/avatars.jsx';
 import { isLive } from '../lib/api.js';
 import { findDm, sendDm } from '../lib/dm.js';
 import { removeTeammate } from '../lib/teammates.js';
+import { watchTurn } from '../lib/bus.js';
 import Composer from './Composer.jsx';
 import Rail, { useRail } from './Rail.jsx';
 import { Bubble, withTimeLabels } from './Message.jsx';
-import { useFileOverlay } from './Files.jsx';
+import { useFilePane } from './Files.jsx';
+import { Markdown } from './Markdown.jsx';
 
 const POLL_MS = 3000;
 
@@ -38,6 +41,7 @@ export default function DmView({ teammate }) {
   const [sid, setSid] = useState(card?.id || '');
   const [turns, setTurns] = useState(null);
   const [live, setLive] = useState(null);
+  const [extLive, setExtLive] = useState(null);   // a turn another window started, as it runs
   const [pendingText, setPendingText] = useState('');
   const [railOpen, setRailOpen] = useRail();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -45,10 +49,17 @@ export default function DmView({ teammate }) {
   const [tick, setTick] = useState(0);
   const menuRef = useRef(null);
   const bodyRef = useRef(null);
-  const files = useFileOverlay();
+  const files = useFilePane({ renderMarkdown: (text) => <Markdown text={text} /> });
+  // The preview takes the rail's place while a file is open (two side panels would squeeze the
+  // conversation to a column); the rail comes back when the preview closes, if it was open.
+  const railBefore = useRef(null);
+  useEffect(() => {
+    if (files.file) { if (railBefore.current === null) { railBefore.current = railOpen; setRailOpen(false); } }
+    else if (railBefore.current !== null) { const was = railBefore.current; railBefore.current = null; if (was) setRailOpen(true); }
+  }, [files.file]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { if (!sid && card?.id) setSid(card.id); }, [card?.id, sid]);
-  const externalBusy = !!(card && isLive(card)) && !live;
+  const externalBusy = (!!(card && isLive(card)) || !!extLive) && !live;
   const busy = !!live || externalBusy;
 
   const load = useCallback(async () => {
@@ -69,6 +80,21 @@ export default function DmView({ teammate }) {
     document.addEventListener('visibilitychange', onVis);
     return () => { window.clearInterval(id); document.removeEventListener('visibilitychange', onVis); };
   }, [live, load]);
+  // The teammate's Harness broadcasts every session's events; this session's are rendered live the
+  // way this tab's own turns are (its user text at once, then tools and text as they happen), and
+  // the turn list is reloaded once it ends. This tab's own turn arrives on the stream too; it is
+  // already rendered from the POST, so the stream is ignored while `live` is set.
+  const liveRef = useRef(live);
+  liveRef.current = live;
+  useEffect(() => {
+    if (!sid) return undefined;
+    const blocks = (v) => { const b = []; if (v.steps.length) b.push({ kind: 'tools', reasoning: '', steps: v.steps }); if (v.text) b.push({ kind: 'text', text: v.text }); return b; };
+    return watchTurn({
+      harnessId: teammate.id, sessionId: sid,
+      onLive: (v) => { if (!liveRef.current) setExtLive({ user: v.user, blocks: blocks(v) }); },
+      onDone: async () => { if (liveRef.current) return; await load(); setExtLive(null); setTick((n) => n + 1); refreshCards(); },
+    });
+  }, [sid, teammate.id, load, refreshCards]);
   const wasBusy = useRef(false);
   useEffect(() => { if (wasBusy.current && !busy) { load(); setTick((n) => n + 1); } wasBusy.current = busy; }, [busy, load]);
 
@@ -120,23 +146,25 @@ export default function DmView({ teammate }) {
     const items = [];
     let prev = '';
     const add = (at, key, from, props) => { const first = prev !== from.kind; prev = from.kind; items.push({ at, node: <Bubble key={key} from={from} first={first} teammates={teammates} onMention={(id) => navigate(`dm/${id}`)} onOpenFile={files.open} {...props} /> }); };
+    const shown = live || (extLive ? { blocks: extLive.blocks, status: 'running' } : null);
     for (const [i, t] of (turns || []).entries()) {
       const at = turnTime(t);
       if (t.user) add(at, `u${i}`, mine, { text: t.user, attachments: (t.user_files || []).map((f) => ({ name: f.name })) });
       for (const m of turnsToMessages([t]).filter((x) => x.role === 'assistant')) {
-        const running = m.status === 'running' && !(live && i === turns.length - 1);
+        const running = m.status === 'running' && !(shown && i === turns.length - 1);
         add(at, `a${i}`, them, { turn: running ? m : { ...m, status: m.status === 'running' ? 'done' : m.status }, files: turnFiles(t, sid) });
       }
     }
     if (pendingText && !(turns || []).some((t) => String(t.user || '') === pendingText)) add(Date.now(), 'pending', mine, { text: pendingText });
-    if (live) add(Date.now(), 'live', them, { turn: live });
+    if (!live && extLive?.user && !(turns || []).some((t) => String(t.user || '') === extLive.user)) add(Date.now(), 'ext-user', mine, { text: extLive.user });
+    if (shown) add(Date.now(), 'live', them, { turn: shown });
     return withTimeLabels(items, (it) => it.node.key);
-  }, [turns, live, pendingText, me, teammate, teammates, sid, navigate, files.open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [turns, live, extLive, pendingText, me, teammate, teammates, sid, navigate, files.open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { const el = bodyRef.current; if (el) el.scrollTop = el.scrollHeight; }, [rows.length, live?.blocks?.length]);
+  useEffect(() => { const el = bodyRef.current; if (el) el.scrollTop = el.scrollHeight; }, [rows.length, live?.blocks?.length, extLive?.blocks?.length]);
 
   return (
-    <div className="wp-room">
+    <div className={`wp-room${files.file ? ' has-preview' : ''}`}>
       <div className="wp-conv">
         <header className="wp-head">
           <button type="button" className="wp-iconbtn wp-menubtn" onClick={openDrawer} aria-label="Rooms"><Menu size={20} /></button>
@@ -172,9 +200,9 @@ export default function DmView({ teammate }) {
         <Composer placeholder={`Message ${teammate.name}`} disabled={busy} onSend={send} autoFocus
                   hint={busy ? `${teammate.name} is working on your last message.` : ''} />
       </div>
+      {files.pane}
       <Rail open={railOpen} onClose={() => setRailOpen(false)} teammate={teammate} sessions={sid ? [sid] : []} title={teammate.name}
             busySessions={busy && sid ? [{ sid, busy: true, name: teammate.name }] : []} refreshKey={tick} onOpenFile={files.open} />
-      {files.overlay}
     </div>
   );
 }

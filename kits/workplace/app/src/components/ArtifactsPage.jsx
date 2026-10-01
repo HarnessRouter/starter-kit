@@ -3,47 +3,18 @@
 // in which room. Read from the sessions' workspaces when the page opens; nothing is indexed, so
 // nothing can be out of date. A card opens the same viewer a task's artifact opens in the console.
 import React, { useEffect, useMemo, useState } from 'react';
-import { Menu } from 'lucide-react';
-import { FileTypeIcon, bytesLabel } from 'reifyui';
+import { Menu, Search, X } from 'lucide-react';
 import { useWorkplace } from '../App.jsx';
-import { Avatar } from '../lib/avatars.jsx';
-import { isImage, sessionFiles } from '../lib/api.js';
+import { sessionFiles } from '../lib/api.js';
 import { findDm } from '../lib/dm.js';
-import { useFileOverlay } from './Files.jsx';
-
-const kindOf = (name) => { const m = String(name || '').toLowerCase().match(/\.([a-z0-9]+)$/); return m ? m[1].toUpperCase() : 'File'; };
-const TEXTY = /\.(md|markdown|txt|csv|tsv|json|ya?ml|toml|py|js|mjs|ts|tsx|jsx|html?|css|sh|sql|log|xml|svg|ini|cfg|env)$/i;
-const DOCY = /\.(md|markdown|txt)$/i;
-const SNIPPET_MAX_BYTES = 256 * 1024;
-const snippets = new Map();   // url -> text, read once per page life
-
-/** The first lines of a text file, read once. Nothing is shown until the bytes are here. */
-function Snippet({ file }) {
-  const [text, setText] = useState(snippets.get(file.url) ?? null);
-  useEffect(() => {
-    if (text !== null || snippets.has(file.url)) return undefined;
-    let alive = true;
-    fetch(file.url).then((r) => (r.ok ? r.text() : '')).then((t) => {
-      const head = t.replace(/\r/g, '').split('\n').slice(0, 14).join('\n').slice(0, 700);
-      snippets.set(file.url, head);
-      if (alive) setText(head);
-    }).catch(() => { snippets.set(file.url, ''); if (alive) setText(''); });
-    return () => { alive = false; };
-  }, [file.url, text]);
-  if (!text) return <span className="wp-art-ic"><FileTypeIcon name={file.filename} size={44} /></span>;
-  return <pre className={`wp-art-snip${DOCY.test(file.filename) ? ' is-doc' : ''}`} aria-hidden="true">{text}</pre>;
-}
-
-function Preview({ file }) {
-  if (isImage(file)) return <img src={file.url} alt="" loading="lazy" />;
-  if (TEXTY.test(file.filename) && (file.bytes == null || file.bytes <= SNIPPET_MAX_BYTES)) return <Snippet file={file} />;
-  return <span className="wp-art-ic"><FileTypeIcon name={file.filename} size={44} /></span>;
-}
+import { ArtifactCard, useFilePane } from './Files.jsx';
+import { Markdown } from './Markdown.jsx';
 
 export default function ArtifactsPage() {
   const { me, cards, teammates, groupCards, docs, openDrawer } = useWorkplace();
   const [items, setItems] = useState(null);
-  const files = useFileOverlay();
+  const [q, setQ] = useState('');
+  const files = useFilePane({ renderMarkdown: (text) => <Markdown text={text} /> });
 
   // The conversations to read: each teammate's direct message, each group's teammate sessions;
   // every session names the teammate whose work it holds, which is who made the files in it.
@@ -83,38 +54,39 @@ export default function ArtifactsPage() {
     return () => { alive = false; };
   }, [convKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The search reads what the card shows: the name, the type, who made it and where.
+  const needle = q.trim().toLowerCase();
+  const shown = items === null ? null : (needle ? items.filter(({ file, teammate, room }) =>
+    [file.filename, file.path, teammate?.name, room].some((v) => String(v || '').toLowerCase().includes(needle))) : items);
   const rooms = new Set((items || []).map((i) => i.convKey)).size;
   const total = (items || []).length;
   return (
-    <div className="wp-page">
+    <div className={`wp-page${files.file ? ' has-preview' : ''}`}>
       <header className="wp-head is-page">
         <button type="button" className="wp-iconbtn wp-menubtn" onClick={openDrawer} aria-label="Rooms"><Menu size={20} /></button>
         <div className="wp-head-titles"><h1 className="wp-head-title">Artifacts</h1><div className="wp-head-sub">{items === null ? 'Looking…' : `${total} file${total === 1 ? '' : 's'} across ${rooms} conversation${rooms === 1 ? '' : 's'}`}</div></div>
+        <label className="wp-search wp-lib-search">
+          <Search size={14} />
+          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search artifacts" aria-label="Search artifacts" />
+          {q ? <button type="button" className="wp-search-x" onClick={() => setQ('')} aria-label="Clear"><X size={12} /></button> : null}
+        </label>
       </header>
+      <div className="wp-page-row">
       <div className="wp-page-scroll">
         <div className="wp-lib">
           {items && !items.length ? <p className="wp-lib-empty">Nothing yet. Ask a teammate for a report, a spreadsheet or an image; what they make lands here.</p> : null}
-          {items && items.length ? (
+          {shown && !shown.length && items && items.length ? <p className="wp-lib-empty">Nothing matches "{q}".</p> : null}
+          {shown && shown.length ? (
             <div className="wp-grid">
-              {items.map(({ file, teammate, room }) => (
-                <button key={`${file.container_id}:${file.file_id}`} type="button" className="wp-art" onClick={() => files.open(file)} title={file.path || file.filename}>
-                  <span className="wp-art-prev"><Preview file={file} /></span>
-                  <span className="wp-art-body">
-                    <span className="wp-art-name">{file.filename}</span>
-                    <span className="wp-art-sub">{kindOf(file.filename)}{file.bytes != null ? ` · ${bytesLabel(file.bytes)}` : ''}</span>
-                    <span className="wp-art-by">
-                      {teammate ? <Avatar avatar={teammate.avatar} id={teammate.id} size={18} /> : null}
-                      <span className="wp-art-by-name">{teammate ? teammate.name : 'A teammate'}</span>
-                      <span className="wp-art-by-room">· {room}</span>
-                    </span>
-                  </span>
-                </button>
+              {shown.map(({ file, teammate, room }) => (
+                <ArtifactCard key={`${file.container_id}:${file.file_id}`} file={file} teammate={teammate} room={room} onOpen={files.open} />
               ))}
             </div>
           ) : null}
         </div>
       </div>
-      {files.overlay}
+      {files.pane}
+      </div>
     </div>
   );
 }
