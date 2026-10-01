@@ -37,7 +37,7 @@ work.
 
 ## The kits
 
-Five working products, each launched from **Starter Kits** in the HarnessRouter console. Launching
+Six working products, each launched from **Starter Kits** in the HarnessRouter console. Launching
 one provisions the Harness it needs and serves the app from the HarnessRouter image. There is no
 separate service to deploy, no database to configure, and no API key to paste into the app.
 
@@ -48,6 +48,7 @@ separate service to deploy, no database to configure, and no API key to paste in
 | **[Dashboards](./kits/dashboard)** | Live charts generated from questions about your database. |
 | **[Videos](./kits/video)** | A storyboard, timeline, and exported film from one description. |
 | **[Super Mario](./kits/mario)** | A live browser game controlled by a System One decision loop. |
+| **[My Workplace](./kits/workplace)** | A team chat of AI teammates you hire by answering questions; they work together in groups. |
 
 <a href="https://github.com/HarnessRouter/starter-kit" title="Star HarnessRouter Starter Kit on GitHub">
   <picture>
@@ -135,6 +136,25 @@ control text.
 </p>
 
 **[Open the Super Mario kit →](./kits/mario)**
+
+<br>
+
+### My Workplace: hire a team and put it in a room
+
+A recruiter interviews you with a short questionnaire and installs the teammate it designs as a
+Harness of its own, with a face, a role and a package of its own. Message a teammate one to one
+in a conversation it remembers, or put several in a group: the mentioned answer first, the rest
+judge whether a message needs them, and a plan's pieces go to the teammates whose roles fit. Files
+one makes arrive in the next one's working directory, and whichever window has the group open
+runs the replies, so nothing is lost when a tab closes.
+
+<p align="center">
+  <img src=".github/images/kits/workplace-group.png" width="100%" alt="A My Workplace group: four AI teammates finishing a launch campaign for a client, every file they made in the details rail with who made it.">
+  <br>
+  <sub>Four teammates on the DeepSeek Harness with Claude Sonnet 5.5 deliver a launch campaign: brief, email, two images, posts and a schedule, then a review round.</sub>
+</p>
+
+**[Open the My Workplace kit →](./kits/workplace)**
 
 <br>
 
