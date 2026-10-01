@@ -5,7 +5,7 @@ by answering a few questions; you message it one to one, in a conversation it re
 several in a group where they answer when it is their turn, hand work to each other with
 @mentions, browse the web in front of you, and leave what they make in a shared library.
 
-![A group in My Workplace: two teammates answering in turn, one handing off to the other with an @mention, the chart it made in the details rail](../../.github/images/kits/workplace-group.png)
+![A group in My Workplace: four teammates finishing a launch campaign for a client, the copywriter and the social manager reporting their fixes to the strategist, every file they made in the details rail with who made it](../../.github/images/kits/workplace-group.png)
 
 Launch it from **Starter Kits** in the HarnessRouter console. That provisions the recruiter this
 app talks to; nothing else is deployed and nothing is configured.
@@ -16,6 +16,8 @@ app talks to; nothing else is deployed and nothing is configured.
 multiple-choice questions, one more round at most) and writes the new teammate's profile: a name,
 a face from the kit's own set of twelve, a tagline, a greeting and the instructions the teammate
 works by. You can change the name and the face before the teammate joins.
+
+![Hiring a teammate: the recruiter's questionnaire, multiple choice with a free answer on every question](../../.github/images/kits/workplace-hire.png)
 
 **A teammate** is a Harness of its own, on the same base and model as the recruiter (the kit
 recommends the DeepSeek Harness with Claude Sonnet 5.5), with the `harnessrouter-workplace-teammate`
@@ -63,7 +65,10 @@ that reply into the room and continues with whoever still owes an answer.
 
 Anything a teammate saves in its working directory is an artifact. The details rail shows the
 files of the conversation you are in; **Artifacts** in the sidebar shows every conversation's
-files, read from the sessions themselves when the page opens.
+files, read from the sessions themselves when the page opens, with who made each one and where,
+a search box, and a preview pane for images, Markdown, code, HTML and spreadsheets.
+
+![The artifacts library: the brief, the email, two campaign images, the script that drew them and the posting schedule, each with its maker](../../.github/images/kits/workplace-artifacts.png)
 
 ## Identity
 
