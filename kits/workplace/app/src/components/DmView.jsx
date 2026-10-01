@@ -35,7 +35,7 @@ function turnFiles(t, sid) {
 
 export default function DmView({ teammate }) {
   const wp = useWorkplace();
-  const { me, cards, teammates, navigate, markLive, markSeen, refreshCards, refreshTeammates, openDrawer } = wp;
+  const { me, cards, cardsLoaded, teammates, navigate, markLive, markSeen, refreshCards, refreshTeammates, openDrawer } = wp;
   const dialog = useDialog();
   const card = findDm(cards, teammate.id, me);
   const [sid, setSid] = useState(card?.id || '');
@@ -60,7 +60,11 @@ export default function DmView({ teammate }) {
 
   useEffect(() => { if (!sid && card?.id) setSid(card.id); }, [card?.id, sid]);
   const externalBusy = (!!(card && isLive(card)) || !!extLive) && !live;
-  const busy = !!live || externalBusy;
+  // Nothing is sent before the card list has been read once: the direct message is found in that
+  // list, and a message sent before it arrived opened a second conversation with the same teammate
+  // (hosted, where the list lands later, 2026-10-01).
+  const finding = !sid && !cardsLoaded;
+  const busy = !!live || externalBusy || finding;
 
   const load = useCallback(async () => {
     if (!sid) { setTurns([]); return; }
@@ -198,7 +202,7 @@ export default function DmView({ teammate }) {
         </div>
 
         <Composer placeholder={`Message ${teammate.name}`} disabled={busy} onSend={send} autoFocus
-                  hint={busy ? `${teammate.name} is working on your last message.` : ''} />
+                  hint={finding ? 'Opening your conversation…' : busy ? `${teammate.name} is working on your last message.` : ''} />
       </div>
       {files.pane}
       <Rail open={railOpen} onClose={() => setRailOpen(false)} teammate={teammate} sessions={sid ? [sid] : []} title={teammate.name}

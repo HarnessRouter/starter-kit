@@ -86,6 +86,7 @@ function Workplace() {
   const [bootErr, setBootErr] = useState('');
   const [teammates, setTeammates] = useState(null); // null = loading
   const [cards, setCards] = useState([]);
+  const [cardsAt, setCardsAt] = useState(0);        // when the list was first read: a direct message is found in it, so nothing is sent before
   const [docs, setDocs] = useState({});             // group session id -> document
   const docsAt = useRef({});
   const [liveLocal, setLiveLocal] = useState({});   // teammate id -> true while this tab runs its turn
@@ -108,7 +109,7 @@ function Workplace() {
   const harnessIds = useMemo(() => [rec?.id, ...(teammates || []).map((t) => t.id)].filter(Boolean), [rec, teammates]);
   const refreshCards = useCallback(async () => {
     if (!me || !harnessIds.length) return;
-    try { setCards(await listCards(me, harnessIds)); } catch { /* keep the last list */ }
+    try { setCards(await listCards(me, harnessIds)); setCardsAt((t) => t || Date.now()); } catch { /* keep the last list */ }
   }, [me, harnessIds]);
 
   const ready = !!rec && !!me;
@@ -150,9 +151,9 @@ function Workplace() {
   const unread = useCallback((key, marker) => !!marker && seen[key] !== undefined && seen[key] !== marker, [seen]);
 
   const value = useMemo(() => ({
-    route, navigate, rec, me, teammates, refreshTeammates, cards, refreshCards, groupCards, docs, setDoc,
+    route, navigate, rec, me, teammates, refreshTeammates, cards, cardsLoaded: cardsAt > 0, refreshCards, groupCards, docs, setDoc,
     working, markLive, markSeen, unread, openDrawer: () => setDrawer(true), closeDrawer: () => setDrawer(false), tabId: TAB_ID,
-  }), [route, rec, me, teammates, refreshTeammates, cards, refreshCards, groupCards, docs, setDoc, working, markLive, markSeen, unread]);
+  }), [route, rec, me, teammates, refreshTeammates, cards, cardsAt, refreshCards, groupCards, docs, setDoc, working, markLive, markSeen, unread]);
 
   useEffect(() => { setDrawer(false); }, [route.kind, route.id]);
 

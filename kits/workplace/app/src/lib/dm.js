@@ -4,7 +4,7 @@
 import { patchSession, sessionTurns, streamTurn, turnsToMessages } from 'reifyui/harness';
 import { DM_TITLE } from './kit.js';
 import { mine } from './auth.js';
-import { turnInput } from './api.js';
+import { listCards, turnInput } from './api.js';
 
 export const dmTitle = (me) => `${DM_TITLE} · ${me?.name || 'me'}`;
 
@@ -31,6 +31,12 @@ export async function loadDm(sid) {
  *  and not the finish; a follow-up turn renamed the session again). The name is how the direct
  *  message is found next time, so it is put back when the turn is over. */
 export async function sendDm({ sid, bot, me, text, files = [], handlers = {} }) {
+  // Before opening a new conversation, look once more for the existing one: the caller's list may
+  // be older than the conversation (another window opened it a moment ago).
+  if (!sid) {
+    const found = findDm(await listCards(me, [bot.id]).catch(() => []), bot.id, me);
+    if (found) { sid = found.id; handlers.onSession?.(sid); }
+  }
   let session = sid || '';
   const r = await streamTurn({
     sessionId: sid, harnessId: bot.id, input: turnInput(text, files), instructions: dmInstructions(bot, me),
