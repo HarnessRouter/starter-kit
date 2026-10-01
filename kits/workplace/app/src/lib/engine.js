@@ -151,9 +151,13 @@ async function runTurn(ctx, job) {
     const t = await lastText(sid).catch(() => ({ text: '', status: '' }));
     text = t.text; status = t.status || status; rid = rid || t.id || '';
   }
-  const failed = status === 'connecting' || status === 'failed' || (r && r.ok === false && !text);
+  // A stopped turn (a person cancelled it) is neither a reply nor a failure: nothing is posted
+  // and the teammate counts the messages as seen, so no window runs the same turn again on its
+  // own; a fresh mention brings the teammate back. Its partial text was posted as an answer once.
+  const stopped = status === 'cancelled';
+  const failed = !stopped && (status === 'connecting' || status === 'failed' || (r && r.ok === false && !text));
   ctx.setRunning?.(null);
-  return finishTurn(ctx, bot, job, { sid, rid, text, status, failed });
+  return finishTurn(ctx, bot, job, { sid, rid, text: stopped ? '' : text, status, failed });
 }
 
 /** A teammate marked as typing with no driver alive: its turn went on in its session. Wait for
@@ -175,8 +179,9 @@ async function harvestTurn(ctx, { id, session }) {
   // reply the vanished tab did write just before it went: nothing to add.
   if (!ours || (t.id && doc.messages.some((m) => m.response === t.id))) { await clear(); return { reply: null, failed: false }; }
   const job = planPending(doc, ctx.roster).find((j) => j.id === bot.id) || { hop: 0, cause: '' };
-  const failed = t.status !== 'completed' && !t.text;
-  return finishTurn(ctx, bot, job, { sid: session, rid: t.id, text: t.text, status: t.status, failed });
+  const stopped = t.status === 'cancelled';
+  const failed = !stopped && t.status !== 'completed' && !t.text;
+  return finishTurn(ctx, bot, job, { sid: session, rid: t.id, text: stopped ? '' : t.text, status: t.status, failed });
 }
 
 /** Drive the room until nobody owes it a turn: claim it, read back any turn whose driver
