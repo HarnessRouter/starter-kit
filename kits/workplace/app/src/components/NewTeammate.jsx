@@ -27,7 +27,9 @@ function Slow({ since }) {
 }
 
 export default function NewTeammate({ first = false }) {
-  const { me, rec, navigate, refreshTeammates, openDrawer } = useWorkplace();
+  const { me, rec, teammates, navigate, refreshTeammates, openDrawer } = useWorkplace();
+  const taken = (teammates || []).map((t) => t.name);
+  const nameTaken = (n) => taken.some((x) => x.toLowerCase() === cleanName(n).toLowerCase());
   const [step, setStep] = useState('start');       // start | thinking | asking | reveal | creating | error
   const [look, setLook] = useState(DEFAULT_AVATAR);
   const [givenName, setGivenName] = useState('');
@@ -48,7 +50,10 @@ export default function NewTeammate({ first = false }) {
     textRef.current = '';
     let r;
     try {
+      // The recruiter does not see the roster: it is told which names are taken, or two
+      // teammates end up with one name and one @handle (a fourth hire was a second Marlowe).
       r = await streamTurn({ sessionId: sid, harnessId: rec.id, input,
+        instructions: taken.length ? `Names already used in this workplace, never reuse any of them: ${taken.join(', ')}.` : undefined,
         handlers: { onSession: (id) => setSid(id), onTextDelta: (d) => { textRef.current += d; }, onError: (m) => setErr(String(m || '')) } });
     } catch (e) { setErr(e?.message || 'The recruiter did not answer.'); setStep('error'); return; }
     if (r?.connecting) { setErr('Still connecting. Try again in a moment.'); setStep('error'); return; }
@@ -61,7 +66,7 @@ export default function NewTeammate({ first = false }) {
     if (!parsed) { setErr('The recruiter answered in a form this page cannot draw. Ask again.'); setStep('error'); return; }
     if (parsed.type === 'teammate') { setProfile({ ...parsed, name: cleanName(givenName) !== 'Teammate' ? cleanName(givenName) : parsed.name }); setStep('reveal'); return; }
     setQset(parsed); setAnswers({}); setRounds((n) => n + 1); setStep('asking');
-  }, [sid, rec, givenName]);
+  }, [sid, rec, givenName, taken.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const startWith = (text, name = givenName) => {
     const parts = [];
@@ -91,6 +96,7 @@ export default function NewTeammate({ first = false }) {
   const answered = answeredN > 0;
 
   const create = async () => {
+    if (nameTaken(profile.name)) { setErr(`There is already a teammate called ${cleanName(profile.name)}. Give this one another name.`); return; }
     setStep('creating'); setProgress([]); setErr('');
     try {
       const { teammate } = await createTeammate({ ...profile, avatar: look }, me, (s) => setProgress((p) => [...p, s]));
