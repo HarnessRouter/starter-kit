@@ -1,20 +1,36 @@
 // The workspace this page is open in, the way the console decides it.
 //
 // A kit is launched per workspace and the gateway scopes every call by two headers the console
-// adds from its own record of the active workspace (localStorage, one key per org). This app is
-// served on the console's origin, so it reads the same record and adds the same headers to its
-// own calls; without them the gateway answers unscoped, and on an instance where the kit has been
+// adds from its record of the active workspace (a cookie on this origin, and one localStorage key
+// per organization). This app is served on the console's origin, so it reads the same record and
+// adds the same headers to its own calls; without them the gateway answers unscoped, and on an instance where the kit has been
 // launched in two workspaces the app picked the wrong recruiter (2026-09-30). The shared
 // transport (reifyui/harness) takes no headers yet, so they are added where every call goes
 // through: fetch, for this origin's API path only.
 const PREFIX = 'hr.workspace.current.';
 const API = '/api/harness/';
 
+const COOKIE = 'hr_workspace';
+
+/** The workspace this page is open in, as the console says it.
+ *
+ *  A hosted console writes it as a cookie on this origin when it opens a kit (its own API proxy
+ *  scopes by that cookie too), so the cookie is the answer wherever it exists. The per-org record
+ *  in localStorage is the fallback for a console that keeps only that: a browser signed in to
+ *  several organizations holds one record per organization, and the last one written is not the
+ *  one this page is open in (a console with eight organizations opened the workplace and the app
+ *  asked about another organization's workspace, so it said the workplace was not launched,
+ *  2026-10-01). */
 export function currentWorkspace() {
   try {
+    const m = document.cookie.match(new RegExp('(?:^|;\\s*)' + COOKIE + '=([^;]*)'));
+    if (m) {
+      const [id, def] = decodeURIComponent(m[1]).split('|');
+      if (id) return { id: String(id), isDefault: def === '1' };
+    }
+  } catch { /* no document, or the cookie is unreadable here */ }
+  try {
     const keys = Object.keys(localStorage).filter((k) => k.startsWith(PREFIX));
-    // One org per browser on a self-hosted instance; on a hosted one the console keeps a key per
-    // org it has shown, and the newest write wins there too (a single key in practice).
     for (const k of keys.reverse()) {
       const raw = JSON.parse(localStorage.getItem(k) || 'null');
       if (raw && raw.id) return { id: String(raw.id), isDefault: !!raw.def };
