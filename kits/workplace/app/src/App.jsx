@@ -113,6 +113,12 @@ function Workplace() {
   }, [me, harnessIds]);
 
   const ready = !!rec && !!me;
+  // The first read of the room is unconditional: the periodic refreshes below run only while the
+  // tab is visible, and a tab that booted in the background (opened behind another, or switched
+  // away from in its first seconds) sat on "Opening the workplace" with an empty room list until
+  // it was looked at (2026-10-02).
+  useEffect(() => { if (ready) refreshTeammates(); }, [ready, refreshTeammates]);
+  useEffect(() => { if (ready && teammates) refreshCards(); }, [ready, teammates !== null, refreshCards]); // eslint-disable-line react-hooks/exhaustive-deps
   useVisibleInterval(() => { if (ready) refreshTeammates(); }, TEAMMATES_MS, [ready, refreshTeammates]);
   useVisibleInterval(() => { if (ready && teammates) refreshCards(); }, CARDS_MS, [ready, teammates !== null, refreshCards]);
 
