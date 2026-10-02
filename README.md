@@ -158,7 +158,7 @@ runs the replies, so nothing is lost when a tab closes.
 
 <br>
 
-All five are launched from one page in the console:
+All six are launched from one page in the console:
 
 ![The Starter Kits page in the HarnessRouter console](.github/images/kits/starter-kits-page.png)
 
