@@ -1,7 +1,7 @@
 # HarnessRouter Commercial Use and Deployment Agreement
 
-Version 1.0.0
-Effective date: August 13, 2026
+Version 1.1.0
+Effective date: October 18, 2026
 
 This HarnessRouter Commercial Use and Deployment Agreement (the "Commercial
 Agreement") is between HarnessRouter ("HarnessRouter") and the individual or
@@ -71,7 +71,7 @@ deployment unless the Order Form expressly provides broader coverage.
 
 ## 4. Commercial coverage is required before use
 
-Licensee must obtain active coverage before:
+On a Self-Hosted Backend, Licensee must obtain active coverage before:
 
 1. beginning compensated work whose deliverable will constitute a Client
    Deliverable;
@@ -87,9 +87,9 @@ deployment is white-labeled, and whether the work is described as consulting,
 professional services, managed services, a proof of concept, or custom
 development.
 
-Use of HarnessRouter Cloud does not waive Commercial Use fees or coverage
-unless the applicable Cloud plan or Order Form expressly includes the relevant
-Commercial Scope.
+On a Cloud Backend, Section 2.2 of the Starter Kit License grants items 1 to 3
+without coverage under this Commercial Agreement. Item 4, handing off source
+code or continued development rights, requires coverage on any backend.
 
 ## 5. Source-code access and customer handoff
 

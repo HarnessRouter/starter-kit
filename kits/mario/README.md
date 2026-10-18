@@ -167,3 +167,7 @@ repository) reads all of it to improve the configuration one version at a time; 
 ## License
 
 Super Mario is a separately licensed production kit and is not covered by the repository's MIT License. See the [HarnessRouter Starter Kit License Agreement](../LICENSE.md).
+
+- **On HarnessRouter Cloud, the license comes with your account.** With HarnessRouter Cloud as the backend, you may use this kit inside your organization and to serve your own customers and end users, paid deliverables included, with no separate kit fee, Direct User limit or commercial agreement. Cloud plan and usage charges apply. This holds when you host the app yourself, as long as the Harness runs on HarnessRouter Cloud.
+- **With a self-hosted backend, commercial use needs a paid agreement.** Selling, deploying, hosting or providing an End Product to an external customer, and creating paid Client Deliverables, require the [Commercial Use and Deployment Agreement](../COMMERCIAL-DEPLOYMENT-AGREEMENT.md) and an [Order Form](../ORDER-FORM-TEMPLATE.md).
+- Handing kit source code or continued development rights to a customer requires that agreement on any backend.

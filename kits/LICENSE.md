@@ -1,7 +1,7 @@
 # HarnessRouter Starter Kit License Agreement
 
-Version 1.0.0
-Effective date: August 13, 2026
+Version 1.1.0
+Effective date: October 18, 2026
 
 This HarnessRouter Starter Kit License Agreement (the "Agreement") is between
 HarnessRouter ("HarnessRouter") and the individual or organization exercising
@@ -59,6 +59,13 @@ data file, or other artifact generated through use of the Kit or an End
 Product. Generated Output does not include Kit source code, templates, Skills,
 components, schemas, or materials extracted for reuse as development assets.
 
+**Cloud Backend** means that all production Harness and agent execution
+initiated through the Kit or an End Product runs through HarnessRouter Cloud as
+required by the applicable documentation, and is not bypassed, replaced,
+concealed, or materially circumvented. Hosting the Kit user interface or an End
+Product's user interface on other infrastructure does not by itself prevent a
+Cloud Backend.
+
 **HarnessRouter Cloud** means the hosted HarnessRouter service identified as
 such by HarnessRouter, excluding third-party infrastructure, models, and
 services merely linked to or used with the Kit.
@@ -71,6 +78,11 @@ learning, evaluation, portfolio, personal projects, or own business
 operations, and not on behalf of another organization or to provide a paid or
 otherwise commercially compensated product, deliverable, or service to a third
 party.
+
+**Self-Hosted Backend** means any use in which production Harness or agent
+execution initiated through the Kit or an End Product runs outside HarnessRouter
+Cloud, including on a HarnessRouter server that Licensee or a third party
+operates.
 
 **Internal Use** means use solely for the internal business operations of the
 Licensee legal entity. Internal Use does not include Commercial Use.
@@ -97,30 +109,35 @@ individual's own infrastructure, or through HarnessRouter Cloud for Individual
 Use without a separate Kit license fee.
 
 This grant does not authorize Commercial Use, use on behalf of another
-organization, redistribution of the Kit, or transfer of Kit source code.
+organization, redistribution of the Kit, or transfer of Kit source code. An
+individual who uses a Cloud Backend may also rely on Section 2.2.
 
-### 2.2 HarnessRouter Cloud Internal Use
+### 2.2 Use on a HarnessRouter Cloud Backend, including serving end users
 
-Subject to this Agreement, HarnessRouter grants a single legal entity a
-non-exclusive, non-transferable, non-sublicensable license to use, copy,
-modify, deploy, and operate the HarnessRouter Materials for Internal Use
-without a separate Kit license fee or Direct User limit while:
+Subject to this Agreement, HarnessRouter grants Licensee a non-exclusive,
+non-transferable, non-sublicensable license to use, copy, modify, deploy, and
+operate the HarnessRouter Materials for Internal Use and for Commercial Use,
+including serving Licensee's own end users and customers through an End
+Product and creating Client Deliverables, without a separate Kit license fee,
+Direct User limit, Commercial Agreement, or Order Form, while:
 
 1. Licensee maintains an active HarnessRouter Cloud account in good standing;
-2. production Harness and agent execution initiated through the Kit or an
-   Internal End Product is routed through HarnessRouter Cloud as required by
-   the applicable documentation;
-3. Licensee pays applicable HarnessRouter Cloud plan and usage charges; and
-4. Licensee does not bypass, replace, conceal, or materially circumvent the
-   required HarnessRouter Cloud execution path.
+2. the Kit and every End Product run on a Cloud Backend; and
+3. Licensee pays applicable HarnessRouter Cloud plan and usage charges.
 
-Hosting the Kit user interface on Licensee infrastructure does not by itself
-disqualify this grant if the required production Harness and agent execution
-continues through HarnessRouter Cloud.
+These rights come with Licensee's HarnessRouter Cloud account; no separate
+agreement is required to exercise them. Hosting the Kit user interface or an
+End Product on Licensee infrastructure does not by itself disqualify this grant
+if the required production Harness and agent execution continues through
+HarnessRouter Cloud.
+
+This Section does not authorize providing Kit source code or continued
+development rights to a customer, or any act Section 5 restricts other than
+the Commercial Use this Section permits. Section 3 governs those.
 
 If Licensee no longer satisfies these conditions, Licensee must stop
-organizational production use or obtain the applicable Non-Cloud Internal Use
-entitlement before continuing.
+production use under this Section, or obtain the applicable Non-Cloud Internal
+Use entitlement or the coverage Section 3 requires, before continuing.
 
 ### 2.3 Free Small-Team Non-Cloud Internal Use
 
@@ -147,14 +164,17 @@ workflows, generations, exports, API usage, or another stated unit. Unless the
 Order Form expressly states otherwise, the license is limited to Internal Use
 by one legal entity and grants no Commercial Use rights.
 
-## 3. Commercial Use requires separate coverage
+## 3. Commercial Use on a Self-Hosted Backend requires separate coverage
 
-No license granted in Section 2 authorizes Commercial Use. Before beginning
-Commercial Use, Licensee must accept the HarnessRouter Commercial Use and
-Deployment Agreement and obtain an active Order Form covering the applicable
-scope.
+Except as Section 2.2 grants, no license in Section 2 authorizes Commercial
+Use. Before beginning Commercial Use on a Self-Hosted Backend, and before
+providing Kit source code or continued development rights to a customer on any
+backend, Licensee must accept the HarnessRouter Commercial Use and Deployment
+Agreement and obtain an active Order Form covering the applicable scope. The
+free grants in Section 2 never authorize Commercial Use on a Self-Hosted
+Backend.
 
-This requirement applies to:
+On a Self-Hosted Backend, this requirement applies to:
 
 1. creating or delivering a Client Deliverable;
 2. providing consulting, agency, design, development, or managed services for
@@ -165,9 +185,8 @@ This requirement applies to:
    white-label deployment, or customer-hosted installation; and
 5. providing Kit source code or continued development rights to a customer.
 
-Use of HarnessRouter Cloud does not waive this requirement unless an
-applicable HarnessRouter Cloud plan or Order Form expressly grants the stated
-Commercial Use rights.
+Items 1 to 4 need no coverage under this Section when they run on a Cloud
+Backend under Section 2.2. Item 5 needs coverage on any backend.
 
 ## 4. Generated Output
 
@@ -175,8 +194,8 @@ Subject to applicable law, third-party rights, and terms governing
 HarnessRouter Cloud or an upstream provider, HarnessRouter claims no ownership
 under this Agreement in Licensee's Generated Output. Licensee may use, modify,
 distribute, and sell Generated Output only to the extent Licensee has the
-applicable rights under this Agreement and, for Commercial Use, an active
-commercial Order Form.
+applicable rights under this Agreement and, for Commercial Use, either the
+rights in Section 2.2 or an active commercial Order Form.
 
 This Section does not represent or warrant that Generated Output is unique,
 copyrightable, accurate, non-infringing, or fit for a particular purpose.
@@ -186,7 +205,7 @@ copyrightable, accurate, non-infringing, or fit for a particular purpose.
 Except as expressly authorized in an active commercial or enterprise Order
 Form, Licensee must not, and must not permit another party to:
 
-1. engage in Commercial Use;
+1. engage in Commercial Use other than as Section 2.2 permits;
 2. sell, license, sublicense, publish, distribute, or transfer the Kit or a
    substantial reusable portion of it;
 3. provide Kit source code to a customer or any person other than an
