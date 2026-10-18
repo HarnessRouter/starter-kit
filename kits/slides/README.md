@@ -45,9 +45,9 @@ Template credits are in [CREDITS.md](./CREDITS.md).
 Slides is a separately licensed production kit and is not covered by the repository's MIT License.
 
 - Individual local use is free under the [HarnessRouter Starter Kit License Agreement](../LICENSE.md).
-- Organizations using HarnessRouter Cloud for Internal Use do not pay a separate Kit license fee or have a Direct User limit; Cloud plan and usage charges still apply.
-- Non-Cloud Internal Use is free for up to three Direct Users. A paid entitlement is required before a fourth Direct User begins use or for separately metered automation.
-- Creating paid presentations, PDFs, images, reports, or other Client Deliverables for an external client requires the [Commercial Use and Deployment Agreement](../COMMERCIAL-DEPLOYMENT-AGREEMENT.md) and an [Order Form](../ORDER-FORM-TEMPLATE.md).
-- Selling, deploying, hosting, or providing an application, account, instance, environment, API, automation, runtime, or source code to an external customer also requires commercial coverage.
+- **On HarnessRouter Cloud, the license comes with your account.** With HarnessRouter Cloud as the backend, you may use this kit inside your organization and to serve your own customers and end users, paid deliverables included, with no separate kit fee, Direct User limit or commercial agreement. Cloud plan and usage charges apply. This holds when you host the app yourself, as long as the Harness runs on HarnessRouter Cloud.
+- Self-hosted internal use is free for up to three Direct Users. A paid entitlement is required before a fourth Direct User begins use or for separately metered automation.
+- **With a self-hosted backend, commercial use needs a paid agreement.** Selling, deploying, hosting or providing an End Product to an external customer, and creating paid Client Deliverables, require the [Commercial Use and Deployment Agreement](../COMMERCIAL-DEPLOYMENT-AGREEMENT.md) and an [Order Form](../ORDER-FORM-TEMPLATE.md).
+- Handing kit source code or continued development rights to a customer requires that agreement on any backend.
 - Sharing materials about your own business with investors, customers, advisers, and other counterparties is not Commercial Use merely because an external person receives them.
 - Third-party templates, fonts, and dependencies remain subject to their own notices and licenses in [CREDITS.md](./CREDITS.md) and the relevant vendored files.

@@ -84,4 +84,8 @@ console session rides on every same-origin request.
 - `app/` — the Vite app the console serves at `/kits/workplace`, built on `reifyui`.
   `npm test` runs the logic tests (the recruiter protocol, mentions, the group document).
 
-Licensed under the HarnessRouter Starter Kit License (`../LICENSE.md`).
+Licensed under the [HarnessRouter Starter Kit License](../LICENSE.md).
+
+- **On HarnessRouter Cloud, the license comes with your account.** With HarnessRouter Cloud as the backend, you may use this kit inside your organization and to serve your own customers and end users, paid deliverables included, with no separate kit fee, Direct User limit or commercial agreement. Cloud plan and usage charges apply. This holds when you host the app yourself, as long as the Harness runs on HarnessRouter Cloud.
+- **With a self-hosted backend, commercial use needs a paid agreement.** Selling, deploying, hosting or providing an End Product to an external customer, and creating paid Client Deliverables, require the [Commercial Use and Deployment Agreement](../COMMERCIAL-DEPLOYMENT-AGREEMENT.md) and an [Order Form](../ORDER-FORM-TEMPLATE.md).
+- Handing kit source code or continued development rights to a customer requires that agreement on any backend.

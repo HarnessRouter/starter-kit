@@ -165,9 +165,10 @@ All six are launched from one page in the console:
 ## Licensing at a glance
 
 The kits under `kits/` are **not** MIT. They carry the
-[HarnessRouter Starter Kit License Agreement](./kits/LICENSE.md). Individual local use is free;
-so is internal use for up to three people, or any size on HarnessRouter Cloud. Selling or hosting
-one for an external customer needs the
+[HarnessRouter Starter Kit License Agreement](./kits/LICENSE.md). Individual local use is free.
+With HarnessRouter Cloud as the backend, the license comes with your Cloud account: use a kit at
+any size inside your organization and to serve your own customers and end users. With a
+self-hosted backend, internal use is free for up to three people, and commercial use needs the
 [Commercial Use and Deployment Agreement](./kits/COMMERCIAL-DEPLOYMENT-AGREEMENT.md). The full
 terms are [below](#licensing).
 
@@ -257,9 +258,10 @@ This is a mixed-license repository:
 - Files without a more specific directory license, including the reference demos, are available under the [repository MIT License](./LICENSE).
 - Everything under `kits/` is governed by the [HarnessRouter Starter Kit License Agreement](./kits/LICENSE.md), not MIT. This covers all current and future contents of `kits/`, including any kit added later.
 - Individual local use is free, including learning, evaluation, personal projects, and the individual's own business operations.
-- Organizations using HarnessRouter Cloud for Internal Use do not pay a separate Kit license fee or have a Direct User limit; Cloud plan and usage charges still apply.
-- Non-Cloud Internal Use is free for up to three Direct Users. A paid entitlement is required before a fourth Direct User begins use or for separately metered automation.
-- **Creating paid Client Deliverables or selling, deploying, hosting, or providing an End Product to an external customer requires the [Commercial Use and Deployment Agreement](./kits/COMMERCIAL-DEPLOYMENT-AGREEMENT.md) and an applicable Order Form.**
+- **On HarnessRouter Cloud, the license comes with your account.** With HarnessRouter Cloud as the backend, you may use a kit inside your organization and to serve your own customers and end users, paid deliverables included, with no separate kit fee, Direct User limit or commercial agreement. Cloud plan and usage charges apply. This holds when you host the app yourself, as long as the Harness runs on HarnessRouter Cloud.
+- Self-hosted internal use is free for up to three Direct Users. A paid entitlement is required before a fourth Direct User begins use or for separately metered automation.
+- **With a self-hosted backend, commercial use needs a paid agreement.** Selling, deploying, hosting or providing an End Product to an external customer, and creating paid Client Deliverables, require the [Commercial Use and Deployment Agreement](./kits/COMMERCIAL-DEPLOYMENT-AGREEMENT.md) and an [Order Form](./kits/ORDER-FORM-TEMPLATE.md).
+- Handing Kit source code or continued development rights to a customer requires that agreement on any backend.
 - Sharing materials about your own business with investors, customers, advisers, and other counterparties is not Commercial Use merely because an external person receives them.
 - Generated presentations and exported files remain usable subject to the applicable Internal or Commercial Use rights.
 - Third-party components remain governed by their own licenses and notices.
