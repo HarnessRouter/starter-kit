@@ -1,3 +1,5 @@
 node_modules/
 dist/
 kits/slides/app/public/templates.json
+.env
+.env.local
