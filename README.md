@@ -14,7 +14,7 @@
 </div>
 
 <p align="center">
-  <a href="https://github.com/HarnessRouter/starter-kit" title="Star HarnessRouter Starter Kit on GitHub"><img src="https://img.shields.io/github/stars/HarnessRouter/starter-kit?style=flat&amp;logo=github&amp;logoColor=white&amp;label=Stars&amp;labelColor=444c56&amp;color=285aff" alt="GitHub stars"></a>
+  <a href="https://github.com/HarnessRouter/starter-kit" title="Star HarnessRouter Starter Kit on GitHub"><img src="https://raw.githubusercontent.com/HarnessRouter/starter-kit/readme-badges/docs/images/github-stars.svg" alt="GitHub stars"></a>
   <a href="./LICENSE"><img src="https://img.shields.io/badge/License-Mixed-285AFF?style=flat&amp;labelColor=444c56" alt="Mixed license: MIT demos and separately licensed kits"></a>
   <a href="./kits"><img src="https://img.shields.io/badge/Starter_Kits-5-285AFF?style=flat&amp;labelColor=444c56" alt="Five starter kits"></a>
   <a href="https://discord.gg/nPcbwqVPb2"><img src="https://img.shields.io/badge/Discord-Join-5865F2?style=flat&amp;logo=discord&amp;logoColor=white&amp;labelColor=444c56" alt="Join the HarnessRouter Discord"></a>
