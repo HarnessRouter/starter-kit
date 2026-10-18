@@ -33,6 +33,9 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Test the README star badge
+        run: python3 scripts/test-star-badge.py
+
       - name: Build
         run: npm run build
 
