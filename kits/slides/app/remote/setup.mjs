@@ -82,11 +82,10 @@ const file = new URL('../.env.local', import.meta.url);
 if (existsSync(file)) stop('.env.local already exists. Move it away to set up again (this changes the password).');
 writeFileSync(file, Object.entries(values).map(([k, v]) => `${k}=${v}`).join('\n') + '\n', { mode: 0o600 });
 chmodSync(file, 0o600);
+// The values are never printed: a terminal's scrollback and a CI log both outlive the moment.
 console.log(`
-Done. The values are in app/.env.local, readable by you only.
-Add all five to your host's environment settings (on Vercel: Project, Settings, Environment Variables),
-then deploy. Share the password only with the people who should use this app:
-
-  ${values.KIT_PASSWORD}
-
-To sign everyone out, set a new KIT_COOKIE_SECRET. To change the password, set a new KIT_PASSWORD.`);
+Done. The five values are in app/.env.local, readable by you only.
+Add them to your host's environment settings (on Vercel: Project, Settings, Environment Variables),
+then deploy. The app's password is KIT_PASSWORD in that file: share it only with the people who
+should use this app. To sign everyone out, set a new KIT_COOKIE_SECRET. To change the password,
+set a new KIT_PASSWORD.`);
