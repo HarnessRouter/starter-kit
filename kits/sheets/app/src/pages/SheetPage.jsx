@@ -13,7 +13,8 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Download, HelpCircle, Home } from 'lucide-react';
 import { PaneResizer, useResizablePane, useDialog } from 'reifyui';
-import { SheetGrid, FilePreview, fitRowHeights } from 'reifyui';
+import { SheetGrid, FilePreview } from 'reifyui';
+import { fitRowHeights } from '../lib/fitRows';
 import { containerFileUrl, getResponse, lastAssistantText, sessionTurns } from 'reifyui/harness';
 import {
   defaultAgentId, getSheet, isPending, markViewed, renameSheet, runnableHarnesses, saveSheet,
@@ -390,7 +391,7 @@ export function SheetPage({ id: routeId, seed }) {
     // grow to fit what is in them — the text and the file cards — rather than staying at the
     // height they had when they were empty.
     const touched = [...new Set(p.cells.map((c) => c.rowId))];
-    const heights = fitRowHeights(gridRef.current, { rowIds: touched });
+    const heights = fitRowHeights(gridRef.current, { rowIds: touched, order: (sheetRef.current.rows || []).map((r) => r.id) });
 
     const done = JSON.parse(JSON.stringify(sheetRef.current));
     for (const r of done.rows || []) if (heights[r.id]) r.height = heights[r.id];

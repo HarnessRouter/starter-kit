@@ -112,6 +112,8 @@ export async function runTurn({ sessionId, text, attachments = [], handlers = {}
     try { evt = JSON.parse(data); } catch { return; }   // malformed frame
     const found = sessionIdOf(evt);
     if (found && found !== sid) { sid = found; handlers.onSession?.(found); }
+    // every event whole, as it arrives: the chat's agent view folds them into the turn's clock
+    try { handlers.onEvent?.(evt); } catch { /* the clock must never break the stream */ }
     d.dispatch(evt);
   });
   return {};

@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
 import 'reifyui/styles/panels.css';
 import 'reifyui/styles/chat.css';
+import 'reifyui/styles/agent-chat.css';
 import 'reifyui/styles/dialog.css';
 import 'reifyui/styles/library.css';
 import 'reifyui/styles/chip.css';

@@ -20,6 +20,7 @@ import { useDeckCollab } from '../lib/collab';
 import { AvatarMenu, LINKS, Wordmark } from '../components/Topbar';
 import { SkeletonDeck } from '../components/Skeleton';
 import { useSrcResolver } from '../lib/srcResolver';
+import { useHarnessMark } from '../lib/harnessMark';
 
 /** Drop ?seed= from the hash in place so refresh/back/bookmark never resend the landing prompt. */
 function stripSeedFromHash() {
@@ -75,6 +76,8 @@ function exportLabel(busy) {
 }
 
 export function DeckPage({ id: routeId, seed, template }) {
+  // the chat draws each turn the agent-chat way, its live line carrying this harness's mark
+  const { mark, motion } = useHarnessMark();
   // The session id lives in state, not in the route. A deck starts as "new:<template>" and
   // becomes a session when its first turn opens one — and that arrives WHILE the copilot is
   // streaming. Re-keying this component off the URL at that moment unmounted it mid-stream and
@@ -354,6 +357,9 @@ export function DeckPage({ id: routeId, seed, template }) {
       {/* The conversation column is the package's. What stays here is what is Slides': the
           transport (lib/copilot.js), the prose, and where the panel sits on this page. */}
       <ChatPanel
+        view="agent"
+        mark={mark}
+        motion={motion}
         sessionId={id}
         runTurn={runTurn}
         loadHistory={loadHistory}
