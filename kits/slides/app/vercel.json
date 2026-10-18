@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build && node remote/check-bundle.mjs dist",
+  "outputDirectory": "dist",
+  "redirects": [{ "source": "/", "destination": "/kits/slides/", "permanent": false }],
+  "rewrites": [
+    { "source": "/api/selfhost/session", "destination": "/api/kit/session" },
+    { "source": "/api/selfhost/logout", "destination": "/api/kit/logout" },
+    { "source": "/kits/slides/:path*", "destination": "/:path*" }
+  ],
+  "functions": { "api/harness/[...path].js": { "maxDuration": 300 } }
+}

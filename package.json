@@ -9,9 +9,10 @@
     "dev": "npm run dev:cursor",
     "dev:cursor": "npm run dev --workspace=@harnessrouter/cursor-coding-app",
     "dev:lumacare": "npm run dev --workspace=@harnessrouter/lumacare",
-    "test": "npm run test --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present && npm run test:remote",
     "build": "npm run build --workspaces --if-present",
     "preview:cursor": "npm run preview --workspace=@harnessrouter/cursor-coding-app",
-    "preview:lumacare": "npm run preview --workspace=@harnessrouter/lumacare"
+    "preview:lumacare": "npm run preview --workspace=@harnessrouter/lumacare",
+    "test:remote": "node --test remote/core.test.mjs"
   }
 }

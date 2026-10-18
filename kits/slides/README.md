@@ -29,6 +29,39 @@ service: nothing it makes is a flat picture you have to ask it to change.
   an absolute `frame{x,y,w,h,rotation}`, so the same renderer drives the canvas, the filmstrip
   thumbnails and the print view.
 
+## Run it on your own hosting (preview)
+
+Remote mode is in preview and not released yet. It runs the same app on your own hosting, such as
+Vercel, against your Slides Harness on HarnessRouter Cloud. The page and one server route deploy
+together from `app/`, and your API key stays on the server.
+
+1. In HarnessRouter, make a workspace for this app and launch Slides in it. Set a cost cap per task
+   under Runtime limits in the Slides Harness's settings, then create an API key for that workspace.
+2. In `app/`, run `npm ci` and then `npm run remote:setup`. It checks the key, then generates the
+   app's password and cookie secret into `app/.env.local`, readable by you only.
+3. Create a Vercel project from this repository with `kits/slides/app` as its root directory. Add
+   the five values from `app/.env.local` as environment variables, and deploy.
+4. Share the password with the people who should use the app. To sign everyone out, set a new
+   `KIT_COOKIE_SECRET`.
+
+To try it on your machine first: `npm run build`, then `npm run remote:dev`.
+
+What protects the key:
+
+- Nothing but the sign-in page is served without the password. A signed-in browser holds a
+  12-hour cookie that only this app's server can read and check.
+- The server route forwards only the calls this app makes, adds the key on the server, and runs
+  every task on the Slides Harness, whatever the browser asks for.
+- A build whose output carries the key, the password or the cookie secret is refused.
+
+What to know:
+
+- Everyone with the password shares the app, and sees the same decks, as a team does.
+- Vercel limits a request to 4.5 MB, so an attachment larger than about 4 MB cannot be sent.
+- A turn streams through a function that Vercel stops at its maximum duration (300 seconds in
+  `vercel.json`). A plan that allows longer functions can raise it.
+- The terms in [License](#license) apply wherever the app runs.
+
 ## What's in the folder
 
 | Path | What |
