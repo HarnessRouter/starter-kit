@@ -6,6 +6,7 @@ import { Gamepad2 } from 'lucide-react';
 import { ChatPanel } from 'reifyui';
 import { streamTurn, turnsToMessages } from 'reifyui/harness';
 import { isPending, sessionTurns } from '../lib/game';
+import { useHarnessMark } from '../lib/harnessMark';
 
 const TOOL_LABELS = {
   run_right: 'Run right',
@@ -19,6 +20,8 @@ const TOOL_LABELS = {
 
 export function ChatColumn({ runId, seed, onSeedConsumed, handlers, externalBusy, onSessionStarted,
                              width, collapsed, onToggle }) {
+  // the chat draws each turn the agent-chat way, its live line carrying this harness's mark
+  const { mark, motion } = useHarnessMark();
   const runTurn = useCallback(({ sessionId, text, handlers: panel }) => streamTurn({
     sessionId: isPending(sessionId) ? '' : sessionId,
     input: text,
@@ -27,7 +30,7 @@ export function ChatColumn({ runId, seed, onSeedConsumed, handlers, externalBusy
       ...panel,
       onCreated: (rid) => { handlers.onCreated?.(rid); panel.onCreated?.(rid); },
       onToolCall: (name, args, callId) => { handlers.onToolCall?.(name, args, callId); panel.onToolCall?.(name, args, callId); },
-      onToolResult: (callId, output) => { handlers.onToolResult?.(callId, output); panel.onToolResult?.(callId, output); },
+      onToolResult: (callId, output, isError) => { handlers.onToolResult?.(callId, output, isError); panel.onToolResult?.(callId, output, isError); },
       onDone: (status, response) => { handlers.onDone?.(status, response); panel.onDone?.(status, response); },
       onError: (message) => { handlers.onError?.(message); panel.onError?.(message); },
     },
@@ -39,6 +42,9 @@ export function ChatColumn({ runId, seed, onSeedConsumed, handlers, externalBusy
 
   return (
     <ChatPanel
+      view="agent"
+      mark={mark}
+      motion={motion}
       sessionId={runId}
       runTurn={runTurn}
       loadHistory={loadHistory}

@@ -16,6 +16,7 @@ import { ChatPanel, createDictation } from 'reifyui';
 import { fileToInputBlock, sessionTurns, turnsToMessages } from 'reifyui/harness';
 import { isPending, takeAttachments } from '../lib/video';
 import { runCopilotTurn } from '../lib/copilot';
+import { useHarnessMark } from '../lib/harnessMark';
 
 /** Drop ?seed= from the hash in place so refresh/back/bookmark never resend it. */
 function stripSeedFromHash() {
@@ -31,6 +32,8 @@ function stripSeedFromHash() {
 
 export function ChatColumn({ videoId, seed, title, agentBusy, onSceneMaybeChanged,
                              onSessionStarted, width, collapsed, onToggle }) {
+  // the chat draws each turn the agent-chat way, its live line carrying this harness's mark
+  const { mark, motion } = useHarnessMark();
   // Built once: a fresh recogniser object every render would stop dictation on every keystroke.
   // It is null where the browser has none, and then the panel renders no microphone at all.
   const [dictation] = useState(() => createDictation());
@@ -49,6 +52,9 @@ export function ChatColumn({ videoId, seed, title, agentBusy, onSceneMaybeChange
 
   return (
     <ChatPanel
+      view="agent"
+      mark={mark}
+      motion={motion}
       sessionId={videoId}
       runTurn={runTurn}
       loadHistory={loadHistory}

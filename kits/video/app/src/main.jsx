@@ -6,6 +6,7 @@ import 'highlight.js/styles/atom-one-dark.css';
 import '@excalidraw/excalidraw/index.css';
 import 'reifyui/styles/panels.css';
 import 'reifyui/styles/chat.css';
+import 'reifyui/styles/agent-chat.css';
 import 'reifyui/styles/dialog.css';
 import 'reifyui/styles/form.css';
 import 'reifyui/styles/file.css';

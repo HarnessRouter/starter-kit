@@ -9,6 +9,7 @@ import 'highlight.js/styles/atom-one-dark.css';
 // below carries only what is left — the parts that are Slides'.
 import 'reifyui/styles/slides.css';
 import 'reifyui/styles/chat.css';
+import 'reifyui/styles/agent-chat.css';
 import 'reifyui/styles/library.css';
 import 'reifyui/styles/chip.css';
 import 'reifyui/styles/preview.css';
