@@ -7,9 +7,21 @@
 // the server exposes no queue — past its concurrency limit turns are accepted and block silently,
 // indistinguishable over the API from working ones — so a progress bar inside one cell would be
 // invented. A spinner is the truth.
+import { Fragment } from 'react';
 import { Play } from 'lucide-react';
 import { FileCard } from 'reifyui';
 import { containerFileUrl } from 'reifyui/harness';
+import { linkParts } from '../lib/answer';
+
+/** The answer's text with its inline citations drawn as links named by their text ("qdrant.tech"),
+ *  never the brackets and the address. A click opens the page in a new tab and does not select or
+ *  open the cell under it. */
+function AnswerText({ value }) {
+  return linkParts(value).map((p, i) => (p.href
+    ? <a key={i} className="hcell-link" href={p.href} target="_blank" rel="noopener noreferrer"
+         onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>{p.text}</a>
+    : <Fragment key={i}>{p.text}</Fragment>));
+}
 
 /** The files a cell produced, as the same card the chat draws — type glyph, name, download,
  *  preview. They were a row of green text chips: no glyph, no download, and no way to look inside
@@ -84,7 +96,7 @@ export function HarnessCell({ cell, live, readOnly, onRun, onPreviewFile }) {
   }
   return (
     <span className="hcell">
-      <span className="hcell-txt" data-shg-clamp-text>{cell.value}</span>
+      <span className="hcell-txt" data-shg-clamp-text><AnswerText value={cell.value} /></span>
       <Artifacts artifacts={cell.artifacts} onPreview={onPreviewFile} />
       {tools}
     </span>

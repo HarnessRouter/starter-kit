@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  cellAnswer, endsOnToolStep, lastAssistantText, settledAnswer, stripTracking,
+  cellAnswer, endsOnToolStep, lastAssistantText, linkParts, settledAnswer, stripTracking,
 } from './answer.js';
 
 const msg = (text, annotations = []) =>
@@ -109,4 +109,36 @@ test('the cell value is the answer with its links cleaned', () => {
     msg('Open source, Apache 2.0 ([github.com](https://github.com/qdrant/qdrant?utm_source=openai)).'),
   ] };
   assert.equal(cellAnswer(res), 'Open source, Apache 2.0 ([github.com](https://github.com/qdrant/qdrant)).');
+});
+
+// ── a cell's links ───────────────────────────────────────────────────────────
+// The value keeps its inline citations (cellAnswer above); the grid draws each as a link named by
+// its text. Shown raw it read "Zero-ops hybrid retrieval for AI apps ([docs.trychroma.com]…" (staging,
+// 2026-10-19).
+
+test('an inline Markdown link becomes a link part named by its text; the text around it stays', () => {
+  assert.deepEqual(
+    linkParts('Hybrid search for RAG workloads. ([qdrant.tech](https://qdrant.tech/documentation/search/))'),
+    [{ text: 'Hybrid search for RAG workloads. (' },
+     { text: 'qdrant.tech', href: 'https://qdrant.tech/documentation/search/' },
+     { text: ')' }]);
+});
+
+test('a link whose address is not http or https stays text, exactly as written', () => {
+  assert.deepEqual(linkParts('[click](javascript:alert(1))'), [{ text: '[click](javascript:alert(1))' }]);
+  assert.deepEqual(linkParts('Write to [us](mailto:team@example.com).'), [{ text: 'Write to [us](mailto:team@example.com).' }]);
+});
+
+test('plain text is one text part, and an empty value is no parts', () => {
+  assert.deepEqual(linkParts('Best at production-grade semantic search.'), [{ text: 'Best at production-grade semantic search.' }]);
+  assert.deepEqual(linkParts(''), []);
+  assert.deepEqual(linkParts(null), []);
+});
+
+test('an address with balanced parentheses keeps them, and two links in a row are two parts', () => {
+  assert.deepEqual(
+    linkParts('[Rust](https://en.wikipedia.org/wiki/Rust_(programming_language)) and [docs](https://doc.rust-lang.org)'),
+    [{ text: 'Rust', href: 'https://en.wikipedia.org/wiki/Rust_(programming_language)' },
+     { text: ' and ' },
+     { text: 'docs', href: 'https://doc.rust-lang.org' }]);
 });

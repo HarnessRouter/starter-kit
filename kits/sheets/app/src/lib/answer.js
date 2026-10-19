@@ -95,3 +95,30 @@ export function cellAnswer(response) {
 export function settledAnswer(response) {
   return endsOnToolStep(response) ? '' : cellAnswer(response);
 }
+
+// An inline Markdown link: [text](address), the address allowed one level of balanced parentheses
+// (Wikipedia's "Rust_(programming_language)").
+const MD_LINK = /\[([^[\]\n]+)\]\(((?:[^\s()<>]|\([^\s()<>]*\))+)\)/g;
+
+/** A cell's value as the grid draws it: text parts, and a link part for each inline Markdown link
+ *  whose address is http or https, named by the link's own text. The value itself is unchanged
+ *  (it keeps its citations, and the export carries them as written); this is only how it reads.
+ *  Any other address (javascript:, mailto:, a relative path) stays text, exactly as written. */
+export function linkParts(value) {
+  const text = String(value ?? '');
+  const parts = [];
+  let at = 0;
+  for (const m of text.matchAll(MD_LINK)) {
+    let href = '';
+    try {
+      const u = new URL(m[2]);
+      if (u.protocol === 'http:' || u.protocol === 'https:') href = m[2];
+    } catch { /* not an address: stays text */ }
+    if (!href) continue;
+    if (m.index > at) parts.push({ text: text.slice(at, m.index) });
+    parts.push({ text: m[1], href });
+    at = m.index + m[0].length;
+  }
+  if (at < text.length) parts.push({ text: text.slice(at) });
+  return parts;
+}
