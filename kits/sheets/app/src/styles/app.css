@@ -119,6 +119,8 @@
   display: -webkit-box; -webkit-box-orient: vertical;
   -webkit-line-clamp: var(--shg-clamp, 1); line-clamp: var(--shg-clamp, 1);
 }
+.hcell-link { font-size: 12px; color: var(--brand-ink); text-decoration: none; }
+.hcell-link:hover { text-decoration: underline; }
 .hcell.failed .hcell-txt { color: #B91C1C; }
 .hcell.skipped .hcell-txt { color: var(--mute-2); font-style: italic; }
 .hcell-live { color: var(--mute); font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

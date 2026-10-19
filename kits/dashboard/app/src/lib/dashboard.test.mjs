@@ -8,7 +8,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  chartOption, formatValue, mergeOption, normalizeLayout, parseDashboard, queriesToRun,
+  axisTick, chartOption, formatValue, mergeOption, normalizeLayout, parseDashboard, queriesToRun,
   statValue, tableView, toFile,
 } from './dashboard.js';
 
@@ -179,6 +179,55 @@ test('an array in the override replaces rather than merges', () => {
   // Merging series arrays element-wise would leave a two-series theme showing a ghost second
   // series under a one-series chart.
   assert.deepEqual(mergeOption({ color: ['a', 'b'] }, { color: ['c'] }), { color: ['c'] });
+});
+
+// A horizontal bar chart's value axis ended on "18,000,0" (RNA sequences per database, staging,
+// 2026-10-19): ECharts centres the last label on the axis end, and half of a long label hangs past
+// the grid's right margin, which containLabel does not count.
+
+const HBAR = { kind: 'chart', option: { xAxis: { type: 'value' }, yAxis: { type: 'category' },
+                                        series: [{ type: 'bar', encode: { x: 'revenue', y: 'month' } }] } };
+
+test('a value axis with no formatter of its own gets compact ticks, and a horizontal one ends inside the chart', () => {
+  const { option } = chartOption(RESULT, HBAR, {});
+  assert.equal(option.xAxis.axisLabel.formatter, axisTick);
+  assert.equal(option.xAxis.axisLabel.alignMaxLabel, 'right');
+  assert.equal(option.yAxis.axisLabel, undefined);            // a category axis is left alone
+  assert.equal(axisTick(18000000), formatValue(18000000, { format: 'compact' }));
+  assert.ok(axisTick(18000000).length < '18,000,000'.length);
+  assert.equal(axisTick(0.25), '0.25');                        // small numbers keep their digits
+  assert.equal(axisTick(500), '500');
+});
+
+test('a vertical value axis gets compact ticks but keeps its labels where they are', () => {
+  const viz = { kind: 'chart', option: { yAxis: { type: 'value' }, series: [{ type: 'line' }] } };
+  const { option } = chartOption(RESULT, viz, { yAxis: { axisLabel: { color: '#888' } } });
+  assert.equal(option.yAxis.axisLabel.formatter, axisTick);
+  assert.equal(option.yAxis.axisLabel.color, '#888');
+  assert.equal(option.yAxis.axisLabel.alignMaxLabel, undefined);
+});
+
+test('a formatter or label alignment the chart wrote is kept', () => {
+  const own = (v) => `${v} seqs`;
+  const viz = { kind: 'chart', option: { xAxis: { type: 'value', axisLabel: { formatter: own, alignMaxLabel: 'center' } },
+                                         series: [{ type: 'bar' }] } };
+  const { option } = chartOption(RESULT, viz, {});
+  assert.equal(option.xAxis.axisLabel.formatter, own);
+  assert.equal(option.xAxis.axisLabel.alignMaxLabel, 'center');
+});
+
+test('each of several value axes is fitted the same way', () => {
+  const viz = { kind: 'chart', option: { yAxis: [{ type: 'value' }, { type: 'value', axisLabel: { formatter: '{value} %' } }],
+                                         series: [{ type: 'line' }] } };
+  const { option } = chartOption(RESULT, viz, {});
+  assert.equal(option.yAxis[0].axisLabel.formatter, axisTick);
+  assert.equal(option.yAxis[1].axisLabel.formatter, '{value} %');
+});
+
+test('the grid holds its labels unless the chart set the grid itself', () => {
+  assert.equal(chartOption(RESULT, HBAR, { grid: { left: 8 } }).option.grid.containLabel, true);
+  const viz = { kind: 'chart', option: { grid: { top: 24, containLabel: false }, series: [{ type: 'line' }] } };
+  assert.deepEqual(chartOption(RESULT, viz, { grid: { left: 8 } }).option.grid, { left: 8, top: 24, containLabel: false });
 });
 
 test('a chart panel with no option says so instead of drawing an empty canvas', () => {
