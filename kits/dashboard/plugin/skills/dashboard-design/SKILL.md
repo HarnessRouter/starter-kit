@@ -175,11 +175,36 @@ the names you find there. Do not guess a tool name from this document. There are
 two capabilities:
 
 - **The schema tool** returns
-  `{ engine, tables: [ { schema, name, columns: [ { name, type, nullable } ], sample? } ], table_count, truncated, sampled }`.
+  `{ engine, cut?, tables: [ { schema, name, kind, row_estimate, column_count, columns?: [ { name, type, nullable } ], sample? } ], table_count, not_found?, truncated, sampled }`.
   Call it FIRST, on every new dashboard, before you write a line of SQL. `engine`
-  is what you copy into `datasource.engine`.
+  is what you copy into `datasource.engine`. Tables come largest first by
+  estimated rows. Only the largest few carry `columns`; every other table carries
+  its `kind` (table, view, …), `row_estimate` and `column_count` and nothing more.
+  It takes two optional parameters: `tables`, up to 20 names (`schema.table` or
+  `table`) to describe in full, and `search`, text that a table's `schema.table`
+  name must contain.
 - **The query tool** runs one SELECT and returns
   `{ columns, rows, row_count, truncated, limit_applied }`.
+
+**Read `cut` first, every time.** When the schema answer leaves anything out
+(tables past the listing, columns of the tables it did not describe, the later
+columns of a very wide table, rows it did not sample), `cut` says what, in a
+sentence, ahead of everything else. Then ask for exactly what is missing:
+
+- a table you need is listed without `columns`: call the schema tool again with
+  `tables` naming it, up to 20 in one call;
+- the table you need is not in the listing at all (a big database lists only its
+  largest few hundred): call it with `search` and a word from the name you
+  expect, such as `invoice`, `order` or `event`;
+- `not_found` names a table that does not exist under that name: search for it
+  rather than guessing another spelling.
+
+Never call the schema tool again with no parameters, to retry or to get more:
+the same call gives the same answer, and on a large database it spends the
+person's time to learn nothing. `row_estimate` is the database's own estimate:
+good for choosing between tables, never a number to put on a dashboard. What
+`cut` says is for you; tell the person only what it means for their dashboard,
+in their words.
 
 If neither is in your tool list, stop: this dashboard has no database
 connected, or the one it had is switched off, and SQL you cannot run is SQL you
@@ -208,7 +233,8 @@ particular customer did.
 **When the schema cannot answer the question, say so.** If they ask for churn and
 there is no cancellation date anywhere, the correct move is one sentence telling
 them what is missing and what you can show instead. Not a plausible-looking
-query over the wrong column.
+query over the wrong column. When `cut` says the listing left tables out,
+"anywhere" means you searched for it first.
 
 ## SELECT, and nothing else
 
