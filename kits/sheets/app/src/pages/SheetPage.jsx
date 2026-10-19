@@ -24,6 +24,7 @@ import {
 } from '../lib/model';
 import { Runner, plan, runId, saveConcurrency, savedConcurrency } from '../lib/run';
 import { makeCellDispatcher } from '../lib/cell';
+import { cellAnswer } from '../lib/answer';
 import { exportSheet } from '../lib/exportSheet';
 import { ChatColumn } from '../components/ChatPanel';
 import { AvatarMenu, LINKS, Wordmark } from '../components/Topbar';
@@ -284,10 +285,8 @@ export function SheetPage({ id: routeId, seed }) {
         const st = res?.status;
         if (!st || st === 'queued' || st === 'in_progress' || st === 'running') { stillRunning = true; continue; }
         if (st === 'completed') {
-          const text = (res.output || [])
-            .filter((o) => o.type === 'message')
-            .flatMap((o) => (o.content || []).filter((c) => c.type === 'output_text').map((c) => c.text))
-            .join('\n').trim();
+          // The same value a cell takes when this tab runs it: the final answer alone.
+          const text = cellAnswer(res);
           doc.cells[key] = { ...cell, status: text ? 'done' : 'failed', ended_at: now(),
                              value: text || null,
                              error: text ? null : 'The agent finished without answering.' };

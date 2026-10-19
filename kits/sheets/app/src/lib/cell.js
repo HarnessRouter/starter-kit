@@ -13,6 +13,7 @@ import {
   patchSession,
 } from 'reifyui/harness';
 import { VALUE_MAX, interpolate } from './model.js';
+import { cellAnswer } from './answer.js';
 
 const POLL_MS = 2000;
 /** How long a terminal-but-empty response is given to produce its own content.
@@ -41,16 +42,6 @@ async function artifactAsDataUrl(artifact) {
 
 /** A directory per source column, so an agent reading three attachments can tell them apart. */
 const slug = (s) => String(s || 'in').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'in';
-
-/** The assistant text of a finished response: message items, in order. */
-function textOf(response) {
-  const parts = [];
-  for (const item of response?.output || []) {
-    if (item?.type !== 'message') continue;
-    for (const c of item.content || []) if (c?.type === 'output_text' && c.text) parts.push(c.text);
-  }
-  return parts.join('\n').trim();
-}
 
 /** The files this turn produced, from the terminal response's citations. */
 function artifactsOf(response) {
@@ -116,8 +107,10 @@ export function makeCellDispatcher({ sheetId, runId, sheetTitle, columns, onCell
       instructions: [
         `You are filling one cell of a spreadsheet: column "${column.name}", row ${rowIndex + 1} of ${task.rowsTotal}.`,
         'Answer for this row only.',
+        'Your reply is the cell: write only the value that belongs in it, with no preamble, no account',
+        'of what you looked up or did, and no sign-off.',
         'Keep the answer short enough to read in a table cell. If the work produces something long,',
-        'write it to a file in your working directory and summarise it in one or two sentences.',
+        'write it to a file in your working directory first, then reply with a one or two sentence summary.',
       ].join(' '),
       ...(cfg.timeout_seconds ? { timeout_seconds: cfg.timeout_seconds } : {}),
     };
@@ -166,11 +159,15 @@ export function makeCellDispatcher({ sheetId, runId, sheetTitle, columns, onCell
         const st = res?.status;
         if (st === 'queued' || st === 'in_progress' || st === 'running' || !st) continue;
 
-        let value = textOf(res);
+        // The final answer only: the text after the agent's last tool step (lib/answer.js).
+        let value = cellAnswer(res);
         let artifacts = artifactsOf(res);
 
-        // Terminal, but empty: the record may simply not be written yet (see SETTLE_MS). Give it
-        // the grace window before concluding anything, and take whatever turns up.
+        // Terminal, but empty: the record may simply not be written yet (see SETTLE_MS). That
+        // includes a record holding only what the agent said before its tool steps, with its reply
+        // still to come: before the final answer was taken alone, that narration was returned
+        // here as the cell's value. Give it the grace window before concluding anything, and take
+        // whatever turns up.
         if (!value && !artifacts.length) {
           const deadline = Date.now() + SETTLE_MS;
           while (Date.now() < deadline && !signal.aborted) {
@@ -179,7 +176,7 @@ export function makeCellDispatcher({ sheetId, runId, sheetTitle, columns, onCell
             // eslint-disable-next-line no-await-in-loop
             const again = await getResponse(responseId).catch(() => null);
             if (!again) continue;
-            value = textOf(again);
+            value = cellAnswer(again);
             artifacts = artifactsOf(again);
             if (value || artifacts.length) { res = again; break; }
           }
