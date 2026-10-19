@@ -183,7 +183,40 @@ export function chartOption(result, viz, theme) {
     // forbidding effective rather than advisory.
     option.series = option.series.map(({ data, ...rest }) => rest);
   }
+  fitAxes(option, viz.option);
   return { option };
+}
+
+/** A value axis's tick: compact from a thousand up (18M, 1.2K), as written below that (0.25, 500). */
+export function axisTick(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return String(v);
+  return formatValue(n, { format: Math.abs(n) >= 1000 ? 'compact' : 'decimal' });
+}
+
+/** Labels that fit the panel. A horizontal bar chart's value axis ended on "18,000,0": ECharts
+ *  centres the last label on the axis end, and half of a long label hangs past the grid's right
+ *  margin, which containLabel does not count. Each value axis with no formatter of its own gets
+ *  compact ticks; a horizontal one also ends its last label at the axis end. The grid holds its
+ *  labels unless the chart set the grid itself. Whatever the chart wrote is kept. */
+function fitAxes(option, own) {
+  for (const dim of ['xAxis', 'yAxis']) {
+    if (option[dim] == null) continue;
+    const fit = (axis) => {
+      if (!axis || typeof axis !== 'object') return axis;
+      // ECharts' own defaults: an x axis is a category axis, a y axis a value axis.
+      if ((axis.type ?? (dim === 'yAxis' ? 'value' : 'category')) !== 'value') return axis;
+      const label = { ...(axis.axisLabel || {}) };
+      if (!('formatter' in label)) label.formatter = axisTick;
+      if (dim === 'xAxis' && !('alignMaxLabel' in label)) label.alignMaxLabel = 'right';
+      return { ...axis, axisLabel: label };
+    };
+    option[dim] = Array.isArray(option[dim]) ? option[dim].map(fit) : fit(option[dim]);
+  }
+  if (!(own && 'grid' in own) && option.grid && typeof option.grid === 'object' && !Array.isArray(option.grid)
+      && !('containLabel' in option.grid)) {
+    option.grid = { ...option.grid, containLabel: true };
+  }
 }
 
 /** Deep merge for plain objects; arrays and scalars from `over` replace. The theme sets axis and
