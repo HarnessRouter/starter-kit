@@ -7,11 +7,16 @@
 // turn put that narration in front of the answer in the cell (staging, 2026-10-19). A cell holds
 // the answer and nothing else.
 //
-// So the cell's text is the assistant's text AFTER its last tool step: the final reply. Words said
-// before a tool step are never the answer, even when nothing follows the step: a turn cut off at
-// its step cap mid-research ends on a tool step, and its last words are the narration. Such a turn
-// has no answer, and the cell says so (lib/cell.js) rather than showing the narration as one.
-// Reasoning items sit between messages without being steps, so they never split a reply.
+// The rule: the cell is the LAST assistant text of the turn, wherever the tool steps fall. Usually
+// that is the reply after the last tool step; for an agent that answers and then saves or checks
+// something, it is the answer before that final step. A turn with no assistant text at all has
+// no answer, and the cell says so (lib/cell.js).
+//
+// One read cannot tell those two apart from a record read too early: a record that ends on a tool
+// step may be a turn that answered and then validated, or a turn whose reply has not been written
+// yet (a terminal status arrives about two seconds before the output, see SETTLE_MS in cell.js).
+// So such a record is not settled: settledAnswer() reads it as empty, the dispatcher waits for a
+// reply to follow, and only when none does it takes cellAnswer(), the last text there is.
 
 /** The text of one message item. */
 function messageText(item) {
@@ -20,23 +25,37 @@ function messageText(item) {
   return parts.join('\n').trim();
 }
 
+const isToolStep = (item) => item?.type !== 'message' && item?.type !== 'reasoning';
+
 /**
- * The final answer of a finished response: the assistant text after its last tool step, '' when
- * the turn said nothing after it. Messages after that step (the reply, and any closing paragraph
- * the platform adds about files) are joined with a newline, as the whole turn's were before.
+ * The last assistant text of a response: the last message with text, together with the messages
+ * just before it back to the previous tool step (a reply and the closing paragraph the platform
+ * adds after it about files, say). Reasoning between messages does not separate them. '' when the
+ * turn said nothing.
  */
-export function finalAnswer(response) {
-  let reply = [];
-  for (const item of response?.output || []) {
-    const type = item?.type;
-    if (type === 'message') {
-      const t = messageText(item);
-      if (t) reply.push(t);
-    } else if (type !== 'reasoning') {
-      reply = [];   // a tool step: whatever was said before it was not the final word
+export function lastAssistantText(response) {
+  const items = response?.output || [];
+  let end = items.length - 1;
+  while (end >= 0 && !(items[end]?.type === 'message' && messageText(items[end]))) end -= 1;
+  if (end < 0) return '';
+  const run = [];
+  for (let i = end; i >= 0 && !isToolStep(items[i]); i -= 1) {
+    if (items[i]?.type === 'message') {
+      const t = messageText(items[i]);
+      if (t) run.unshift(t);
     }
   }
-  return reply.join('\n').trim();
+  return run.join('\n').trim();
+}
+
+/** Does the record end on a tool step, so that a reply may still be written after it? */
+export function endsOnToolStep(response) {
+  const items = response?.output || [];
+  for (let i = items.length - 1; i >= 0; i -= 1) {
+    if (items[i]?.type === 'reasoning') continue;
+    return isToolStep(items[i]);
+  }
+  return false;
 }
 
 // Query parameters that only tell the linked site who sent the visit. Removing them never changes
@@ -66,7 +85,13 @@ export function stripTracking(text) {
   });
 }
 
-/** The cell's value from a finished response: its final answer, with tracking removed from links. */
+/** The cell's value: the turn's last assistant text, with tracking removed from its links. */
 export function cellAnswer(response) {
-  return stripTracking(finalAnswer(response));
+  return stripTracking(lastAssistantText(response));
+}
+
+/** The cell's value from a record that has settled, '' from one that may still be writing its
+ *  reply (it ends on a tool step). The dispatcher waits on '' before concluding anything. */
+export function settledAnswer(response) {
+  return endsOnToolStep(response) ? '' : cellAnswer(response);
 }

@@ -13,7 +13,7 @@ import {
   patchSession,
 } from 'reifyui/harness';
 import { VALUE_MAX, interpolate } from './model.js';
-import { cellAnswer } from './answer.js';
+import { cellAnswer, settledAnswer } from './answer.js';
 
 const POLL_MS = 2000;
 /** How long a terminal-but-empty response is given to produce its own content.
@@ -159,16 +159,20 @@ export function makeCellDispatcher({ sheetId, runId, sheetTitle, columns, onCell
         const st = res?.status;
         if (st === 'queued' || st === 'in_progress' || st === 'running' || !st) continue;
 
-        // The final answer only: the text after the agent's last tool step (lib/answer.js).
-        let value = cellAnswer(res);
+        // The answer only: the turn's last assistant text, never the narration before its tool
+        // steps (lib/answer.js). A record that ends on a tool step is not settled yet: it reads
+        // as empty here, because its reply may still be on the way.
+        let value = settledAnswer(res);
         let artifacts = artifactsOf(res);
 
-        // Terminal, but empty: the record may simply not be written yet (see SETTLE_MS). That
-        // includes a record holding only what the agent said before its tool steps, with its reply
-        // still to come: before the final answer was taken alone, that narration was returned
-        // here as the cell's value. Give it the grace window before concluding anything, and take
-        // whatever turns up.
+        // Terminal, but empty: the record may simply not be written yet (see SETTLE_MS), or may
+        // hold only what the agent said before a tool step with its reply still to come. Before
+        // the answer was taken alone, that narration was returned here as the cell's value. Give
+        // it the grace window before concluding anything, and take whatever turns up. If nothing
+        // follows the tool step, the turn ended there, and its last assistant text (an answer
+        // given before a final save or check) is the answer.
         if (!value && !artifacts.length) {
+          let latest = res;
           const deadline = Date.now() + SETTLE_MS;
           while (Date.now() < deadline && !signal.aborted) {
             // eslint-disable-next-line no-await-in-loop
@@ -176,10 +180,13 @@ export function makeCellDispatcher({ sheetId, runId, sheetTitle, columns, onCell
             // eslint-disable-next-line no-await-in-loop
             const again = await getResponse(responseId).catch(() => null);
             if (!again) continue;
-            value = cellAnswer(again);
+            latest = again;
+            value = settledAnswer(again);
             artifacts = artifactsOf(again);
-            if (value || artifacts.length) { res = again; break; }
+            if (value || artifacts.length) break;
           }
+          res = latest;
+          if (!value && !artifacts.length) value = cellAnswer(latest);
         }
 
         const base = { ...partial, ended_at: now(), session_id: res?.metadata?.session_id || sessionId };
