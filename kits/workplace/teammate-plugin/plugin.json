@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "harnessrouter-workplace-teammate",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "What every teammate of the workplace knows: direct messages, groups, staying quiet with [skip], @mentions, and files as artifacts.",
   "author": { "name": "HarnessRouter", "url": "https://harnessrouter.ai" },
   "homepage": "https://github.com/HarnessRouter/starter-kit/tree/main/kits/workplace",

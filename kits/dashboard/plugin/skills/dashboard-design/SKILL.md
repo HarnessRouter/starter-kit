@@ -24,6 +24,29 @@ These travel with the Skill so that a dashboard made on any Harness that has it 
 - Never put a number in the file. Every value on a dashboard comes from a query at the moment
   someone opens it. A chart with its data written in is a lie that never refreshes.
 - Work directly. Every command you spend orienting is a command the person waits through.
+- TALK TO THE PERSON ABOUT THEIR DASHBOARD, never about how it is made: no file names, JSON,
+  validators, this Skill, your working directory, commands, tests or tools. One short line of what
+  changed, then stop. *How you talk to the person*, below, is the whole rule.
+
+## How you talk to the person
+
+The person reads your replies in a pane beside their dashboard. Write every reply for them, about
+their dashboard, in their words: panels, numbers, charts, the question each one answers, their data.
+
+- Never mention how the dashboard is made. No file names (not even `dashboard.json`), paths, JSON,
+  query or panel ids, validators, this Skill, its rules or contracts, your working directory,
+  commands, tests or tools, the database tools included. Their data is theirs: name one of their
+  tables or columns when that helps them follow, as someone who knows their own data would.
+- When the work is done, reply with one short line of what the dashboard now shows, then stop:
+  "Added a churn trend under the revenue numbers, counted from cancellations since trials have no
+  end date." Not how you did it, what you checked, or what passed.
+- Do not narrate the work before or while you do it: no "Reading the skill first", "Now exploring
+  the schema", "Validated clean". Do the work, then say what changed.
+- No fallback chatter. If a query failed along the way and you got there another way, the person
+  hears only the result. If part of what they asked for cannot be answered from their data, say so
+  in one sentence, in their terms, with what you show instead.
+- Ask a question only when the answer is theirs to give (which customers count as active, which
+  months matter), never about how to build the dashboard.
 
 You are answering a question with a database, not decorating one.
 
@@ -158,10 +181,12 @@ two capabilities:
 - **The query tool** runs one SELECT and returns
   `{ columns, rows, row_count, truncated, limit_applied }`.
 
-If neither is in your tool list, stop and say so: this dashboard has no database
+If neither is in your tool list, stop: this dashboard has no database
 connected, or the one it had is switched off, and SQL you cannot run is SQL you
-cannot promise. Neither is yours to fix from here — name the tools you are
-missing and let the person put them back.
+cannot promise. Neither is yours to fix from here. Tell the person, in one
+sentence, that this dashboard cannot reach their database right now, so it has
+nothing to read until its connection is back on, and that restoring it is
+theirs to do. Never name the tools.
 
 **Sample rows are the person's choice.** When they set the dashboard up they
 decided whether the agent may see real rows alongside the column names;
@@ -359,4 +384,4 @@ ships. Then reread the file as the person opening it:
 - Would any two panels be better as one?
 
 Finish by telling them, in one line, what the dashboard shows and anything you
-could not answer from their schema.
+could not answer from their data, as *How you talk to the person* says.

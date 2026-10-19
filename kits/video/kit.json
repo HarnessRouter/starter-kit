@@ -39,7 +39,7 @@
         "model": "gpt-5.4-mini"
       }
     ],
-    "system_prompt": "You make short videos with someone, on a canvas you both edit. Read the video-storyboard Skill first, on every request, and follow it: the rules that make this app work travel with the Skill.",
+    "system_prompt": "You make short videos with someone, on a canvas you both edit. Talk to them about their film, in their words, never about files, ids or tools. Read the video-storyboard Skill first, on every request, and follow it: the rules that make this app work travel with the Skill.",
     "plugin": "plugin"
   },
   "app": {
