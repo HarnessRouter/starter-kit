@@ -1,5 +1,6 @@
 // The few calls the shared transport does not already name, and the shapes it leaves to the app.
-import { hr, containerFileUrl, sessionDetail, sessionTurns } from 'reifyui/harness';
+import { hr, containerFileUrl, getResponse, sessionDetail, sessionTurns } from 'reifyui/harness';
+import { hasOutput, lastAssistantText } from './reply.js';
 
 export const jsonInit = (method, body) => ({ method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -39,7 +40,16 @@ export async function settled(sid, { timeoutMs = 15 * 60 * 1000, every = 3000 } 
 export async function lastText(sid) {
   const turns = await sessionTurns(sid, { limit: 1 });
   const t = turns[turns.length - 1];
-  return { id: String(t?.id || ''), user: String(t?.user || ''), text: String(t?.assistant || ''), status: String(t?.status || ''), files: t?.files || [] };
+  const id = String(t?.id || '');
+  // The turns feed joins every text of the turn. The room gets only the last assistant text
+  // (lib/reply.js), so it is read from the turn's own response; the feed's text stands only for
+  // a response that cannot be read.
+  let text = String(t?.assistant || '');
+  if (id) {
+    const res = await getResponse(id).catch(() => null);
+    if (hasOutput(res)) text = lastAssistantText(res);
+  }
+  return { id, user: String(t?.user || ''), text, status: String(t?.status || ''), files: t?.files || [] };
 }
 
 // ── files ──────────────────────────────────────────────────────────────────

@@ -21,6 +21,7 @@ import { handleOf } from './builder.js';
 import { parseMentions } from './mentions.js';
 import { appendMessage, isSkip, orphans, planPending, renderDelta, roundHeldByOther, teammateMessage, unseenFor } from './groupdoc.js';
 import { changedFiles, lastText, settled, sleep, turnInput } from './api.js';
+import { hasOutput, lastAssistantText } from './reply.js';
 
 const HEARTBEAT_MS = 15000;
 const TAKEOVER_WAIT_MS = 2000;   // after claiming the room, long enough for a racing claim to land
@@ -114,6 +115,7 @@ async function runTurn(ctx, job) {
   const sid0 = doc.bots?.[bot.id]?.session || '';
   let sid = sid0, rid = '';
   const live = { text: '', steps: [], status: 'running' };
+  let final = null;   // the terminal response, with every output item of the turn
   const emit = () => ctx.onLive?.(bot.id, { ...live, steps: live.steps.slice(), session: sid });
   emit();
   const attachments = [...(job.hop === 0 ? ctx.attachmentsFor?.(job.cause) || [] : []), ...(await handedFiles(inbox, bot.id))];
@@ -136,13 +138,16 @@ async function runTurn(ctx, job) {
         onTextDelta: (t) => { live.text += t; emit(); },
         onToolCall: (name, args, callId) => { live.steps.push({ name, args, callId }); emit(); },
         onToolResult: (callId, output) => { const s = live.steps.find((x) => x.callId === callId); if (s) { s.result = output; emit(); } },
-        onDone: (status) => { live.status = status || 'done'; emit(); },
+        onDone: (status, response) => { live.status = status || 'done'; final = response || null; emit(); },
       },
     });
   } catch (e) {
     r = { ok: false, error: e };
   }
-  let text = live.text, status = live.status;
+  // The room gets the teammate's last assistant text of the turn (lib/reply.js), not every text
+  // fragment it streamed: those ran the narration before a tool step into the reply. The live
+  // bubble above shows the fragments while the turn runs; the message is the reply.
+  let text = hasOutput(final) ? lastAssistantText(final) : live.text, status = live.status;
   if (r?.connecting) { status = 'connecting'; }
   else if (r?.dropped || (!text && sid)) {
     // The turn ran without this stream (a dropped stream, or an answer the stream did not carry):
