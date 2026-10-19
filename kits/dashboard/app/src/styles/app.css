@@ -137,12 +137,20 @@
  * object-fit: cover with a top anchor: the captures are wide boards (~1200x476) and the card art
  * box is a different aspect, so anchoring the top keeps the headline stats — the row that actually
  * distinguishes one template from another — rather than centring on empty chart whitespace. */
+/* The frame fills the card's 16:9 art box by STRETCHING (the box is a flex row): a stretched item
+   takes the box's definite height, which height: 100% would not be sure to resolve against, and
+   an explicit height would turn the stretch off. */
+.db-tpl-frame { position: relative; display: block; align-self: stretch; flex: 1 1 auto; min-width: 0; }
 .db-tpl-shot {
+  position: absolute; inset: 0;
   display: block; width: 100%; height: 100%;
   object-fit: cover; object-position: top center;
   background: var(--bg);
   pointer-events: none;                       /* the CARD takes the click */
+  opacity: 0;                                 /* the layout shape shows until the picture is in */
 }
+.db-tpl-shot.is-ready { opacity: 1; transition: opacity .15s ease-out; }
+@media (prefers-reduced-motion: reduce) { .db-tpl-shot.is-ready { transition: none; } }
 /* The preview control floats over the art, so it needs its own surface to stay legible. */
 .db-eye { background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-1); }
 

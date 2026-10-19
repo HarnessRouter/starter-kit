@@ -30,13 +30,17 @@ const KIT = path.resolve(HERE, '..', '..');   // scripts/ -> app/ -> kit root
 const OUT = path.join(KIT, 'templates', 'thumbs');
 const BASE = process.argv[2] || 'http://localhost:5173/kits/dashboard';
 const W = 1200;                       // board width; the card scales it down with object-fit
+// The board is laid out at W (narrower, the canvas collapses its columns) and captured at 0.6x:
+// a 720px picture is what a ~236px card needs on a 3x screen. At 2x the five pictures were 744 KB
+// on the first screen for cards a tenth of their width.
+const SCALE = 0.6;
 
 const tpl = JSON.parse(await readFile(path.join(KIT, 'templates', 'templates.json'), 'utf8'));
 const templates = Array.isArray(tpl) ? tpl : (tpl.templates || []);
 await mkdir(OUT, { recursive: true });
 
 const browser = await chromium.launch();
-const ctx = await browser.newContext({ viewport: { width: 1600, height: 1200 }, deviceScaleFactor: 2,
+const ctx = await browser.newContext({ viewport: { width: 1600, height: 1200 }, deviceScaleFactor: SCALE,
                                        ignoreHTTPSErrors: true });
 // A self-hosted console gates every page behind a session, so a headless run lands on /login and
 // finds no templates at all. Logging in through the same endpoint the login form posts to keeps
