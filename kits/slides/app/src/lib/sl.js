@@ -185,8 +185,12 @@ export function markViewed(id) {
 }
 export function relativeTime(ts) {
   if (!ts) return null;
-  const t = typeof ts === 'number' ? ts : Date.parse(ts);
+  // A number is an epoch time in either unit: the local record writes milliseconds, the session
+  // list sends seconds (created_at). Seconds read as milliseconds land in January 1970, which is
+  // what "Last opened" showed for a video made that night (staging, 2026-10-19).
+  let t = typeof ts === 'number' ? ts : (/^\d+(\.\d+)?$/.test(String(ts)) ? Number(ts) : Date.parse(ts));
   if (Number.isNaN(t)) return null;
+  if (t < 1e12) t *= 1000;
   const m = Math.floor((Date.now() - t) / 60000);
   if (m < 1) return 'just now';
   if (m < 60) return `${m} min ago`;

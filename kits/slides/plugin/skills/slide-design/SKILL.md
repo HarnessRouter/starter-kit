@@ -19,6 +19,28 @@ These travel with the Skill so that a deck made on any Harness that has it behav
 - Read it before every change and write it back whole. Validate with this Skill's
   `validate_deck.py` before you finish.
 - Work directly. Every command you spend orienting is a command the person waits through.
+- TALK TO THE PERSON ABOUT THEIR DECK, never about how it is made: no file names, JSON,
+  validators, this Skill, your working directory, commands, tests or tools. One short line of what
+  changed, then stop. *How you talk to the person*, below, is the whole rule.
+
+## How you talk to the person
+
+The person reads your replies in a pane beside their deck. Write every reply for them, about their
+deck, in their words: slides, titles, the story, the look, the speaker notes.
+
+- Never mention how the deck is made. No file names (not even `deck.json`), paths, JSON, fields or
+  ids, validators, this Skill, its rules or contracts, your working directory, commands, tests or
+  tools. Those are yours; the person has never seen them and should not have to.
+- When the work is done, reply with one short line of what changed, then stop: "Added a pricing
+  slide after Traction and gave the title slide more room." Not how you did it, what you checked,
+  or what passed.
+- Do not narrate the work before or while you do it: no "Reading the skill first", "Now writing the
+  deck", "No reference documents, so starting from scratch". Do the work, then say what changed.
+- No fallback chatter. If something failed along the way and you got there another way, the person
+  hears only the result. If part of what they asked for cannot be done, say so in one sentence, in
+  their terms, with what you did instead.
+- Ask a question only when the answer is theirs to give (who the audience is, how long the talk
+  runs), never about how to build the deck.
 
 You are designing a presentation, not filling a form.
 
@@ -93,8 +115,8 @@ them). Read them BEFORE planning — they are the starting point, not garnish:
   Pick the meaningful ones (logo, product shots — not decorations), crop or
   clean them in your workspace if needed (Pillow is available; or generate one with the imagegen skill), then reference them from an image element's `content.src`
   by workspace-relative path — a brand logo on the cover instantly grounds the deck.
-- Tell the user in one line what you extracted (e.g. "Working from your intro
-  deck: 12 slides, brand navy #0B2A4A + orange accent").
+- Say what you took from it in your closing line (e.g. "Built from your intro
+  deck: its 12 slides, brand navy and an orange accent.").
 
 ## 0.5 Template starter decks (when present)
 
@@ -195,4 +217,5 @@ Then reread the file you just wrote, as a designer:
 - Any slide with > 5 elements or > 60% coverage → split or cut.
 - Any orphan default styling (wrong ink on custom background)?
 - Does the arc land the deck's one job?
-Fix what fails, then summarize the deck for the user in their terms.
+Fix what fails, then reply to the person as *How you talk to the person* says:
+one short line about their deck.

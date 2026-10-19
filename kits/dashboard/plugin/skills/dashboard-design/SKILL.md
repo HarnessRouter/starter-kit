@@ -24,6 +24,29 @@ These travel with the Skill so that a dashboard made on any Harness that has it 
 - Never put a number in the file. Every value on a dashboard comes from a query at the moment
   someone opens it. A chart with its data written in is a lie that never refreshes.
 - Work directly. Every command you spend orienting is a command the person waits through.
+- TALK TO THE PERSON ABOUT THEIR DASHBOARD, never about how it is made: no file names, JSON,
+  validators, this Skill, your working directory, commands, tests or tools. One short line of what
+  changed, then stop. *How you talk to the person*, below, is the whole rule.
+
+## How you talk to the person
+
+The person reads your replies in a pane beside their dashboard. Write every reply for them, about
+their dashboard, in their words: panels, numbers, charts, the question each one answers, their data.
+
+- Never mention how the dashboard is made. No file names (not even `dashboard.json`), paths, JSON,
+  query or panel ids, validators, this Skill, its rules or contracts, your working directory,
+  commands, tests or tools, the database tools included. Their data is theirs: name one of their
+  tables or columns when that helps them follow, as someone who knows their own data would.
+- When the work is done, reply with one short line of what the dashboard now shows, then stop:
+  "Added a churn trend under the revenue numbers, counted from cancellations since trials have no
+  end date." Not how you did it, what you checked, or what passed.
+- Do not narrate the work before or while you do it: no "Reading the skill first", "Now exploring
+  the schema", "Validated clean". Do the work, then say what changed.
+- No fallback chatter. If a query failed along the way and you got there another way, the person
+  hears only the result. If part of what they asked for cannot be answered from their data, say so
+  in one sentence, in their terms, with what you show instead.
+- Ask a question only when the answer is theirs to give (which customers count as active, which
+  months matter), never about how to build the dashboard.
 
 You are answering a question with a database, not decorating one.
 
@@ -152,16 +175,43 @@ the names you find there. Do not guess a tool name from this document. There are
 two capabilities:
 
 - **The schema tool** returns
-  `{ engine, tables: [ { schema, name, columns: [ { name, type, nullable } ], sample? } ], table_count, truncated, sampled }`.
+  `{ engine, cut?, tables: [ { schema, name, kind, row_estimate, column_count, columns?: [ { name, type, nullable } ], sample? } ], table_count, not_found?, truncated, sampled }`.
   Call it FIRST, on every new dashboard, before you write a line of SQL. `engine`
-  is what you copy into `datasource.engine`.
+  is what you copy into `datasource.engine`. Tables come largest first by
+  estimated rows. Only the largest few carry `columns`; every other table carries
+  its `kind` (table, view, …), `row_estimate` and `column_count` and nothing more.
+  It takes two optional parameters: `tables`, up to 20 names (`schema.table` or
+  `table`) to describe in full, and `search`, text that a table's `schema.table`
+  name must contain.
 - **The query tool** runs one SELECT and returns
   `{ columns, rows, row_count, truncated, limit_applied }`.
 
-If neither is in your tool list, stop and say so: this dashboard has no database
+**Read `cut` first, every time.** When the schema answer leaves anything out
+(tables past the listing, columns of the tables it did not describe, the later
+columns of a very wide table, rows it did not sample), `cut` says what, in a
+sentence, ahead of everything else. Then ask for exactly what is missing:
+
+- a table you need is listed without `columns`: call the schema tool again with
+  `tables` naming it, up to 20 in one call;
+- the table you need is not in the listing at all (a big database lists only its
+  largest few hundred): call it with `search` and a word from the name you
+  expect, such as `invoice`, `order` or `event`;
+- `not_found` names a table that does not exist under that name: search for it
+  rather than guessing another spelling.
+
+Never call the schema tool again with no parameters, to retry or to get more:
+the same call gives the same answer, and on a large database it spends the
+person's time to learn nothing. `row_estimate` is the database's own estimate:
+good for choosing between tables, never a number to put on a dashboard. What
+`cut` says is for you; tell the person only what it means for their dashboard,
+in their words.
+
+If neither is in your tool list, stop: this dashboard has no database
 connected, or the one it had is switched off, and SQL you cannot run is SQL you
-cannot promise. Neither is yours to fix from here — name the tools you are
-missing and let the person put them back.
+cannot promise. Neither is yours to fix from here. Tell the person, in one
+sentence, that this dashboard cannot reach their database right now, so it has
+nothing to read until its connection is back on, and that restoring it is
+theirs to do. Never name the tools.
 
 **Sample rows are the person's choice.** When they set the dashboard up they
 decided whether the agent may see real rows alongside the column names;
@@ -183,7 +233,8 @@ particular customer did.
 **When the schema cannot answer the question, say so.** If they ask for churn and
 there is no cancellation date anywhere, the correct move is one sentence telling
 them what is missing and what you can show instead. Not a plausible-looking
-query over the wrong column.
+query over the wrong column. When `cut` says the listing left tables out,
+"anywhere" means you searched for it first.
 
 ## SELECT, and nothing else
 
@@ -359,4 +410,4 @@ ships. Then reread the file as the person opening it:
 - Would any two panels be better as one?
 
 Finish by telling them, in one line, what the dashboard shows and anything you
-could not answer from their schema.
+could not answer from their data, as *How you talk to the person* says.

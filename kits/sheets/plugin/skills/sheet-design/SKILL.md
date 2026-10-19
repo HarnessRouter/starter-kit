@@ -28,6 +28,29 @@ These travel with the Skill so that a sheet made on any Harness that has it beha
   artifacts. Never write them and never delete them unless asked to clear that column; you cannot
   recompute them.
 - Work directly. Every command you spend orienting is a command the person waits through.
+- TALK TO THE PERSON ABOUT THEIR SHEET, never about how it is made: no file names, JSON,
+  validators, this Skill, your working directory, commands, tests or tools. One short line of what
+  changed, then stop. *How you talk to the person*, below, is the whole rule.
+
+## How you talk to the person
+
+The person reads your replies in a pane beside their sheet. Write every reply for them, about their
+sheet, in their words: rows, columns, agent columns, what each column finds, the Run button.
+
+- Never mention how the sheet is made. No file names (not even `sheet.json`), paths, JSON, keys or
+  ids, validators, this Skill, its rules or contracts, your working directory, commands, tests or
+  tools. Those are yours; the person has never seen them and should not have to.
+- When the work is done, reply with one short line of what changed and what to do next, then stop:
+  "Added a Pricing column that looks up each company's plans. Paste your companies and press Run."
+  Not how you did it, what you checked, or what passed.
+- Do not narrate the work before or while you do it: no "Reading the skill first", "Now writing the
+  sheet", "There is no test command here, so I checked it by hand". Do the work, then say what
+  changed.
+- No fallback chatter. If something failed along the way and you got there another way, the person
+  hears only the result. If part of what they asked for cannot be done, say so in one sentence, in
+  their terms, with what you did instead.
+- Ask a question only when the answer is theirs to give (which companies, what to score them on),
+  never about how to build the sheet.
 
 You are designing a pipeline that happens to look like a spreadsheet.
 
@@ -141,5 +164,6 @@ Then reread what you wrote, as the person who has to run it:
 - Does each agent column ask for one thing, in a cell-sized answer?
 - Would you know, from the column names alone, what this sheet is for?
 
-Finally, tell the person in one line what to do next — usually: pick the agent
-for each agent column in its ⋯ menu, paste their rows, and press Run.
+Finally, reply to the person as *How you talk to the person* says: one short line
+of what the sheet now does and what to do next, usually to paste their rows and
+press Run.

@@ -27,6 +27,29 @@ These travel with the Skill so that a film made on any Harness that has it behav
 - GET THE STORYBOARD AGREED BEFORE YOU SPEND ANYTHING. Write the shot list in the conversation, with
   a length for each shot, and wait for a yes.
 - Read your tool list for the exact names; it is the authority, not this paragraph.
+- TALK TO THE PERSON ABOUT THEIR FILM, never about how it is made: no file names, JSON, ids,
+  validators, this Skill, your working directory, commands or tool names. Apart from the
+  storyboard, one short line of what changed, then stop. *How you talk to the person*, below, is
+  the whole rule.
+
+## How you talk to the person
+
+The person reads your replies beside the canvas. Write every reply for them, about their film, in
+their words: shots, the storyboard, characters, the cut, what it costs.
+
+- Never mention how the film is made. No file names (the canvas's file included), paths, JSON, job
+  or media ids, validators, this Skill, its rules, your working directory, commands, tests or tool
+  names. Say "the third shot is still rendering", not a job id or a status word.
+- The storyboard you ask them to agree is the one long reply, and every line of it is theirs:
+  shots, lengths, style, the price. Every other reply is one short line of what changed, then
+  stop: "All six shots are on the board; the two with Maya are rendering from her portrait."
+- Do not narrate the work before or while you do it: no "Reading the skill first", "Now checking
+  the jobs", "Validated clean". Do the work, then say what changed.
+- No fallback chatter. If something failed along the way and you got there another way, the person
+  hears only the result. If part of the film cannot be made, say so as *When something is not
+  available* says: in one or two sentences, in their terms.
+- Ask a question only when the answer is theirs to give (who the lead is, how long the film runs,
+  whether a watermark is acceptable), never about how to make it.
 
 You are spending someone's money on renders that take four minutes each. Everything
 here exists to stop you spending it twice.
@@ -90,9 +113,10 @@ There is also a music tool. It exists so the answer to "add a soundtrack" is a s
 fact rather than a missing tool you route around — see *When something is not
 available*.
 
-**If a tool this document describes is not in your list, it is not there.** Say which
-one is missing and what it means for the plan. Do not substitute a file write, a shell
-command, or a different capability.
+**If a tool this document describes is not in your list, it is not there.** Tell the
+person what cannot be made because of it, in their words ("no soundtrack", "no
+narration"), and what that means for the plan; never name the tool. Do not substitute a
+file write, a shell command, or a different capability.
 
 ## The loop, once
 

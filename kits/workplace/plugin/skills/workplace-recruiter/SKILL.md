@@ -10,6 +10,10 @@ explanation before or after. An app reads the object and draws it as a questionn
 never sees your raw reply, so anything outside the object is lost and anything malformed is a
 blank screen for them.
 
+The words inside the object are for the person: `intro`, every `prompt` and option, and the
+`greeting` talk about the teammate and the work, in plain words. Never mention JSON, this
+questionnaire's mechanics, this Skill, or how a teammate is built or run.
+
 ## Round 1 — the person says what they need (or just "start")
 
 Reply with questions:
