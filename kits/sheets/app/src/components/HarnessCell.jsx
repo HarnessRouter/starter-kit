@@ -1,7 +1,8 @@
 // What an agent cell looks like in the grid.
 //
-// Mounted through SheetGrid's renderCell slot, inside the cell's own value box, so the row-height
-// line clamp and the cell chrome still apply.
+// Mounted through SheetGrid's renderCell slot, inside the cell's own value box, so the cell chrome
+// still applies and the row fits this cell the way it fits any other: the answer wraps, the row
+// grows to it up to the grid's cap, and past the cap the cell scrolls.
 //
 // Every state here is a state the run genuinely produces. There is no percentage and no estimate:
 // the server exposes no queue — past its concurrency limit turns are accepted and block silently,
@@ -81,7 +82,7 @@ export function HarnessCell({ cell, live, readOnly, onRun, onPreviewFile }) {
     return (
       <span className="hcell failed" title={cell.error || ''}>
         <span className="hcell-dot failed" />
-        <span className="hcell-txt" data-shg-clamp-text>{cell.error || 'This cell failed.'}</span>
+        <span className="hcell-txt">{cell.error || 'This cell failed.'}</span>
         {tools}
       </span>
     );
@@ -89,14 +90,14 @@ export function HarnessCell({ cell, live, readOnly, onRun, onPreviewFile }) {
   if (status === 'skipped') {
     return (
       <span className="hcell skipped" title={cell.error || ''}>
-        <span className="hcell-txt" data-shg-clamp-text>{cell.error || 'Skipped.'}</span>
+        <span className="hcell-txt">{cell.error || 'Skipped.'}</span>
         {tools}
       </span>
     );
   }
   return (
     <span className="hcell">
-      <span className="hcell-txt" data-shg-clamp-text><AnswerText value={cell.value} /></span>
+      <span className="hcell-txt"><AnswerText value={cell.value} /></span>
       <Artifacts artifacts={cell.artifacts} onPreview={onPreviewFile} />
       {tools}
     </span>
