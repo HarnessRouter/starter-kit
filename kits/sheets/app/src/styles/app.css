@@ -114,16 +114,15 @@
    took a fixed slice of every cell and the answer was ellipsised to pay for it, in every row,
    whether that row produced a file or not. */
 .hcell { display: flex; flex-direction: column; align-items: stretch; gap: 5px; min-width: 0; width: 100%; }
-.hcell-txt {
-  min-width: 0; overflow: hidden; text-overflow: ellipsis;
-  display: -webkit-box; -webkit-box-orient: vertical;
-  -webkit-line-clamp: var(--shg-clamp, 1); line-clamp: var(--shg-clamp, 1);
-}
+/* The answer in full, the way the grid draws its own text: its line breaks kept, a long word or
+   address broken at the cell's edge, on the grid's 18px line. The grid's value box caps the
+   cell's height and scrolls past it, so nothing here clamps or ellipsises. */
+.hcell-txt { min-width: 0; line-height: 18px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .hcell-link { font-size: 12px; color: var(--brand-ink); text-decoration: none; }
 .hcell-link:hover { text-decoration: underline; }
 .hcell.failed .hcell-txt { color: #B91C1C; }
 .hcell.skipped .hcell-txt { color: var(--mute-2); font-style: italic; }
-.hcell-live { color: var(--mute); font-size: 12px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hcell-live { color: var(--mute); font-size: 12px; line-height: 18px; min-width: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 
 .hcell-dot { width: 7px; height: 7px; border-radius: 999px; flex: none; margin-top: 5px; }
 .hcell-dot.queued { background: var(--mute-2); }
