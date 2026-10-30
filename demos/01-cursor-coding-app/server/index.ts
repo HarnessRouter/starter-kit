@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express, { type Request, type Response } from 'express';
 import { authenticate, DEMO_USERS } from './auth.js';
+import { contentDisposition } from './disposition.js';
 import { OwnershipStore } from './store.js';
 import type { RunRecord } from './types.js';
 
@@ -251,7 +252,7 @@ app.get('/api/sessions/:sessionId/files/:fileId/preview', async (req, res) => {
     if (!upstream.ok || !upstream.body) return res.status(upstream.status).json({ error: 'Preview unavailable' });
     const mediaType = officeTypes.has(found.file.media_type) ? 'application/pdf' : found.file.media_type || 'application/octet-stream';
     res.setHeader('Content-Type', mediaType);
-    res.setHeader('Content-Disposition', `inline; filename="${path.basename(found.file.path).replace(/["\r\n]/g, '_')}"`);
+    res.setHeader('Content-Disposition', contentDisposition('inline', found.file.path));
     const bytes = Buffer.from(await upstream.arrayBuffer());
     res.send(bytes);
   } catch (error) {
@@ -265,9 +266,8 @@ app.get('/api/sessions/:sessionId/files/:fileId/download', async (req, res) => {
     if (!found) return;
     const upstream = await fetch(`${apiBase}/v1/containers/${encodeURIComponent(found.record.sessionId)}/files/${encodeURIComponent(found.file.file_id)}/content`, { headers: upstreamHeaders() });
     if (!upstream.ok || !upstream.body) return res.status(upstream.status).json({ error: 'Download unavailable' });
-    const filename = path.basename(found.file.path).replace(/["\r\n]/g, '_');
     res.setHeader('Content-Type', found.file.media_type || 'application/octet-stream');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Disposition', contentDisposition('attachment', found.file.path));
     res.send(Buffer.from(await upstream.arrayBuffer()));
   } catch (error) {
     errorResponse(res, error);
