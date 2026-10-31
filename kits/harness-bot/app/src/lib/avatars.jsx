@@ -1,7 +1,7 @@
 // The faces: the Harness Bot mascot, animated, in the kit's six colours. Each is a 256px loop on
-// white, drawn in a circle the way a profile photo is, so it reads on any background (the dark
-// rail, a coloured bubble) and is the same face at 20px in the sidebar and at 96px on the
-// creation screen. Someone who asked their system for less motion gets the first frame, still.
+// white, drawn in a circle the way a profile photo is, so it reads on any background (the grey
+// room list, the white room, a dark page around an embedded app) and is the same face at 20px in a
+// menu and at 96px on the creation screen. Someone who asked their system for less motion gets the first frame, still.
 import React from 'react';
 import { COLOR_IDS, COLOR_LABELS, avatarOf, DEFAULT_AVATAR, RECRUITER_AVATAR } from './faces.js';
 import amber from '../assets/faces/harness-bot-amber.gif';

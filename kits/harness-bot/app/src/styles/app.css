@@ -305,7 +305,9 @@
 .wp-lib { max-width: 1180px; margin: 0 auto; padding: 20px 20px 48px; }
 .wp-lib-empty { color: var(--ink-3); margin: 0; }
 .wp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(224px, 1fr)); gap: 14px; }
-.wp-art { display: flex; flex-direction: column; text-align: left; padding: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); overflow: hidden; cursor: pointer; color: var(--ink); font: inherit; transition: box-shadow 120ms, border-color 120ms; }
+/* min-width 0: a grid item is as wide as its longest unbroken file name otherwise, and at phone width the
+   second column ran past the screen. */
+.wp-art { min-width: 0; display: flex; flex-direction: column; text-align: left; padding: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); overflow: hidden; cursor: pointer; color: var(--ink); font: inherit; transition: box-shadow 120ms, border-color 120ms; }
 .wp-art:hover { border-color: var(--ink-4); box-shadow: 0 6px 20px rgba(29, 29, 31, 0.08); }
 .wp-art:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 .wp-art-prev { position: relative; aspect-ratio: 4 / 3; background: var(--soft); border-bottom: 1px solid var(--line-soft); display: flex; align-items: center; justify-content: center; overflow: hidden; }
