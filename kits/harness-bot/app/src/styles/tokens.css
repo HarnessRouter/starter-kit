@@ -1,0 +1,74 @@
+/* Harness Bot design tokens. The room is white paper; the furniture around it (the room list,
+   the details panel) is the soft grey of a desktop app; the person speaks in black bubbles and a
+   teammate in grey ones; one blue is the accent for links, focus and "new". Flat colours, no
+   gradients, the system typeface. */
+:root {
+  --accent: #2F7BF6;
+  --accent-ink: #1E63D6;
+  --accent-soft: #DCE9FF;
+
+  --hot: #E23D3A;
+  --hot-soft: #FDE8E7;
+  --ok: #38C25D;
+
+  --paper: #FFFFFF;
+  --soft: #F5F5F7;
+  --soft-2: #E8E8ED;
+  --line: #E5E5EA;
+  --line-soft: #EFEFF3;
+
+  --ink: #1D1D1F;
+  --ink-2: #515154;
+  --ink-3: #86868B;
+  --ink-4: #AEAEB2;
+
+  --bubble-me: #1D1D1F;
+  --bubble-me-ink: #FFFFFF;
+  --bubble-them: #F2F2F7;
+
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 18px;
+  --r-pill: 999px;
+  --shadow-1: 0 1px 2px rgba(29, 29, 31, 0.06);
+  --shadow-2: 0 8px 24px rgba(29, 29, 31, 0.10);
+  --shadow-3: 0 18px 48px rgba(29, 29, 31, 0.18);
+
+  /* The shared surface reads its palette through these. */
+  --uic-brand: var(--accent);
+  --uic-brand-ink: var(--accent-ink);
+  --uic-brand-soft: var(--accent-soft);
+  --uic-brand-50: #EEF4FF;
+  --uic-bg: var(--soft);
+  --uic-surface: var(--paper);
+  --uic-surface-2: var(--soft);
+  --uic-line: var(--line);
+  --uic-line-soft: var(--line-soft);
+  --uic-ink: var(--ink);
+  --uic-ink-2: var(--ink-2);
+  --uic-ink-3: var(--ink-3);
+  --uic-ink-4: var(--ink-4);
+  --uic-hot: var(--hot);
+  --uic-hot-soft: var(--hot-soft);
+  --uic-ok: var(--ok);
+  --uic-font: var(--font);
+  --uic-mono: var(--mono);
+  --uic-r-sm: var(--r-sm);
+  --uic-r-md: var(--r-md);
+  --uic-r-lg: var(--r-lg);
+  --uic-r-input: 10px;
+  --uic-shadow-1: var(--shadow-1);
+  --uic-shadow-2: var(--shadow-2);
+  --uic-shadow-3: var(--shadow-3);
+  --uic-skel: var(--line);
+  --uic-mention-color: var(--accent);
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body { font-family: var(--font); color: var(--ink); background: var(--paper); -webkit-font-smoothing: antialiased; font-size: 14px; line-height: 1.45; }
+button, input, textarea { font-family: inherit; }
+a { color: var(--accent-ink); }
