@@ -1,10 +1,9 @@
 <div align="center">
-  <a href="https://harnessrouter.ai">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset=".github/images/logo-dark.png">
-      <source media="(prefers-color-scheme: light)" srcset=".github/images/logo-light.png">
-      <img alt="HarnessRouter" src=".github/images/logo-light.png" width="55%">
-    </picture>
+  <a href="https://harnessrouter.ai#gh-light-mode-only">
+    <img alt="HarnessRouter" src=".github/images/logo-light.png#gh-light-mode-only" width="55%">
+  </a>
+  <a href="https://harnessrouter.ai#gh-dark-mode-only">
+    <img alt="HarnessRouter" src=".github/images/logo-dark.png#gh-dark-mode-only" width="55%">
   </a>
 </div>
 
