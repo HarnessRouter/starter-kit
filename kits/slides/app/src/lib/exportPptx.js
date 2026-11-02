@@ -11,6 +11,7 @@
 // pptxgenjs is imported by this module ONLY, so it lands in its own chunk and costs nothing until
 // someone actually exports.
 import { ROLE_STYLE } from 'reifyui/slides';   // one source of truth — never re-declare it here
+import { codeRuns, flowchartSource } from './deckContent.js';
 
 const PX_IN = 13.333 / 1920;
 const inch = (v) => +((v || 0) * PX_IN).toFixed(4);
@@ -139,7 +140,7 @@ async function addChart(slide, el, notes) {
 }
 
 async function addFlowchart(slide, el, notes) {
-  const src = (el.content || {}).code || (el.content || {}).text;
+  const src = flowchartSource(el);
   if (!src) return false;
   const mermaid = (await import('mermaid')).default;
   // htmlLabels:false matters — with it on, mermaid emits <foreignObject>, the one shape that
@@ -236,7 +237,7 @@ export async function downloadPptx(deck, resolveSrc, onProgress) {
         } else if (el.type === 'chart') {
           await addChart(slide, el, notes);
         } else if (el.type === 'flowchart') {
-          await addFlowchart(slide, el, notes);
+          if (!(await addFlowchart(slide, el, notes))) notes.dropped.push(`a diagram on slide ${i + 1} with no Mermaid source`);
         } else if (el.type === 'embed') {
           const html = el.content?.html || '';
           if (/<svg/i.test(html)) {
@@ -250,10 +251,12 @@ export async function downloadPptx(deck, resolveSrc, onProgress) {
             notes.dropped.push('an embedded block that is not an image');
           }
         } else if (el.type === 'code') {
-          const props = textProps({ ...el, content: { ...el.content, role: 'body' } }, theme);
+          const props = textProps({ ...el, content: { ...el.content, runs: codeRuns(el), role: 'body' } }, theme);
           if (props.length) {
             slide.addText(props.map((p) => ({ ...p, options: { ...p.options, fontFace: 'Consolas' } })),
                           { ...frameOf(el), valign: 'top', margin: 0, inset: 0, isTextBox: true, fit: 'none' });
+          } else {
+            notes.dropped.push(`a code block on slide ${i + 1} with no text`);
           }
         }
       } catch (e) {
